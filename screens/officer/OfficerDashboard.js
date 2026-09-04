@@ -30,7 +30,8 @@ import { useLang } from '../../i18n/LanguageContext';
 
 const DUTY_LABEL = {
   gate: 'गेट अधिकारी',
-  weighbridge: 'तौल एवं ग्रेडिंग',
+  assay: 'गुणवत्ता निरीक्षक',
+  weighbridge: 'तौल अधिकारी',
   accounts: 'लेखा व भुगतान',
   admin: 'मंडी प्रशासक',
 };

@@ -22,8 +22,10 @@ import {
   subscribeToQueue,
   buildQueueView,
   cancelBooking,
+  fixPrice,
   STATUS,
 } from '../../services/bookings';
+import { CROP_LIST } from '../../services/centres';
 import { downloadReceiptPdf, downloadGatePassPdf } from '../../services/receipt';
 import GatePassCard from '../../components/GatePassCard';
 
@@ -38,6 +40,7 @@ const STAGES = [
   { key: STATUS.BOOKED, label: 'बुकिंग हुई' },
   { key: STATUS.IN_GATE, label: 'गेट प्रवेश' },
   { key: STATUS.ASSAY, label: 'गुणवत्ता जांच' },
+  { key: STATUS.PRICE_FIXED, label: 'भाव तय (MSP / नीलामी)' },
   { key: STATUS.WEIGHING, label: 'तौल' },
   { key: STATUS.PAYMENT_PENDING, label: 'भुगतान तैयार' },
   { key: STATUS.PAID, label: 'भुगतान पूरा' },
@@ -54,6 +57,7 @@ export default function TokenDetailScreen({ navigation, route }) {
   const [cancelling, setCancelling] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingPass, setDownloadingPass] = useState(false);
+  const [fixing, setFixing] = useState(false);
 
   const unsubQueue = useRef(null);
 
@@ -135,6 +139,31 @@ export default function TokenDetailScreen({ navigation, route }) {
 
   const view = buildQueueView(token, queue);
   const currentIndex = STAGE_ORDER.indexOf(token.status);
+
+  const msp = CROP_LIST.find((c) => c.id === token?.crop)?.msp || 0;
+
+  const acceptMsp = () => {
+    Alert.alert(
+      'MSP पर बेचें?',
+      `₹${msp} प्रति क्विंटल पर सरकारी एजेंसी को बेचने की पुष्टि करें। इसके बाद तौल होगा।`,
+      [
+        { text: 'नहीं', style: 'cancel' },
+        {
+          text: 'हाँ, MSP पर बेचें',
+          onPress: async () => {
+            setFixing(true);
+            try {
+              await fixPrice(tokenId, { mode: 'msp', ratePerQuintal: msp });
+            } catch (error) {
+              Alert.alert('त्रुटि', error?.message || 'भाव तय नहीं हुआ।');
+            } finally {
+              setFixing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleGatePass = async () => {
     setDownloadingPass(true);
@@ -268,6 +297,55 @@ export default function TokenDetailScreen({ navigation, route }) {
           />
           <Row label="वाहन" value={token.vehicleNumber || 'गेट पर दर्ज होगा'} />
         </View>
+
+        {/* Price decision: after assay, before weighing */}
+        {token.status === STATUS.ASSAY ? (
+          <View style={[styles.card, styles.priceCard]}>
+            <Text style={styles.cardTitle}>भाव तय करें</Text>
+            <Text style={styles.priceHint}>
+              जांच पूरी हो गई (ग्रेड {token.grade}). अब बताएं कि आप कैसे बेचना चाहते हैं। भाव तय होने के बाद ही तौल होगा।
+            </Text>
+
+            <View style={styles.priceOption}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.priceTitle}>सरकारी खरीद (MSP)</Text>
+                <Text style={styles.priceBig}>₹{msp} / क्विंटल</Text>
+                <Text style={styles.priceSub}>निश्चित भाव, तुरंत आगे बढ़ें</Text>
+              </View>
+              <PrimaryButton
+                title="MSP पर बेचें"
+                loading={fixing}
+                onPress={acceptMsp}
+                style={{ height: 44, paddingHorizontal: 14 }}
+              />
+            </View>
+
+            <View style={[styles.priceOption, { opacity: 0.55 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.priceTitle}>व्यापारी नीलामी (e-Auction)</Text>
+                <Text style={styles.priceSub}>
+                  जल्द आ रहा है — व्यापारियों की लाइव बोली
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {token.ratePerQuintal && token.status !== STATUS.ASSAY ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>तय भाव</Text>
+            <Row
+              label="भाव"
+              value={`₹${token.ratePerQuintal} / क्विंटल`}
+              bold
+            />
+            <Row
+              label="माध्यम"
+              value={token.priceMode === 'auction' ? 'नीलामी' : 'MSP'}
+            />
+            <Row label="खरीदार" value={token.buyerName} />
+          </View>
+        ) : null}
 
         {/* Assay results, once recorded */}
         {token.assayAt ? (
@@ -421,6 +499,21 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   receiptCard: { borderColor: Colors.secondary, borderWidth: 2 },
+  priceCard: { borderColor: '#F59E0B', borderWidth: 2 },
+  priceHint: { color: Colors.subText, fontSize: 12, marginBottom: 12 },
+  priceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  priceTitle: { fontWeight: '800', color: Colors.navy, fontSize: 13 },
+  priceBig: { fontWeight: '900', color: '#16A34A', fontSize: 20 },
+  priceSub: { color: Colors.subText, fontSize: 11 },
   cardTitle: {
     fontSize: 14,
     fontWeight: '800',
