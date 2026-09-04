@@ -1,0 +1,125 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import AppHeader from '../../components/AppHeader';
+import PrimaryButton from '../../components/PrimaryButton';
+import GatePassCard from '../../components/GatePassCard';
+import Colors from '../../theme/colors';
+import { downloadGatePassPdf } from '../../services/receipt';
+
+/*
+ * Shown once, right after booking. The farmer gets the token
+ * number AND the gate pass (QR + 6-digit number) together.
+ */
+export default function TokenConfirmationScreen({ navigation, route }) {
+  const { booking } = route.params || {};
+  const [downloading, setDownloading] = useState(false);
+
+  const savePass = async () => {
+    setDownloading(true);
+    try {
+      await downloadGatePassPdf(booking);
+    } catch (error) {
+      console.error('Gate pass PDF error:', error);
+      Alert.alert('PDF नहीं बना', error?.message || 'कृपया दोबारा प्रयास करें।');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // popToTop always lands on the first screen of the farmer stack
+  // (the dashboard) whatever its route name is.
+  const goHome = () => navigation.popToTop();
+
+  if (!booking) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader navigation={navigation} />
+        <Text style={styles.empty}>बुकिंग जानकारी नहीं मिली</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader navigation={navigation} />
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.success}>
+          <Ionicons name="checkmark-circle" size={64} color="#16A34A" />
+          <Text style={styles.successTitle}>टोकन बुक हो गया!</Text>
+          <Text style={styles.successSub}>आपका टोकन नंबर</Text>
+          <Text style={styles.tokenNumber}>{booking.tokenNumber}</Text>
+          <Text style={styles.eta}>
+            अनुमानित बारी: {booking.estimatedTurnTime || booking.slotWindow}
+          </Text>
+        </View>
+
+        <GatePassCard token={booking} />
+
+        <PrimaryButton
+          title="⬇  गेट पास PDF सेव करें"
+          variant="outline"
+          loading={downloading}
+          onPress={savePass}
+        />
+
+        <View style={styles.tips}>
+          <Text style={styles.tipTitle}>गेट पर क्या करें?</Text>
+          <Text style={styles.tip}>1. यह QR या 6-अंकों का गेट पास नंबर दिखाएँ</Text>
+          <Text style={styles.tip}>2. अपना वाहन नंबर बताएँ</Text>
+          <Text style={styles.tip}>3. गेट अधिकारी आपको अंदर भेजेंगे</Text>
+          <Text style={styles.tipNote}>
+            यह गेट पास आपके टोकन पेज पर भी हमेशा उपलब्ध रहेगा।
+          </Text>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <PrimaryButton
+          title="डैशबोर्ड पर जाएँ"
+          onPress={goHome}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: 18, paddingBottom: 30 },
+  empty: { textAlign: 'center', marginTop: 40, color: Colors.subText },
+
+  success: { alignItems: 'center', marginBottom: 18, marginTop: 6 },
+  successTitle: { fontSize: 20, fontWeight: '900', color: Colors.navy, marginTop: 8 },
+  successSub: { fontSize: 12, color: Colors.subText, marginTop: 10, fontWeight: '700' },
+  tokenNumber: { fontSize: 44, fontWeight: '900', color: Colors.primary },
+  eta: { fontSize: 13, color: Colors.navy, fontWeight: '700', marginTop: 2 },
+
+  tips: {
+    backgroundColor: Colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 16,
+    marginTop: 14,
+  },
+  tipTitle: { fontWeight: '900', color: Colors.navy, marginBottom: 8 },
+  tip: { color: Colors.text, marginBottom: 4, fontSize: 13 },
+  tipNote: { color: Colors.subText, fontSize: 11, marginTop: 6 },
+
+  footer: {
+    padding: 18,
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+});

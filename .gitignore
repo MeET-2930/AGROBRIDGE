@@ -13,3 +13,10 @@ web-build/
 .env.local
 services/firebase.js
 .DS_Store
+
+# local secrets / junk
+services/firebase.js
+backup-before-*/
+AGROBRIDGE_files_backup/
+install*.sh
+seedCentres.js
