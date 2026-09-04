@@ -199,10 +199,15 @@ export default function TokenDetailScreen({ navigation, route }) {
           <Text style={styles.cardTitle}>प्रगति</Text>
 
           {STAGES.map((stage, index) => {
+            /*
+             * Each status means "this step is DONE". So the step
+             * matching the current status is green, and the NEXT
+             * step is the amber "in progress" one. Booking is
+             * complete the moment the token exists.
+             */
             const isPaid = token.status === STATUS.PAID;
-            const done =
-              isPaid || (currentIndex >= 0 && index < currentIndex);
-            const active = !isPaid && index === currentIndex;
+            const done = isPaid || (currentIndex >= 0 && index <= currentIndex);
+            const active = !isPaid && index === currentIndex + 1;
             const isLast = index === STAGES.length - 1;
 
             return (

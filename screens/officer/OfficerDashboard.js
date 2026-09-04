@@ -92,6 +92,7 @@ export default function OfficerDashboard({ navigation }) {
   const totals = {
     total: rows.length,
     waiting: rows.filter((r) => r.status === STATUS.BOOKED).length,
+    absent: rows.filter((r) => r.status === STATUS.NO_SHOW).length,
     inside: rows.filter((r) => INSIDE_STATUSES.includes(r.status)).length,
     paid: rows.filter((r) => r.status === STATUS.PAID).length,
     done: rows.filter((r) => CLOSED_STATUSES.includes(r.status)).length,
@@ -278,6 +279,13 @@ export default function OfficerDashboard({ navigation }) {
               {totals.paid}
             </Text>
             <Text style={styles.lbl}>भुगतान</Text>
+          </View>
+
+          <View style={styles.stat}>
+            <Text style={[styles.num, { color: '#EF9A9A' }]}>
+              {totals.absent}
+            </Text>
+            <Text style={styles.lbl}>अनुपस्थित</Text>
           </View>
         </View>
 

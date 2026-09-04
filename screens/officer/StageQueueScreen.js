@@ -7,8 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Modal,
-  TextInput,
   Alert,
 } from 'react-native';
 
@@ -17,13 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppHeader from '../../components/AppHeader';
 import ScreenTitle from '../../components/ScreenTitle';
-import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
 import {
   subscribeToTodaysQueue,
   getStageById,
-  markGateEntry,
   markNoShow,
   gatePassCodeOf,
 } from '../../services/bookings';
@@ -42,10 +38,6 @@ export default function StageQueueScreen({ navigation, route }) {
   const stage = getStageById(stageId);
 
   const [rows, setRows] = useState([]);
-  const [modal, setModal] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [vehicle, setVehicle] = useState('');
-  const [busy, setBusy] = useState(false);
 
   const unsub = useRef(null);
 
@@ -89,26 +81,6 @@ export default function StageQueueScreen({ navigation, route }) {
 
   const list = rows.filter((r) => stage.statuses.includes(r.status));
 
-  const openGate = (token) => {
-    setSelected(token);
-    setVehicle(token.vehicleNumber || '');
-    setModal(true);
-  };
-
-  const confirmGate = async () => {
-    if (!selected) return;
-    setBusy(true);
-
-    try {
-      await markGateEntry(selected.tokenId, vehicle);
-      setModal(false);
-    } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'गेट प्रवेश दर्ज नहीं हुआ।');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const noShow = (tokenId) => {
     Alert.alert('अनुपस्थित?', 'क्या किसान नहीं आया?', [
       { text: 'रद्द', style: 'cancel' },
@@ -128,7 +100,12 @@ export default function StageQueueScreen({ navigation, route }) {
 
   const runAction = (token) => {
     if (stage.action === 'gate') {
-      openGate(token);
+      /*
+       * Gate entry is ONLY allowed after the farmer's gate pass has
+       * been scanned or its number typed. Tapping a card just opens
+       * the scanner with that token highlighted as the expected one.
+       */
+      navigation.navigate('GateScan', { rows, expectTokenId: token.tokenId });
       return;
     }
 
@@ -220,7 +197,9 @@ export default function StageQueueScreen({ navigation, route }) {
                   style={styles.primary}
                   onPress={() => runAction(token)}
                 >
-                  <Text style={styles.primaryText}>{stage.actionLabel}</Text>
+                  <Text style={styles.primaryText}>
+                    {stage.action === 'gate' ? 'गेट पास स्कैन' : stage.actionLabel}
+                  </Text>
                   <Ionicons
                     name="arrow-forward"
                     size={16}
@@ -233,45 +212,6 @@ export default function StageQueueScreen({ navigation, route }) {
         )}
       </ScrollView>
 
-      <Modal visible={modal} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>वाहन नंबर दर्ज करें</Text>
-            <Text style={styles.sheetSub}>
-              टोकन {selected?.tokenNumber} • {selected?.farmerName}
-            </Text>
-            <Text style={styles.sheetPass}>
-              किसान का गेट पास नंबर: {gatePassCodeOf(selected)} — मिलान करें
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              value={vehicle}
-              onChangeText={setVehicle}
-              placeholder="HR 26 AB 1234"
-              placeholderTextColor="#999"
-              autoCapitalize="characters"
-            />
-
-            <Text style={styles.note}>
-              पुष्टि करते ही कतार आगे बढ़ जाएगी।
-            </Text>
-
-            <View style={styles.sheetRow}>
-              <TouchableOpacity onPress={() => setModal(false)}>
-                <Text style={styles.cancel}>रद्द</Text>
-              </TouchableOpacity>
-
-              <PrimaryButton
-                title="पुष्टि करें"
-                loading={busy}
-                onPress={confirmGate}
-                style={{ flex: 1, height: 44 }}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

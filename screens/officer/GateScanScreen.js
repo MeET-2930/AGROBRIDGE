@@ -25,6 +25,8 @@ import { findByGatePass, markGateEntry, STATUS } from '../../services/bookings';
  */
 export default function GateScanScreen({ navigation, route }) {
   const rows = route.params?.rows || [];
+  const expectTokenId = route.params?.expectTokenId || null;
+  const expected = rows.find((r) => r.tokenId === expectTokenId) || null;
 
   const [permission, requestPermission] = useCameraPermissions();
   const [typed, setTyped] = useState('');
@@ -53,6 +55,18 @@ export default function GateScanScreen({ navigation, route }) {
     if (hit.status !== STATUS.BOOKED) {
       Alert.alert('पहले से प्रवेश', `टोकन ${hit.tokenNumber} पहले ही अंदर है।`);
       locked.current = false;
+      return;
+    }
+
+    if (expected && hit.tokenId !== expected.tokenId) {
+      Alert.alert(
+        'दूसरा टोकन',
+        `यह पास ${hit.tokenNumber} का है, आपने ${expected.tokenNumber} चुना था। फिर भी ${hit.tokenNumber} को प्रवेश दें?`,
+        [
+          { text: 'नहीं', style: 'cancel', onPress: () => { locked.current = false; } },
+          { text: 'हाँ', onPress: () => { setMatch(hit); setVehicle(hit.vehicleNumber || ''); setHow(source); } },
+        ]
+      );
       return;
     }
 
@@ -100,6 +114,23 @@ export default function GateScanScreen({ navigation, route }) {
 
       {!match ? (
         <View style={{ flex: 1 }}>
+          {expected ? (
+            <View style={styles.expectBar}>
+              <Text style={styles.expectLabel}>प्रतीक्षित टोकन</Text>
+              <Text style={styles.expectToken}>{expected.tokenNumber}</Text>
+              <Text style={styles.expectName}>{expected.farmerName}</Text>
+              <Text style={styles.expectHint}>
+                किसान का गेट पास स्कैन करें या नंबर टाइप करें — बिना पास प्रवेश नहीं
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.expectBarPlain}>
+              <Text style={styles.expectHint}>
+                बिना गेट पास (QR / 6-अंक) के प्रवेश नहीं दिया जा सकता
+              </Text>
+            </View>
+          )}
+
           <View style={styles.cameraBox}>
             {permission?.granted ? (
               <CameraView
@@ -146,6 +177,11 @@ export default function GateScanScreen({ navigation, route }) {
         </View>
       ) : (
         <View style={styles.result}>
+          <View style={styles.verifiedTop}>
+            <Text style={styles.verifiedLabel}>✓ सत्यापित टोकन</Text>
+            <Text style={styles.verifiedToken}>{match.tokenNumber}</Text>
+          </View>
+
           <View style={styles.okBadge}>
             <Ionicons name="checkmark-circle" size={22} color="#16A34A" />
             <Text style={styles.okText}>
@@ -153,7 +189,6 @@ export default function GateScanScreen({ navigation, route }) {
             </Text>
           </View>
 
-          <Text style={styles.token}>{match.tokenNumber}</Text>
           <Text style={styles.name}>{match.farmerName}</Text>
           <Text style={styles.sub}>+91 {match.farmerPhone}</Text>
           <Text style={styles.sub}>
@@ -187,8 +222,29 @@ export default function GateScanScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  expectBar: {
+    backgroundColor: Colors.navy,
+    padding: 14,
+    alignItems: 'center',
+  },
+  expectBarPlain: { backgroundColor: Colors.navy, padding: 10, alignItems: 'center' },
+  expectLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700' },
+  expectToken: { color: Colors.white, fontSize: 34, fontWeight: '900' },
+  expectName: { color: Colors.white, fontWeight: '700' },
+  expectHint: { color: '#FFD54F', fontSize: 11, marginTop: 4, textAlign: 'center', fontWeight: '700' },
+
+  verifiedTop: {
+    backgroundColor: '#16A34A',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  verifiedLabel: { color: Colors.white, fontWeight: '800', fontSize: 12 },
+  verifiedToken: { color: Colors.white, fontWeight: '900', fontSize: 48 },
+
   cameraBox: {
-    height: 300,
+    height: 260,
     backgroundColor: '#000',
     overflow: 'hidden',
     alignItems: 'center',
