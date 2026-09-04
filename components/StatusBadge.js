@@ -9,7 +9,8 @@ import { View, Text, StyleSheet } from 'react-native';
 const MAP = {
   'booked': { bg: '#FFF8E1', color: '#F57F17', label: 'बुक / BOOKED' },
   'in-gate': { bg: '#E3F2FD', color: '#1565C0', label: 'गेट अंदर / IN GATE' },
-  'assay': { bg: '#EDE7F6', color: '#5E35B1', label: 'जांच / ASSAY' },
+  'assay': { bg: '#EDE7F6', color: '#5E35B1', label: 'जांच पूरी / ASSAYED' },
+  'price-fixed': { bg: '#E8F5E9', color: '#1B5E20', label: 'भाव तय / PRICE FIXED' },
   'weighing': { bg: '#E0F7FA', color: '#00838F', label: 'तौल / WEIGHING' },
   'payment-processing': { bg: '#FFF3E0', color: '#EF6C00', label: 'भुगतान बाकी' },
   'paid': { bg: '#E8F5E9', color: '#2E7D32', label: 'भुगतान / PAID' },

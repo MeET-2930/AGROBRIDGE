@@ -47,6 +47,7 @@ export const STATUS = {
   BOOKED: 'booked',
   IN_GATE: 'in-gate',
   ASSAY: 'assay',
+  PRICE_FIXED: 'price-fixed', // rate per quintal decided (MSP or auction)
   WEIGHING: 'weighing',
   PAYMENT_PENDING: 'payment-processing',
   PAID: 'paid',
@@ -59,6 +60,7 @@ export const STATUS = {
 export const INSIDE_STATUSES = [
   STATUS.IN_GATE,
   STATUS.ASSAY,
+  STATUS.PRICE_FIXED,
   STATUS.WEIGHING,
   STATUS.PAYMENT_PENDING,
 ];
@@ -390,6 +392,12 @@ export async function createBooking({
       tareWeightQuintals: null,
       actualQuantity: null,
 
+      // Pricing (decided after assay, before weighing)
+      priceMode: null, // 'msp' | 'auction'
+      priceFixedAt: null,
+      buyerId: null,
+      buyerName: null,
+
       // Payment
       ratePerQuintal: null,
       grossAmount: null,
@@ -494,7 +502,9 @@ export function buildQueueView(booking, queue) {
         status === STATUS.IN_GATE
           ? 'गेट प्रवेश हो गया है'
           : status === STATUS.ASSAY
-          ? 'गुणवत्ता जांच चल रही है'
+          ? 'जांच पूरी — भाव तय करें (MSP / नीलामी)'
+          : status === STATUS.PRICE_FIXED
+          ? 'भाव तय — तौल की प्रतीक्षा'
           : status === STATUS.WEIGHING
           ? 'तौल हो रहा है'
           : 'भुगतान तैयार हो रहा है',
@@ -732,7 +742,45 @@ export async function recordAssay(
 }
 
 /**
+ * Fix the sale price per quintal. Happens AFTER assay and BEFORE
+ * weighing (the e-NAM order): the weigh-man only weighs produce
+ * whose buyer and rate are already settled.
+ *
+ * mode = 'msp'      -> government agency buys at MSP
+ * mode = 'auction'  -> winning trader bid (wired in the trader build)
+ */
+export async function fixPrice(
+  tokenId,
+  { mode = 'msp', ratePerQuintal, buyerId = null, buyerName = null }
+) {
+  const rate = parseFloat(ratePerQuintal) || 0;
+  if (rate <= 0) throw new Error('Valid rate per quintal is required');
+
+  const bookingRef = doc(db, 'bookings', tokenId);
+  const snap = await getDoc(bookingRef);
+  if (!snap.exists()) throw new Error('Token not found');
+
+  const booking = snap.data();
+  if (booking.status !== STATUS.ASSAY) {
+    throw new Error('भाव तभी तय हो सकता है जब गुणवत्ता जांच पूरी हो चुकी हो।');
+  }
+
+  const patch = {
+    status: STATUS.PRICE_FIXED,
+    priceMode: mode,
+    ratePerQuintal: rate,
+    priceFixedAt: new Date().toISOString(),
+    buyerId: buyerId || null,
+    buyerName:
+      buyerName || (mode === 'msp' ? 'सरकारी खरीद एजेंसी (MSP)' : null),
+  };
+
+  return advanceStage(tokenId, patch);
+}
+
+/**
  * Weighbridge officer: record gross and tare, derive net.
+ * Refuses until the price has been fixed.
  */
 export async function recordWeighing(
   tokenId,
@@ -741,6 +789,11 @@ export async function recordWeighing(
   const gross = parseFloat(grossWeightQuintals) || 0;
   const tare = parseFloat(tareWeightQuintals) || 0;
   const net = Math.round((gross - tare) * 100) / 100;
+
+  const preSnap = await getDoc(doc(db, 'bookings', tokenId));
+  if (preSnap.exists() && preSnap.data().status !== STATUS.PRICE_FIXED) {
+    throw new Error('भाव तय होने से पहले तौल नहीं हो सकता।');
+  }
 
   if (net <= 0) {
     throw new Error('शुद्ध वजन शून्य से अधिक होना चाहिए।');
@@ -783,7 +836,9 @@ export async function markPaid(
   const quantity =
     parseFloat(actualQuantity) || parseFloat(booking.actualQuantity) || 0;
 
-  const rate = parseFloat(ratePerQuintal) || 0;
+  // The rate was fixed before weighing; the cashier cannot change it.
+  const rate =
+    parseFloat(booking.ratePerQuintal) || parseFloat(ratePerQuintal) || 0;
 
   if (quantity <= 0) throw new Error('Valid quantity is required');
   if (rate <= 0) throw new Error('Valid rate is required');
@@ -1099,22 +1154,25 @@ export const DUTY_STAGES = {
     },
   ],
 
-  weighbridge: [
+  assay: [
     {
       id: 'assay',
       title: 'गुणवत्ता जांच',
-      subtitle: 'नमी, ग्रेड और अन्य पदार्थ',
+      subtitle: 'नमूना, नमी, ग्रेड और अन्य पदार्थ',
       icon: 'flask-outline',
       statuses: [STATUS.IN_GATE],
       action: 'Assay',
       actionLabel: 'जांच करें',
     },
+  ],
+
+  weighbridge: [
     {
       id: 'weighing',
       title: 'तौल',
-      subtitle: 'भरा और खाली वाहन का वजन',
+      subtitle: 'केवल भाव तय हो चुके वाहन',
       icon: 'scale-outline',
-      statuses: [STATUS.ASSAY],
+      statuses: [STATUS.PRICE_FIXED],
       action: 'Weighing',
       actionLabel: 'तौल करें',
     },
@@ -1136,6 +1194,7 @@ export const DUTY_STAGES = {
 // Admin sees every stage.
 DUTY_STAGES.admin = [
   ...DUTY_STAGES.gate,
+  ...DUTY_STAGES.assay,
   ...DUTY_STAGES.weighbridge,
   ...DUTY_STAGES.accounts,
 ];

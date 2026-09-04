@@ -35,7 +35,12 @@ export default function MarkPaidScreen({ navigation, route }) {
 
   // Default the rate to the MSP of the crop the farmer booked.
   const defaultRate =
-    CROP_LIST.find((c) => c.id === token?.crop)?.msp || 2275;
+    token?.ratePerQuintal ||
+    CROP_LIST.find((c) => c.id === token?.crop)?.msp ||
+    2275;
+
+  // Once fixed (MSP / auction) the rate is locked for the cashier.
+  const rateLocked = Boolean(token?.ratePerQuintal);
 
   const [rate, setRate] = useState(String(defaultRate));
   const [grade, setGrade] = useState(token?.grade || 'FAQ');
@@ -149,12 +154,15 @@ export default function MarkPaidScreen({ navigation, route }) {
           ))}
         </View>
 
-        <Text style={styles.label}>दर प्रति क्विंटल (₹)</Text>
+        <Text style={styles.label}>
+          दर प्रति क्विंटल (₹){rateLocked ? '  • तय भाव, बदला नहीं जा सकता' : ''}
+        </Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, rateLocked && { opacity: 0.6 }]}
           keyboardType="numeric"
           value={rate}
           onChangeText={setRate}
+          editable={!rateLocked}
         />
 
         <View style={styles.preview}>

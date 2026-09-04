@@ -19,9 +19,14 @@ export const OFFICER_DUTIES = [
     desc: 'गेट आगमन और वाहन प्रविष्टि',
   },
   {
+    id: 'assay',
+    name: 'गुणवत्ता निरीक्षक (Assay / QC)',
+    desc: 'नमूना, नमी, ग्रेड तय करना',
+  },
+  {
     id: 'weighbridge',
-    name: 'तौल एवं ग्रेडिंग (Assay)',
-    desc: 'वजन माप और गुणवत्ता',
+    name: 'तौल अधिकारी (Weighbridge)',
+    desc: 'भाव तय होने के बाद वजन माप',
   },
   {
     id: 'accounts',
