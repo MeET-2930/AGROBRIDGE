@@ -20,3 +20,4 @@ backup-before-*/
 AGROBRIDGE_files_backup/
 install*.sh
 seedCentres.js
+repomix-output.xml
