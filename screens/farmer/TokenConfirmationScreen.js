@@ -35,9 +35,17 @@ export default function TokenConfirmationScreen({ navigation, route }) {
     }
   };
 
-  // popToTop always lands on the first screen of the farmer stack
-  // (the dashboard) whatever its route name is.
-  const goHome = () => navigation.popToTop();
+  /*
+   * This screen is opened with navigation.reset, so it is the ONLY
+   * screen in the stack and goBack/popToTop do nothing. Instead we
+   * reset to the first route of the farmer stack (the dashboard),
+   * whatever it happens to be called.
+   */
+  const goHome = () => {
+    const state = navigation.getState();
+    const home = state?.routeNames?.[0] || 'FarmerDashboard';
+    navigation.reset({ index: 0, routes: [{ name: home }] });
+  };
 
   if (!booking) {
     return (
