@@ -47,6 +47,14 @@ async function fetchCentres() {
   const snapshot =
     await db.collection("centres").get();
 
+  const order = [
+    "centre_farrukhnagar_05",
+    "centre_gurugram_01",
+    "centre_pataudi_04",
+    "centre_rewari_03",
+    "centre_sohna_02",
+  ];
+
   return snapshot.docs
       .map((item) => ({
         id: item.id,
@@ -56,13 +64,27 @@ async function fetchCentres() {
           (centre) =>
             centre.active !== false,
       )
-      .sort(
-          (a, b) =>
-            String(a.name || "")
-                .localeCompare(
-                    String(b.name || ""),
-                ),
-      );
+      .sort((a, b) => {
+        const aIndex = order.indexOf(a.id);
+        const bIndex = order.indexOf(b.id);
+
+        if (aIndex === -1 && bIndex === -1) {
+          return String(a.name || "")
+              .localeCompare(
+                  String(b.name || ""),
+              );
+        }
+
+        if (aIndex === -1) {
+          return 1;
+        }
+
+        if (bIndex === -1) {
+          return -1;
+        }
+
+        return aIndex - bIndex;
+      });
 }
 
 /**
@@ -128,7 +150,7 @@ function tokenLabel(position) {
   const number =
     String(
         ((position - 1) % 20) + 1,
-    ).padStart(2, "0");
+    ).padStart("0", 2);
 
   return `${letter}-${number}`;
 }
