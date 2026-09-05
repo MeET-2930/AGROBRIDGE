@@ -1,0 +1,27 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.env.local
+.DS_Store
+
+# local secrets / junk
+backup-before-*/
+AGROBRIDGE_files_backup/
+install*.sh
+seedCentres.js
+repomix-output.xml
+
+# local i18n scratch
+i18n-snapshot.md
+firebase-debug.log
+firebase-debug.log
+dist/
