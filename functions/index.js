@@ -250,6 +250,10 @@ async function fetchAvailableSlots(
  *
  * This is the server-side equivalent of
  * services/bookings.js.
+ *
+ * callSid is used as an idempotency key so
+ * the same Twilio call cannot create the
+ * same booking twice.
  */
 async function createBookingFromIvr({
   farmerId,
@@ -262,6 +266,7 @@ async function createBookingFromIvr({
   date,
   slotTime,
   slotWindow,
+  callSid,
 }) {
   if (!farmerId) {
     throw new Error(
@@ -291,10 +296,17 @@ async function createBookingFromIvr({
     !Number.isSafeInteger(
         quantity,
     ) ||
-    quantity <= 0
+    quantity <= 0 ||
+    quantity > 999
   ) {
     throw new Error(
         "INVALID_QUANTITY",
+    );
+  }
+
+  if (!callSid) {
+    throw new Error(
+        "CALL_SID_REQUIRED",
     );
   }
 
@@ -320,6 +332,15 @@ async function createBookingFromIvr({
         .collection("centreQueues")
         .doc(queueDocId);
 
+  /*
+   * Twilio CallSid is stable for the entire
+   * phone call, so it works as our idempotency key.
+   */
+  const idempotencyRef =
+    db
+        .collection("ivrIdempotency")
+        .doc(callSid);
+
   const tokenId =
     `TKN-${Date.now()}-${Math.floor(
         Math.random() * 1000,
@@ -341,6 +362,43 @@ async function createBookingFromIvr({
   const booking =
     await db.runTransaction(
         async (tx) => {
+          /*
+           * IMPORTANT:
+           * Read idempotency first, inside the
+           * same transaction as the booking.
+           */
+          const idempotencySnap =
+            await tx.get(
+                idempotencyRef,
+            );
+
+          if (idempotencySnap.exists) {
+            const existing =
+              idempotencySnap.data();
+
+            if (existing.bookingId) {
+              const existingBookingRef =
+                db
+                    .collection("bookings")
+                    .doc(existing.bookingId);
+
+              const existingBookingSnap =
+                await tx.get(
+                    existingBookingRef,
+                );
+
+              if (
+                existingBookingSnap.exists
+              ) {
+                return existingBookingSnap.data();
+              }
+            }
+
+            throw new Error(
+                "DUPLICATE_CALL",
+            );
+          }
+
           const queueSnap =
             await tx.get(
                 queueRef,
@@ -615,11 +673,40 @@ async function createBookingFromIvr({
 
             createdAt:
               new Date().toISOString(),
+
+            /*
+             * Store the originating Twilio call
+             * for debugging/idempotency tracing.
+             */
+            callSid,
           };
 
           tx.set(
               bookingRef,
               record,
+          );
+
+          /*
+           * Store the relationship between this
+           * Twilio call and the booking.
+           *
+           * Because this is in the same transaction,
+           * either both booking + idempotency record
+           * are committed or neither is.
+           */
+          tx.set(
+              idempotencyRef,
+              {
+                bookingId:
+                  tokenId,
+
+                callSid,
+
+                farmerId,
+
+                createdAt:
+                  FieldValue.serverTimestamp(),
+              },
           );
 
           tx.set(
@@ -727,13 +814,13 @@ const prompts = {
       `You selected the ${slot} time slot.`,
 
     selectQuantity:
-      "Please enter the approximate quantity of your crop in quintals, then press the hash key.",
+      "Please enter the approximate quantity of your crop in quintals, from 1 to 999, then press the hash key.",
 
     selectedQuantity: (quantity) =>
       `You entered ${quantity} quintals.`,
 
     invalidQuantity:
-      "Sorry, please enter a valid whole number greater than zero, then press the hash key.",
+      "Sorry, please enter a whole number from 1 to 999, then press the hash key.",
 
     confirmation:
       (mandi, crop, date, slot, quantity) =>
@@ -837,13 +924,13 @@ const prompts = {
       `आपने ${slot} का समय चुना है।`,
 
     selectQuantity:
-      "कृपया अपनी फसल की अनुमानित मात्रा क्विंटल में दर्ज करें, फिर हैश दबाएं।",
+      "कृपया अपनी फसल की अनुमानित मात्रा क्विंटल में, 1 से 999 तक, दर्ज करें और फिर हैश दबाएं।",
 
     selectedQuantity: (quantity) =>
       `आपने ${quantity} क्विंटल दर्ज किए हैं।`,
 
     invalidQuantity:
-      "क्षमा करें, कृपया शून्य से अधिक पूरी संख्या दर्ज करें और फिर हैश दबाएं।",
+      "क्षमा करें, कृपया 1 से 999 तक पूरी संख्या दर्ज करें और फिर हैश दबाएं।",
 
     confirmation:
       (mandi, crop, date, slot, quantity) =>
@@ -1125,6 +1212,8 @@ exports.ivr = onRequest(
               language,
               from:
                 req.body.From,
+              callSid:
+                req.body.CallSid,
               digits:
                 req.body.Digits,
               centreId:
@@ -2397,7 +2486,8 @@ exports.ivr = onRequest(
             !Number.isSafeInteger(
                 quantity,
             ) ||
-            quantity <= 0
+            quantity <= 0 ||
+            quantity > 999
           ) {
             const gather =
               response.gather(
@@ -2695,7 +2785,8 @@ exports.ivr = onRequest(
             Number.isSafeInteger(
                 quantity,
             ) &&
-            quantity > 0;
+            quantity > 0 &&
+            quantity <= 999;
 
           if (
             !centreId ||
@@ -2849,7 +2940,16 @@ exports.ivr = onRequest(
                   req.body.From,
               );
 
-            if (!callerPhone) {
+            const callSid =
+              String(
+                  req.body.CallSid ||
+                  "",
+              ).trim();
+
+            if (
+              !callerPhone ||
+              !callSid
+            ) {
               response.say(
                   t.error,
               );
@@ -2900,6 +3000,11 @@ exports.ivr = onRequest(
             try {
               /*
                * ACTUALLY CREATE THE BOOKING.
+               *
+               * CallSid is passed as the idempotency
+               * key so repeated confirmation requests
+               * from the same call don't create
+               * duplicate bookings.
                */
               const booking =
                 await createBookingFromIvr({
@@ -2930,6 +3035,8 @@ exports.ivr = onRequest(
 
                   slotWindow:
                     selectedSlot.windowLabel,
+
+                  callSid,
                 });
 
               logger.info(
@@ -2958,6 +3065,8 @@ exports.ivr = onRequest(
 
                     quantity:
                       booking.approxQuantityQuintals,
+
+                    callSid,
                   },
               );
 
@@ -2985,6 +3094,13 @@ exports.ivr = onRequest(
               ) {
                 response.say(
                     t.slotJustFilled,
+                );
+              } else if (
+                error.message ===
+                "DUPLICATE_CALL"
+              ) {
+                response.say(
+                    t.error,
                 );
               } else {
                 response.say(
