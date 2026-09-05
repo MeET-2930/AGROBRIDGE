@@ -1,0 +1,90 @@
+// =====================================================================
+//  AGROBRIDGE  firestore.rules
+//
+//  TWO MODES - only one block may be active at a time.
+//
+//  MODE A  (evaluation / internal round)  - currently ACTIVE
+//     Fully open, like Firebase "test mode" but WITHOUT the 30-day
+//     expiry that silently breaks apps. Anyone can read/write.
+//
+//  MODE B  (production - deploy after internals)
+//     Requires Firebase Anonymous Auth wiring in services/auth.js
+//     (install15). Farmers see only their own bookings, officers
+//     write only at their posted mandi, traders only bid, nothing
+//     is ever deleted.
+//
+//  Deploy:   firebase deploy --only firestore:rules
+// =====================================================================
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------
+    // MODE A - OPEN (active now). Comment this block out to switch.
+    // ------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // ------------------------------------------------------------
+    // MODE B - PRODUCTION (uncomment after install15 is live)
+    // ------------------------------------------------------------
+    /*
+    function signedIn() { return request.auth != null; }
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isRole(r) { return signedIn() && me().role == r; }
+    function myCentre() { return me().centreId; }
+
+    // Mandi master data: everyone reads, nobody writes from the app.
+    match /centres/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Own profile only.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role; // cannot change role
+      allow delete: if false;
+    }
+
+    // Live queue per centre/day: farmers read their mandi's queue,
+    // only officers of that mandi (and the booking transaction) write.
+    match /queues/{id} {
+      allow read: if signedIn();
+      allow write: if isRole('officer') && resource.data.centreId == myCentre()
+                   || isRole('farmer');   // slot booking transaction
+      allow delete: if false;
+    }
+
+    match /bookings/{id} {
+      allow read: if isRole('farmer') && resource.data.farmerId == request.auth.uid
+                  || isRole('officer') && resource.data.centreId == myCentre()
+                  || isRole('trader')  && resource.data.centreId == myCentre();
+      allow create: if isRole('farmer') && request.resource.data.farmerId == request.auth.uid;
+      // farmer: cancel / fix price on his own token; officer: advance stages at his mandi
+      allow update: if isRole('farmer') && resource.data.farmerId == request.auth.uid
+                    || isRole('officer') && resource.data.centreId == myCentre();
+      allow delete: if false;
+    }
+
+    match /auctions/{id} {
+      allow read: if signedIn();
+      allow create, update: if isRole('farmer') && request.resource.data.farmerId == request.auth.uid
+                            || isRole('trader') && resource.data.centreId == myCentre();
+      allow delete: if false;
+    }
+
+    // Bug reports: anyone signed in may create; only console reads.
+    match /feedback/{id} {
+      allow create: if signedIn();
+      allow read, update, delete: if false;
+    }
+    */
+  }
+}

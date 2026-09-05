@@ -44,6 +44,7 @@ import TokenConfirmationScreen from './screens/farmer/TokenConfirmationScreen';
 import TokenDetailScreen from './screens/farmer/TokenDetailScreen';
 import HistoryScreen from './screens/farmer/HistoryScreen';
 import PaymentsScreen from './screens/farmer/PaymentsScreen';
+import HelpScreen from './screens/common/HelpScreen';
 
 // Officer & Trader portals
 import OfficerStack from './navigation/OfficerStack';
@@ -77,6 +78,7 @@ function FarmerStack() {
       <FarmerNav.Screen name="TokenDetail" component={TokenDetailScreen} />
       <FarmerNav.Screen name="History" component={HistoryScreen} />
       <FarmerNav.Screen name="Payments" component={PaymentsScreen} />
+      <FarmerNav.Screen name="Help" component={HelpScreen} />
     </FarmerNav.Navigator>
   );
 }

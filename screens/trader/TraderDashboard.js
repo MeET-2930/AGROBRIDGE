@@ -133,7 +133,7 @@ export default function TraderDashboard({ navigation }) {
           <DashboardCard title={tr('tr_liveAuction')} icon="hammer-outline" onPress={() => navigation.navigate('AuctionBoard')} />
           <DashboardCard title={tr('tr_myPurchases')} icon="cart-outline" onPress={() => navigation.navigate('MyPurchases')} />
           <DashboardCard title={tr('tr_mandiProfile')} icon="business-outline" onPress={() => navigation.navigate('TraderProfile')} />
-          <DashboardCard title={tr('help')} icon="help-circle-outline" onPress={() => {}} />
+          <DashboardCard title={tr('help')} icon="help-circle-outline" onPress={() => navigation.navigate('Help', { role: 'trader' })} />
         </View>
       </ScrollView>
 

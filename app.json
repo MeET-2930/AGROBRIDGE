@@ -2,7 +2,7 @@
   "expo": {
     "name": "AGROBRIDGE",
     "slug": "AGROBRIDGE",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,13 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.agrobridge.app",
+      "versionCode": 2,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

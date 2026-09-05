@@ -11,6 +11,7 @@ import MarkPaidScreen from '../screens/officer/MarkPaidScreen';
 import DelayReportScreen from '../screens/officer/DelayReportScreen';
 import ReportsScreen from '../screens/officer/ReportsScreen';
 import GateScanScreen from '../screens/officer/GateScanScreen';
+import HelpScreen from '../screens/common/HelpScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -27,6 +28,7 @@ export default function OfficerStack() {
       <Stack.Screen name="DelayReport" component={DelayReportScreen} />
       <Stack.Screen name="Reports" component={ReportsScreen} />
       <Stack.Screen name="GateScan" component={GateScanScreen} />
+      <Stack.Screen name="Help" component={HelpScreen} />
     </Stack.Navigator>
   );
 }

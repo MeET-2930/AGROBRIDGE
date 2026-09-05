@@ -326,6 +326,15 @@ export default function OfficerDashboard({ navigation }) {
             />
           </TouchableOpacity>
         ) : null}
+
+        <TouchableOpacity
+          style={styles.toolRow}
+          onPress={() => navigation.navigate('Help', { role: 'officer' })}
+        >
+          <Ionicons name="help-circle-outline" size={20} color={Colors.secondary} />
+          <Text style={styles.toolText}>{tr('hc_title')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+        </TouchableOpacity>
       </ScrollView>
 
       <Modal visible={open} transparent animationType="fade">

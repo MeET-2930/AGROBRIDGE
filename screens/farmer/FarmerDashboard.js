@@ -265,7 +265,7 @@ export default function FarmerDashboard({ navigation }) {
           <DashboardCard
             title={tr('help')}
             icon="help-circle-outline"
-            onPress={() => {}}
+            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
           />
         </View>
       </ScrollView>
