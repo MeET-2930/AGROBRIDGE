@@ -1,3 +1,9 @@
+/*
+ * screens/trader/TraderDashboard.js
+ * Same layout as the farmer dashboard: avatar + greeting row,
+ * one live status card, a grid of DashboardCard tiles, and logout
+ * tucked inside the profile pop-up (tap the avatar).
+ */
 import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
@@ -6,31 +12,40 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppHeader from '../../components/AppHeader';
+import DashboardCard from '../../components/DashboardCard';
+import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
+
 import { getCurrentUserSession, logoutUserSession } from '../../services/auth';
 import { todayLocal } from '../../services/dates';
 import {
   subscribeToCentreAuctions,
   subscribeToTraderWins,
   isBiddingOpen,
-  AUCTION_STATUS,
 } from '../../services/auctions';
+import { useLang } from '../../i18n/LanguageContext';
+import { centreLabel } from '../../services/centres';
 
-/*
- * Trader home: live lots at their mandi, their wins, quick links.
- */
 export default function TraderDashboard({ navigation }) {
+  const { tr, lang } = useLang();
   const [session, setSession] = useState(null);
   const [lots, setLots] = useState([]);
   const [wins, setWins] = useState([]);
+  const [profileOpen, setProfileOpen] = useState(false);
   const unsubA = useRef(null);
   const unsubB = useRef(null);
+
+  const stopListening = () => {
+    if (unsubA.current) { unsubA.current(); unsubA.current = null; }
+    if (unsubB.current) { unsubB.current(); unsubB.current = null; }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -39,232 +54,157 @@ export default function TraderDashboard({ navigation }) {
         const user = await getCurrentUserSession();
         if (!alive) return;
         setSession(user);
+        stopListening();
         if (user?.centreId) {
-          unsubA.current = subscribeToCentreAuctions(
-            user.centreId,
-            todayLocal(),
-            (rows) => alive && setLots(rows)
-          );
+          unsubA.current = subscribeToCentreAuctions(user.centreId, todayLocal(), (rows) => alive && setLots(rows));
         }
         if (user?.uid) {
           unsubB.current = subscribeToTraderWins(user.uid, (rows) => alive && setWins(rows));
         }
       })();
-      return () => {
-        alive = false;
-        unsubA.current && unsubA.current();
-        unsubB.current && unsubB.current();
-      };
+      return () => { alive = false; stopListening(); };
     }, [])
   );
 
   const open = lots.filter(isBiddingOpen);
   const leading = open.filter((l) => l.highestBidderId === session?.uid).length;
   const todayWins = wins.filter((w) => w.date === todayLocal());
-  const todayQty = todayWins.reduce((s, w) => s + (w.approxQuantityQuintals || 0), 0);
 
-  const logout = () =>
-    Alert.alert('लॉग आउट?', '', [
-      { text: 'नहीं', style: 'cancel' },
-      {
-        text: 'हाँ',
-        onPress: async () => {
-          await logoutUserSession();
-          navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
-        },
-      },
-    ]);
+  const logout = async () => {
+    setProfileOpen(false);
+    stopListening();
+    await logoutUserSession();
+    navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} />
+      <AppHeader navigation={navigation} showBack={false} />
+
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
+        {/* Greeting row - identical to the farmer's */}
+        <View style={styles.profileRow}>
+          <TouchableOpacity style={styles.avatar} onPress={() => setProfileOpen(true)}>
+            <Ionicons name="person" size={24} color={Colors.white} />
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.hello}>नमस्ते, {session?.name || 'व्यापारी'}</Text>
-            <Text style={styles.firm}>{session?.businessName || ''}</Text>
-            <Text style={styles.centre}>
-              {session?.centreName || 'मंडी चुनें'} • लाइसेंस {session?.licenseNumber || '—'}
+            <Text style={styles.greet}>{tr('namaste')} 🙏</Text>
+            <Text style={styles.name}>{session?.name || tr('tr_trader')}</Text>
+            <Text style={styles.phone}>
+              {session?.businessName ? `${session.businessName} • ` : ''}
+              {session?.centreName ? centreLabel(session.centreName, lang) : tr('tr_pickMandi')}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('TraderProfile')}>
-            <Ionicons name="person-circle-outline" size={40} color={Colors.white} />
-          </TouchableOpacity>
         </View>
 
+        {/* Live status card (like the farmer's active booking card) */}
         {!session?.centreId ? (
-          <TouchableOpacity
-            style={styles.warn}
-            onPress={() => navigation.navigate('TraderProfile')}
-          >
-            <Ionicons name="alert-circle" size={22} color="#B45309" />
-            <Text style={styles.warnText}>
-              नीलामी देखने के लिए पहले अपनी मंडी चुनें →
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Recent wins banner */}
-        {todayWins.length > 0 ? (
-          <TouchableOpacity
-            style={styles.winBanner}
-            onPress={() => navigation.navigate('MyPurchases')}
-          >
-            <Ionicons name="trophy" size={26} color="#B45309" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.winTitle}>
-                🏆 आज {todayWins.length} लॉट जीते
-              </Text>
-              <Text style={styles.winSub}>
-                {todayWins
-                  .slice(0, 3)
-                  .map((w) => `${w.tokenNumber} @ ₹${w.highestBid}`)
-                  .join(' • ')}
-                {todayWins.length > 3 ? ' …' : ''}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#B45309" />
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Live auctions card */}
-        <TouchableOpacity
-          style={[styles.bigCard, open.length > 0 && styles.bigCardLive]}
-          onPress={() => navigation.navigate('AuctionBoard')}
-        >
-          <View style={styles.bigLeft}>
-            <Ionicons name="hammer-outline" size={30} color={Colors.white} />
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>{tr('tr_pickMandi')}</Text>
+            <Text style={styles.emptySub}>{tr('tr_needMandi')}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('TraderProfile')}>
+              <Text style={styles.link}>{tr('tr_mandiProfile')} →</Text>
+            </TouchableOpacity>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.bigTitle}>लाइव नीलामी</Text>
-            <Text style={styles.bigSub}>
+        ) : (
+          <View style={[styles.bookingCard, open.length > 0 && styles.bookingCardLive]}>
+            <Text style={styles.bookingLabel}>{tr('tr_liveAuction')}</Text>
+            <Text style={styles.bookingCentre}>
               {open.length > 0
-                ? `${open.length} लॉट पर बोली चालू${leading ? ` • ${leading} में आप आगे` : ''}`
-                : 'अभी कोई लॉट खुला नहीं'}
+                ? tr('tr_openLots', { n: open.length }) + (leading ? tr('tr_leading', { n: leading }) : '')
+                : tr('tr_noOpen')}
             </Text>
+            <Text style={styles.bookingMeta}>
+              {tr('tr_totalLots')}: {lots.length} • {tr('tr_won')}: {todayWins.length}
+            </Text>
+            {todayWins.length > 0 ? (
+              <Text style={styles.bookingMeta}>{tr('tr_wonToday', { n: todayWins.length })}</Text>
+            ) : null}
+            <PrimaryButton
+              title={tr('ab_title')}
+              style={{ marginTop: 12, height: 44 }}
+              onPress={() => navigation.navigate('AuctionBoard')}
+            />
           </View>
-          <Ionicons name="chevron-forward" size={22} color={Colors.white} />
-        </TouchableOpacity>
+        )}
 
-        <Text style={styles.sectionTitle}>आज का सारांश</Text>
-        <View style={styles.stats}>
-          <Stat n={lots.length} l="कुल लॉट" />
-          <Stat n={open.length} l="बोली चालू" c="#FFD54F" />
-          <Stat n={todayWins.length} l="जीते" c="#A5D6A7" />
-          <Stat n={`${todayQty}`} l="क्विंटल खरीद" c="#90CAF9" />
+        {/* Tile grid - same component as the farmer dashboard */}
+        <View style={styles.grid}>
+          <DashboardCard title={tr('tr_liveAuction')} icon="hammer-outline" onPress={() => navigation.navigate('AuctionBoard')} />
+          <DashboardCard title={tr('tr_myPurchases')} icon="cart-outline" onPress={() => navigation.navigate('MyPurchases')} />
+          <DashboardCard title={tr('tr_mandiProfile')} icon="business-outline" onPress={() => navigation.navigate('TraderProfile')} />
+          <DashboardCard title={tr('help')} icon="help-circle-outline" onPress={() => {}} />
         </View>
-
-        <Text style={styles.sectionTitle}>अन्य</Text>
-        <Tool icon="cart-outline" label="मेरी खरीद" onPress={() => navigation.navigate('MyPurchases')} />
-        <Tool icon="business-outline" label="मंडी / प्रोफ़ाइल" onPress={() => navigation.navigate('TraderProfile')} />
-        <Tool icon="log-out-outline" label="लॉग आउट" onPress={logout} danger />
       </ScrollView>
+
+      {/* Profile pop-up with logout - same as the farmer's */}
+      <Modal visible={profileOpen} transparent animationType="fade">
+        <Pressable style={styles.overlay} onPress={() => setProfileOpen(false)}>
+          <View style={styles.modal}>
+            <Text style={styles.profileName}>{session?.name || tr('tr_trader')}</Text>
+            <Text style={styles.profilePhone}>+91 {session?.phone || ''}</Text>
+            <Text style={styles.profilePhone}>{tr('tr_licenseLine', { l: session?.licenseNumber || '—' })}</Text>
+
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => { setProfileOpen(false); navigation.navigate('TraderProfile'); }}
+            >
+              <Ionicons name="business-outline" size={18} color={Colors.secondary} />
+              <Text style={styles.profileLinkText}>{tr('tr_mandiProfile')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+              <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+              <Text style={styles.logoutText}>{tr('logout')}</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
-  );
-}
-
-function Stat({ n, l, c }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={[styles.num, c && { color: c }]}>{n}</Text>
-      <Text style={styles.lbl}>{l}</Text>
-    </View>
-  );
-}
-
-function Tool({ icon, label, onPress, danger }) {
-  return (
-    <TouchableOpacity style={styles.toolRow} onPress={onPress}>
-      <Ionicons name={icon} size={20} color={danger ? Colors.error : Colors.secondary} />
-      <Text style={[styles.toolText, danger && { color: Colors.error }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
-    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 18, paddingBottom: 30 },
-  hero: {
-    backgroundColor: Colors.navy,
-    borderRadius: 16,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  hello: { color: Colors.white, fontSize: 18, fontWeight: '900' },
-  firm: { color: Colors.white, fontWeight: '700', marginTop: 2 },
-  centre: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 4 },
-  warn: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-    backgroundColor: '#FFF4D6',
-    borderColor: '#F0C36D',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-  },
-  warnText: { flex: 1, color: '#7A5200', fontWeight: '800' },
-  winBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
-    borderWidth: 1.5,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-  },
-  winTitle: { fontWeight: '900', color: '#92400E', fontSize: 15 },
-  winSub: { color: '#92400E', fontSize: 12, marginTop: 2 },
 
-  bigCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: Colors.secondary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  avatar: {
+    width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.navy,
+    alignItems: 'center', justifyContent: 'center',
   },
-  bigCardLive: { backgroundColor: '#B45309' },
-  bigLeft: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  greet: { fontSize: 12, color: Colors.subText, fontWeight: '600' },
+  name: { fontSize: 18, fontWeight: '800', color: Colors.navy },
+  phone: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+
+  bookingCard: {
+    backgroundColor: Colors.white, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: Colors.border, marginBottom: 18,
   },
-  bigTitle: { color: Colors.white, fontWeight: '900', fontSize: 17 },
-  bigSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: Colors.navy, marginBottom: 10 },
-  stats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    backgroundColor: Colors.navy,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
+  bookingCardLive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  bookingLabel: { fontSize: 11, color: Colors.subText, fontWeight: '700' },
+  bookingCentre: { fontSize: 15, fontWeight: '800', color: Colors.navy, marginTop: 4 },
+  bookingMeta: { fontSize: 12, color: Colors.subText, marginTop: 4 },
+
+  emptyCard: {
+    backgroundColor: Colors.white, borderRadius: 16, padding: 22, alignItems: 'center',
+    marginBottom: 18, borderWidth: 1, borderColor: Colors.border,
   },
-  stat: { width: '47%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 10 },
-  num: { color: Colors.white, fontSize: 22, fontWeight: '900' },
-  lbl: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 2 },
-  toolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 10,
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: Colors.navy },
+  emptySub: { fontSize: 12, color: Colors.subText, textAlign: 'center', marginTop: 6 },
+  link: { marginTop: 12, color: Colors.primary, fontWeight: '800' },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  modal: { width: '80%', backgroundColor: Colors.white, borderRadius: 16, padding: 20 },
+  profileName: { textAlign: 'center', fontSize: 18, fontWeight: '800', color: Colors.navy },
+  profilePhone: { textAlign: 'center', color: Colors.subText, marginTop: 4 },
+  profileLink: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    marginTop: 18, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border,
   },
-  toolText: { flex: 1, fontWeight: '800', color: Colors.navy },
+  profileLinkText: { color: Colors.secondary, fontWeight: '800', fontSize: 15 },
+  logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 6 },
+  logoutText: { color: Colors.error, fontWeight: '800', fontSize: 16 },
 });

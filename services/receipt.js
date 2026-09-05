@@ -13,6 +13,8 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { buildGatePassQr, gatePassCodeOf } from './bookings';
+import { translate } from '../i18n/translations';
+import { cropLabel, gradeLabel } from './centres';
 
 function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', {
@@ -47,11 +49,13 @@ function row(label, value, cls = '') {
   )}</td></tr>`;
 }
 
-export function buildReceiptHtml(token) {
+export function buildReceiptHtml(token, lang = 'hi') {
   const t = token || {};
+  const T = (k, p) => translate(k, lang, p);
+  const Q = T('quintal');
 
   return `<!DOCTYPE html>
-<html lang="hi">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -88,8 +92,8 @@ export function buildReceiptHtml(token) {
       <div class="sub">${esc(t.centreAddress || '')}</div>
     </div>
     <div style="text-align:right">
-      <div class="paid">भुगतान पूरा / PAID</div>
-      <div class="sub" style="margin-top:8px">रसीद क्रमांक: <b>${esc(
+      <div class="paid">${T('st_paid')} / PAID</div>
+      <div class="sub" style="margin-top:8px">${T('td_receiptNo')}: <b>${esc(
         t.receiptId
       )}</b></div>
       <div class="sub">${esc(fmtDateTime(t.paidAt))}</div>
@@ -98,68 +102,97 @@ export function buildReceiptHtml(token) {
 
   <div class="grid" style="margin-top:18px">
     <div>
-      <div class="sub">टोकन</div>
+      <div class="sub">${T('token')}</div>
       <div class="token">${esc(t.tokenNumber)}</div>
-      <div class="sub">टोकन ID: ${esc(t.id || t.tokenId)}</div>
+      <div class="sub">${T('token')} ID: ${esc(t.id || t.tokenId)}</div>
     </div>
     <div>
-      <h2 style="margin-top:0">किसान</h2>
+      <h2 style="margin-top:0">${T('farmer')}</h2>
       <table>
-        ${row('नाम', t.farmerName)}
-        ${row('मोबाइल', t.farmerPhone)}
-        ${row('वाहन', t.vehicleNumber)}
+        ${row(T('name'), t.farmerName)}
+        ${row(T('mobile'), t.farmerPhone)}
+        ${row(T('vehicle'), t.vehicleNumber)}
       </table>
     </div>
   </div>
 
-  <h2>फसल एवं गुणवत्ता</h2>
+  <h2>${T('crop')} • ${T('grade')}</h2>
   <table>
-    ${row('फसल', t.cropName || t.crop)}
-    ${row('तारीख / स्लॉट', `${t.date || ''}  ${t.slotWindow || ''}`)}
-    ${row('ग्रेड', t.grade)}
-    ${row('नमी', t.moisturePercent != null ? `${t.moisturePercent}%` : '—')}
+    ${row(T('crop'), cropLabel(t, lang))}
+    ${row(T('date') + ' / ' + T('pdf_slot'), `${t.date || ''}  ${t.slotWindow || ''}`)}
+    ${row(T('grade'), gradeLabel(t.grade, lang))}
+    ${row(T('moisture'), t.moisturePercent != null ? `${t.moisturePercent}%` : '—')}
     ${row(
-      'अन्य पदार्थ',
+      T('foreignMatter'),
       t.foreignMatterPercent != null ? `${t.foreignMatterPercent}%` : '—'
     )}
   </table>
 
-  <h2>तौल</h2>
+  <h2>${T('td_weighing')}</h2>
   <table>
-    ${row('कुल वजन', `${t.grossWeightQuintals ?? '—'} क्विंटल`)}
-    ${row('खाली वाहन', `${t.tareWeightQuintals ?? '—'} क्विंटल`)}
-    ${row('शुद्ध वजन', `${t.actualQuantity ?? '—'} क्विंटल`)}
+    ${row(T('td_gross'), `${t.grossWeightQuintals ?? '—'} ${Q}`)}
+    ${row(T('td_tare'), `${t.tareWeightQuintals ?? '—'} ${Q}`)}
+    ${row(T('td_net'), `${t.actualQuantity ?? '—'} ${Q}`)}
   </table>
 
-  <h2>भुगतान विवरण</h2>
+  <h2>${T('td_receipt')}</h2>
   <table>
-    ${row('दर', `${money(t.ratePerQuintal)} / क्विंटल`)}
-    ${row('कुल राशि', money(t.grossAmount))}
-    ${row('मंडी शुल्क', `− ${money(t.mandiFee)}`, 'ded')}
-    ${row('आढ़त', `− ${money(t.commission)}`, 'ded')}
-    ${row('हमाली', `− ${money(t.hamali)}`, 'ded')}
-    ${row('नेट भुगतान', money(t.netPayable), 'net')}
-    ${t.paymentReference ? row('संदर्भ / UTR', t.paymentReference) : ''}
-    ${t.paymentMode ? row('भुगतान माध्यम', t.paymentMode) : ''}
+    ${row(T('rate'), `${money(t.ratePerQuintal)} / ${Q}`)}
+    ${row(T('td_total'), money(t.grossAmount))}
+    ${row(T('td_mandiFee'), `− ${money(t.mandiFee)}`, 'ded')}
+    ${row(T('td_commission'), `− ${money(t.commission)}`, 'ded')}
+    ${row(T('td_hamali'), `− ${money(t.hamali)}`, 'ded')}
+    ${row(T('td_netPay'), money(t.netPayable), 'net')}
+    ${t.paymentReference ? row(T('td_ref', { ref: '' }).replace(/[:：]\s*$/, '') + ' / UTR', t.paymentReference) : ''}
+    ${t.paymentMode ? row(T('td_mode'), t.paymentMode) : ''}
   </table>
 
-  <div class="stamp">✓ भुगतान सफल</div>
+  <div class="stamp">✓ ${T('qv_paid_h')}</div>
 
   <div class="foot">
-    यह रसीद AGROBRIDGE ऐप द्वारा डिजिटल रूप से तैयार की गई है • ${esc(
+    ${T('pdf_generated')} • ${esc(
       fmtDateTime(new Date().toISOString())
     )}
   </div>
+  ${parchiPage(t, lang)}
 </body>
 </html>`;
+}
+
+/*
+ * Page 2 of the receipt: the arhtiya's hand-written parchi, only
+ * when the payment was an offline bid. Gives the farmer both slips
+ * in one file - the cashier's official receipt and the munim's slip.
+ */
+function parchiPage(t, lang) {
+  const p = t?.parchi;
+  if (!p?.imageBase64) return '';
+  const T = (k, q) => translate(k, lang, q);
+  const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+  return `
+  <div style="page-break-before: always;"></div>
+  <h1 style="margin-top:0">${T('pc_pdfPage')}</h1>
+  <table>
+    ${row(T('token'), t.tokenNumber || '')}
+    ${row(T('farmer'), t.farmerName || '')}
+    ${row(T('pc_parchiRate'), `${money(p.rate)} / ${T('quintal')}`)}
+    ${row(T('pc_paidRate'), `${money(t.ratePerQuintal)} / ${T('quintal')}`, p.matchesFixedRate ? 'net' : 'ded')}
+    ${p.note ? row(T('pc_note'), esc(p.note)) : ''}
+    ${row(T('pc_capturedBy').replace(/\{by\}.*$/, '').trim() || T('pc_attached'),
+      esc(`${p.capturedBy || '—'} • ${fmtDateTime(p.capturedAt)}`))}
+  </table>
+  <div style="text-align:center;margin-top:14px">
+    <img src="${p.imageBase64}" style="max-width:100%;max-height:820px;border:1px solid #ccc;border-radius:8px" />
+  </div>
+  <div class="foot">${T('pc_bothSlipsSub')}</div>`;
 }
 
 /**
  * Generate the PDF and open the share sheet.
  * Returns the local file uri (also useful for debugging).
  */
-export async function downloadReceiptPdf(token) {
-  const html = buildReceiptHtml(token);
+export async function downloadReceiptPdf(token, lang = 'hi') {
+  const html = buildReceiptHtml(token, lang);
 
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
@@ -168,7 +201,7 @@ export async function downloadReceiptPdf(token) {
   if (canShare) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',
-      dialogTitle: `रसीद ${token?.receiptId || token?.tokenNumber || ''}`,
+      dialogTitle: `${translate('td_receipt', lang)} ${token?.receiptId || token?.tokenNumber || ''}`,
       UTI: 'com.adobe.pdf',
     });
   } else {
@@ -212,14 +245,15 @@ function qrSvg(value, size = 180) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rects}</g></svg>`;
 }
 
-export function buildGatePassHtml(token) {
+export function buildGatePassHtml(token, lang = 'hi') {
   const t = token || {};
+  const T = (k, p) => translate(k, lang, p);
   const code = gatePassCodeOf(t);
   const qr = t.gatePassQr || buildGatePassQr(t.tokenId, code);
   const codePretty = code.replace(/(\d{3})(\d{3})/, '$1 $2');
 
   return `<!DOCTYPE html>
-<html lang="hi"><head><meta charset="utf-8" />
+<html lang="${lang}"><head><meta charset="utf-8" />
 <style>
   body { font-family: -apple-system, Roboto, "Noto Sans Devanagari", sans-serif;
          color:#10233F; margin:0; padding:28px; }
@@ -240,27 +274,27 @@ export function buildGatePassHtml(token) {
 </style></head>
 <body>
   <div class="pass">
-    <div class="head"><div class="t">🎫 गेट पास / GATE PASS</div><div class="tok">${esc(
+    <div class="head"><div class="t">🎫 ${T('pdf_gatePassTitle')}</div><div class="tok">${esc(
       t.tokenNumber
     )}</div></div>
     <div class="body">
       <div class="qr">${qrSvg(qr, 200)}</div>
       <div class="info">
-        <div class="lbl">गेट पास नंबर / GATE PASS NO.</div>
+        <div class="lbl">${T('pdf_gatePassNo')}</div>
         <div class="code">${esc(codePretty)}</div>
-        <div class="lbl">किसान</div><div class="val">${esc(t.farmerName)} • +91 ${esc(
+        <div class="lbl">${T('farmer')}</div><div class="val">${esc(t.farmerName)} • +91 ${esc(
     t.farmerPhone
   )}</div>
-        <div class="lbl">तारीख • समय</div><div class="val">${esc(t.date)} • ${esc(
+        <div class="lbl">${T('gp_dateTime')}</div><div class="val">${esc(t.date)} • ${esc(
     t.slotWindow
   )}</div>
-        <div class="lbl">फसल • अनुमानित मात्रा</div><div class="val">${esc(
-          t.cropName || t.crop
-        )} • ${esc(t.approxQuantityQuintals)} क्विंटल</div>
-        <div class="lbl">वाहन</div><div class="val">${esc(
-          t.vehicleNumber || 'गेट पर दर्ज होगा'
+        <div class="lbl">${T('crop')} • ${T('approxQuantity')}</div><div class="val">${esc(
+          cropLabel(t, lang)
+        )} • ${esc(t.approxQuantityQuintals)} ${T('quintal')}</div>
+        <div class="lbl">${T('vehicle')}</div><div class="val">${esc(
+          t.vehicleNumber || T('td_atGate')
         )}</div>
-        <div class="lbl">टोकन ID</div><div class="val" style="font-size:12px">${esc(
+        <div class="lbl">${T('token')} ID</div><div class="val" style="font-size:12px">${esc(
           t.tokenId
         )}</div>
       </div>
@@ -268,21 +302,21 @@ export function buildGatePassHtml(token) {
     <div class="foot">
       <b>${esc(t.centreName)}</b>
       <span>${esc(t.centreAddress || '')}</span><br/>
-      <span>गेट पर यह QR या नंबर और वाहन नंबर दिखाएँ • Show this QR or number with your vehicle number at the gate</span>
+      <span>${T('gp_hint')}</span>
     </div>
   </div>
   <div class="brand">AGROBRIDGE • ${esc(fmtDateTime(new Date().toISOString()))}</div>
 </body></html>`;
 }
 
-export async function downloadGatePassPdf(token) {
-  const html = buildGatePassHtml(token);
+export async function downloadGatePassPdf(token, lang = 'hi') {
+  const html = buildGatePassHtml(token, lang);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',
-      dialogTitle: `गेट पास ${token?.tokenNumber || ''}`,
+      dialogTitle: `${translate('pdf_gatePassTitle', lang)} ${token?.tokenNumber || ''}`,
       UTI: 'com.adobe.pdf',
     });
   } else {

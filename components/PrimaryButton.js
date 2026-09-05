@@ -1,51 +1,50 @@
+/*
+ * components/PrimaryButton.js
+ * Props: title, onPress, disabled, loading, style, variant
+ *   variant = 'primary' (default) | 'outline' | 'danger'
+ */
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import Colors from '../theme/colors';
 
 export default function PrimaryButton({
-  title, onPress, style, textStyle, disabled = false, loading = false, variant = 'primary',
+  title, onPress, disabled = false, loading = false, style, variant = 'primary',
 }) {
-  let btnBg = Colors.primary;
-  let textColor = Colors.white;
-  let borderColor = 'transparent';
-  if (variant === 'secondary') btnBg = Colors.secondary;
-  else if (variant === 'outline') { btnBg = Colors.white; textColor = Colors.navy; borderColor = Colors.border; }
-  else if (variant === 'danger') btnBg = Colors.error;
+  const isOutline = variant === 'outline';
+  const isDanger = variant === 'danger';
+  const off = disabled || loading;
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: btnBg, borderColor, borderWidth: variant === 'outline' ? 1.5 : 0 },
-        disabled && styles.disabled,
-        style,
-      ]}
+      style={[styles.btn, isOutline && styles.outline, isDanger && styles.danger, off && styles.off, style]}
       onPress={onPress}
-      disabled={disabled || loading}
+      disabled={off}
       activeOpacity={0.85}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? Colors.navy : Colors.white} />
+        <ActivityIndicator color={isOutline ? Colors.primary : Colors.white} />
       ) : (
-        <Text style={[styles.text, { color: textColor }, textStyle]}>{title}</Text>
+        <Text style={[styles.text, isOutline && styles.textOutline]} numberOfLines={1}>
+          {title}
+        </Text>
       )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    height: 52,
+  btn: {
+    backgroundColor: Colors.primary,
     borderRadius: 14,
+    height: 52,
+    paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
   },
-  disabled: { opacity: 0.55 },
-  text: { fontSize: 16, fontWeight: '700', letterSpacing: 0.4 },
+  outline: { backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.primary, elevation: 0 },
+  danger: { backgroundColor: Colors.error },
+  off: { opacity: 0.5 },
+  text: { color: Colors.white, fontSize: 15, fontWeight: '800' },
+  textOutline: { color: Colors.primary },
 });

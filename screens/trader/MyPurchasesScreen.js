@@ -10,11 +10,14 @@ import { getCurrentUserSession } from '../../services/auth';
 import { subscribeToTraderWins } from '../../services/auctions';
 import { subscribeToBooking } from '../../services/bookings';
 
+import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel, gradeLabel } from '../../services/centres';
 /*
  * Lots this trader won, with the live booking status underneath
  * (price-fixed -> weighing -> paid) so they know when to collect.
  */
 export default function MyPurchasesScreen({ navigation }) {
+  const { tr, lang, trError } = useLang();
   const [wins, setWins] = useState([]);
   const [bookings, setBookings] = useState({});
 
@@ -41,12 +44,12 @@ export default function MyPurchasesScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenTitle title="मेरी खरीद" subtitle={`${wins.length} लॉट • ${totalQty} क्विंटल • ₹${Math.round(totalRs).toLocaleString('en-IN')}`} />
+        <ScreenTitle title={tr('tr_myPurchases')} subtitle={tr('mpu_sub', { n: wins.length, q: totalQty, rs: Math.round(totalRs).toLocaleString('en-IN') })} />
 
         {wins.length === 0 ? (
           <View style={styles.emptyBox}>
             <Ionicons name="cart-outline" size={40} color={Colors.subText} />
-            <Text style={styles.empty}>अभी कोई खरीद नहीं</Text>
+            <Text style={styles.empty}>{tr('mpu_empty')}</Text>
           </View>
         ) : (
           wins.map((w) => {
@@ -58,18 +61,18 @@ export default function MyPurchasesScreen({ navigation }) {
                 onPress={() => navigation.navigate('AuctionBidding', { tokenId: w.tokenId })}
               >
                 <View style={styles.top}>
-                  <Text style={styles.lot}>लॉट {w.tokenNumber}</Text>
+                  <Text style={styles.lot}>{tr('bd_lotTitle', { t: w.tokenNumber })}</Text>
                   {b ? <StatusBadge status={b.status} /> : null}
                 </View>
-                <Text style={styles.crop}>{w.cropName} • ग्रेड {w.grade} • {w.farmerName}</Text>
+                <Text style={styles.crop}>{tr('mpu_cropLine', { crop: cropLabel(w, lang), g: gradeLabel(w.grade, lang), f: w.farmerName })}</Text>
                 <View style={styles.grid}>
-                  <Cell l="भाव" v={`₹${w.highestBid}/क्विं.`} />
-                  <Cell l="मात्रा" v={b?.actualQuantity ? `${b.actualQuantity} क्विं. (तौला)` : `~${w.approxQuantityQuintals} क्विं.`} />
-                  <Cell l="कुल" v={b?.grossAmount ? `₹${Math.round(b.grossAmount).toLocaleString('en-IN')}` : '— तौल बाकी'} />
-                  <Cell l="दिनांक" v={w.date} />
+                  <Cell l={tr('price')} v={`₹${w.highestBid}/${tr('quintalShort')}`} />
+                  <Cell l={tr('quantity')} v={b?.actualQuantity ? tr('mpu_weighed', { q: b.actualQuantity }) : tr('mpu_approx', { q: w.approxQuantityQuintals })} />
+                  <Cell l={tr('mpu_total')} v={b?.grossAmount ? `₹${Math.round(b.grossAmount).toLocaleString('en-IN')}` : tr('mpu_weighPending')} />
+                  <Cell l={tr('date')} v={w.date} />
                 </View>
                 <Text style={styles.hint}>
-                  {!b ? '' : b.status === 'price-fixed' ? '⏳ तौल की प्रतीक्षा' : b.status === 'weighing' ? '⚖️ तौल हो गया, भुगतान बाकी' : b.status === 'paid' ? '✅ सौदा पूरा' : ''}
+                  {!b ? '' : b.status === 'price-fixed' ? tr('mpu_awaitWeigh') : b.status === 'weighing' ? tr('mpu_awaitPay') : b.status === 'paid' ? tr('mpu_complete') : ''}
                 </Text>
               </TouchableOpacity>
             );

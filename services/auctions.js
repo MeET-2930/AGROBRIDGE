@@ -35,6 +35,7 @@ import {
 
 import { db } from './firebase';
 import { CROP_LIST } from './centres';
+import { tErr } from './i18nError';
 
 export const BID_STEP = 5; // minimum increment, Rs per quintal
 export const DEFAULT_AUCTION_MINUTES = 10;
@@ -131,30 +132,30 @@ export async function openAuction(booking, minutes = DEFAULT_AUCTION_MINUTES) {
  */
 export async function placeBid(tokenId, { traderId, traderName, amount }) {
   const bid = Math.round(Number(amount));
-  if (!traderId) throw new Error('कृपया दोबारा लॉग इन करें।');
-  if (!bid || bid <= 0) throw new Error('सही बोली राशि दर्ज करें।');
+  if (!traderId) throw tErr('loginAgain');
+  if (!bid || bid <= 0) throw tErr('err.badBid');
 
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(auctionRef(tokenId));
-    if (!snap.exists()) throw new Error('यह लॉट अब उपलब्ध नहीं है।');
+    if (!snap.exists()) throw tErr('err.lotGone');
 
     const lot = snap.data();
 
     if (lot.status !== AUCTION_STATUS.OPEN) {
-      throw new Error('यह नीलामी बंद हो चुकी है।');
+      throw tErr('err.auctionClosed');
     }
     if (new Date(lot.closesAt).getTime() <= Date.now()) {
-      throw new Error('समय समाप्त — बोली स्वीकार नहीं।');
+      throw tErr('err.timeOver');
     }
     if (bid < lot.reservePrice) {
-      throw new Error(`बोली MSP ₹${lot.reservePrice} से कम नहीं हो सकती।`);
+      throw tErr('err.belowMsp', { n: lot.reservePrice });
     }
     const minNext = lot.highestBid > 0 ? lot.highestBid + BID_STEP : lot.reservePrice;
     if (bid < minNext) {
-      throw new Error(`बोली कम से कम ₹${minNext} होनी चाहिए।`);
+      throw tErr('err.bidMin', { n: minNext });
     }
     if (lot.highestBidderId === traderId) {
-      throw new Error('आपकी बोली पहले से सबसे ऊँची है।');
+      throw tErr('err.alreadyHighest');
     }
 
     const entry = {
@@ -198,14 +199,14 @@ export async function closeAuctionIfDue(tokenId) {
 export async function acceptHighestBid(tokenId, farmerId) {
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(auctionRef(tokenId));
-    if (!snap.exists()) throw new Error('लॉट नहीं मिला।');
+    if (!snap.exists()) throw tErr('err.lotNotFound');
     const lot = snap.data();
-    if (lot.farmerId !== farmerId) throw new Error('यह आपका लॉट नहीं है।');
+    if (lot.farmerId !== farmerId) throw tErr('err.notYourLot');
     if (!lot.highestBid || !lot.highestBidderId) {
-      throw new Error('कोई बोली नहीं आई।');
+      throw tErr('err.noBids');
     }
     if (![AUCTION_STATUS.OPEN, AUCTION_STATUS.CLOSED].includes(lot.status)) {
-      throw new Error('यह नीलामी पहले ही तय हो चुकी है।');
+      throw tErr('err.auctionDecided');
     }
     tx.update(auctionRef(tokenId), {
       status: AUCTION_STATUS.ACCEPTED,
@@ -232,10 +233,10 @@ export async function rejectAuction(tokenId, reason = 'farmer-rejected') {
 export async function extendAuction(tokenId, minutes = 5) {
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(auctionRef(tokenId));
-    if (!snap.exists()) throw new Error('लॉट नहीं मिला।');
+    if (!snap.exists()) throw tErr('err.lotNotFound');
     const lot = snap.data();
     if (![AUCTION_STATUS.OPEN, AUCTION_STATUS.CLOSED].includes(lot.status)) {
-      throw new Error('यह नीलामी तय हो चुकी है, दोबारा नहीं खुल सकती।');
+      throw tErr('err.cannotReopen');
     }
     tx.update(auctionRef(tokenId), {
       status: AUCTION_STATUS.OPEN,

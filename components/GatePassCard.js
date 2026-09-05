@@ -3,12 +3,15 @@ import { View, Text, StyleSheet } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Colors from '../theme/colors';
 import { buildGatePassQr, gatePassCodeOf } from '../services/bookings';
+import { cropLabel } from '../services/centres';
+import { useLang } from '../i18n/LanguageContext';
 
 /*
  * Gate pass shown to the farmer. The QR and the 6-digit number
  * mean the same thing; the number exists for keypad phones (SMS).
  */
 export default function GatePassCard({ token, compact = false }) {
+  const { tr, lang } = useLang();
   if (!token) return null;
 
   const code = gatePassCodeOf(token);
@@ -17,7 +20,7 @@ export default function GatePassCard({ token, compact = false }) {
   return (
     <View style={styles.card}>
       <View style={styles.head}>
-        <Text style={styles.headText}>🎫 गेट पास / GATE PASS</Text>
+        <Text style={styles.headText}>{tr('gp_title')}</Text>
         <Text style={styles.headToken}>{token.tokenNumber}</Text>
       </View>
 
@@ -27,27 +30,25 @@ export default function GatePassCard({ token, compact = false }) {
         </View>
 
         <View style={styles.info}>
-          <Text style={styles.label}>गेट पास नंबर</Text>
+          <Text style={styles.label}>{tr('gp_number')}</Text>
           <Text style={styles.code}>{code.replace(/(\d{3})(\d{3})/, '$1 $2')}</Text>
 
-          <Text style={styles.label}>किसान</Text>
+          <Text style={styles.label}>{tr('farmer')}</Text>
           <Text style={styles.value}>{token.farmerName || '—'}</Text>
 
-          <Text style={styles.label}>तारीख • समय</Text>
+          <Text style={styles.label}>{tr('gp_dateTime')}</Text>
           <Text style={styles.value}>
             {token.date} • {token.slotWindow}
           </Text>
 
-          <Text style={styles.label}>फसल</Text>
-          <Text style={styles.value}>{token.cropName || token.crop}</Text>
+          <Text style={styles.label}>{tr('crop')}</Text>
+          <Text style={styles.value}>{cropLabel(token, lang)}</Text>
         </View>
       </View>
 
       <View style={styles.foot}>
         <Text style={styles.footText}>{token.centreName}</Text>
-        <Text style={styles.footHint}>
-          गेट पर यह QR या नंबर और वाहन नंबर दिखाएँ
-        </Text>
+        <Text style={styles.footHint}>{tr('gp_hint')}</Text>
       </View>
     </View>
   );

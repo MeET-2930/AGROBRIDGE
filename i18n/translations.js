@@ -1,131 +1,852 @@
+/*
+ * i18n/translations.js
+ * ---------------------------------------------------------------
+ * Every user-facing string in AGROBRIDGE, in four languages:
+ *   hi  हिन्दी     (default)
+ *   en  English
+ *   pa  ਪੰਜਾਬੀ
+ *   mr  मराठी
+ *
+ * Usage:   tr('gatePass.title')
+ *          tr('queue.ahead', { n: 3 })     ->  "{n}" is replaced
+ *
+ * Keys are grouped by screen/feature with a dot prefix.
+ * Add a key here first, then use it in the screen.
+ * ---------------------------------------------------------------
+ */
+
+export const DEFAULT_LANG = 'hi';
+
 export const LANGUAGES = [
   { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
   { code: 'en', label: 'English', native: 'English' },
   { code: 'pa', label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
   { code: 'mr', label: 'Marathi', native: 'मराठी' },
-  { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી' },
 ];
 
+// Short helper so each row is one readable line: r(hi, en, pa, mr)
+const r = (hi, en, pa, mr) => ({ hi, en, pa, mr });
+
 export const t = {
-  // Brand
-  brand: { hi: 'AGROBRIDGE', en: 'AGROBRIDGE', pa: 'AGROBRIDGE', mr: 'AGROBRIDGE', gu: 'AGROBRIDGE' },
-  brandSub: { hi: 'किसानसेतु - डिजिटल मंडी खरीद', en: 'KisanSetu - Smart Procurement', pa: 'ਕਿਸਾਨਸੇਤੁ - ਸਮਾਰਟ ਮੰਡੀ', mr: 'किसानसेतु - स्मार्ट खरेदी', gu: 'કિસਾਨસેતુ - સ્માર્ટ મંડી' },
-  smartPlatform: { hi: 'स्मार्ट खरीद प्लेटफॉर्म', en: 'Smart Procurement Platform', pa: 'ਸਮਾਰਟ ਖਰੀਦ ਪਲੇਟਫਾਰਮ', mr: 'स्मार्ट खरेदी प्लॅਟफॉर्म', gu: 'સ્માર્ટ ખરીદ પ્લેટફોર્મ' },
+  /* ------------------------------------------------------------ */
+  /* Brand / common                                                */
+  /* ------------------------------------------------------------ */
+  brand: r('AGROBRIDGE', 'AGROBRIDGE', 'AGROBRIDGE', 'AGROBRIDGE'),
+  brandSub: r('किसानसेतु - डिजिटल मंडी खरीद', 'KisanSetu - Smart Procurement', 'ਕਿਸਾਨਸੇਤੁ - ਸਮਾਰਟ ਮੰਡੀ ਖਰੀਦ', 'किसानसेतु - स्मार्ट खरेदी'),
+  appLoading: r('ऐप तैयार हो रहा है...', 'Getting the app ready...', 'ਐਪ ਤਿਆਰ ਹੋ ਰਹੀ ਹੈ...', 'अ‍ॅप तयार होत आहे...'),
+  listen: r('सुनें', 'Listen', 'ਸੁਣੋ', 'ऐका'),
+  selectLanguage: r('भाषा बदलें', 'Select Language', 'ਭਾਸ਼ਾ ਬਦਲੋ', 'भाषा बदला'),
 
-  // Navigation & Actions
-  getStarted: { hi: 'शुरू करें', en: 'Get Started', pa: 'ਸ਼ੁਰੂ ਕਰੋ', mr: 'सुरू करा', gu: 'શરૂ કરો' },
-  continue: { hi: 'आगे बढ़ें', en: 'Continue', pa: 'ਅੱਗੇ ਵਧੋ', mr: 'पुढे जा', gu: 'આગળ વધો' },
-  back: { hi: 'वापस', en: 'Back', pa: 'ਵਾਪਸ', mr: 'मागे', gu: 'પાછળ' },
-  logout: { hi: 'लॉग आउट', en: 'Log Out', pa: 'ਲੋਗ ਆਉਟ', mr: 'लॉग आउट', gu: 'લૉગ ਆਉਟ' },
-  cancel: { hi: 'रद्द करें', en: 'Cancel', pa: 'ਰੱਦ ਕਰੋ', mr: 'रद्द करा', gu: 'રદ કરો' },
-  confirm: { hi: 'पुष्टि करें', en: 'Confirm', pa: 'ਪੁਸ਼ਟੀ ਕਰੋ', mr: 'पुष्टी करा', gu: 'પુષ્ટિ કરો' },
-  login: { hi: 'लॉग इन', en: 'Login', pa: 'ਲਾਗਇਨ', mr: 'लॉगिन', gu: 'લૉગિન' },
-  register: { hi: 'नया खाता बनाएं', en: 'Create Account', pa: 'ਨਵਾਂ ਖਾਤਾ', mr: 'नवीन खाते', gu: 'નવું ખાતું' },
-  sendOtp: { hi: 'ओटीपी भेजें', en: 'Send OTP', pa: 'OTP ਭੇਜੋ', mr: 'OTP पाठवा', gu: 'OTP મોકલો' },
-  verifyOtp: { hi: 'सत्यापित करें', en: 'Verify & Proceed', pa: 'ਪੁਸ਼ਟੀ ਕਰੋ', mr: 'सत्यापित करा', gu: 'ચકાસો' },
+  getStarted: r('शुरू करें', 'Get Started', 'ਸ਼ੁਰੂ ਕਰੋ', 'सुरू करा'),
+  continue: r('आगे बढ़ें', 'Continue', 'ਅੱਗੇ ਵਧੋ', 'पुढे जा'),
+  back: r('वापस', 'Back', 'ਵਾਪਸ', 'मागे'),
+  goBack: r('वापस जाएं', 'Go Back', 'ਵਾਪਸ ਜਾਓ', 'मागे जा'),
+  logout: r('लॉग आउट', 'Log Out', 'ਲੌਗ ਆਊਟ', 'लॉग आउट'),
+  logoutConfirm: r('लॉग आउट करें?', 'Log out?', 'ਲੌਗ ਆਊਟ ਕਰੀਏ?', 'लॉग आउट करायचे?'),
+  cancel: r('रद्द करें', 'Cancel', 'ਰੱਦ ਕਰੋ', 'रद्द करा'),
+  confirm: r('पुष्टि करें', 'Confirm', 'ਪੁਸ਼ਟੀ ਕਰੋ', 'पुष्टी करा'),
+  save: r('सहेजें', 'Save', 'ਸੰਭਾਲੋ', 'जतन करा'),
+  saved: r('सहेजा गया', 'Saved', 'ਸੰਭਾਲਿਆ ਗਿਆ', 'जतन केले'),
+  ok: r('ठीक', 'OK', 'ਠੀਕ', 'ठीक'),
+  yes: r('हाँ', 'Yes', 'ਹਾਂ', 'होय'),
+  no: r('नहीं', 'No', 'ਨਹੀਂ', 'नाही'),
+  error: r('त्रुटि', 'Error', 'ਗਲਤੀ', 'त्रुटी'),
+  done: r('हो गया', 'Done', 'ਹੋ ਗਿਆ', 'झाले'),
+  tapToRetry: r('दोबारा प्रयास करने के लिए टैप करें', 'Tap to retry', 'ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਲਈ ਟੈਪ ਕਰੋ', 'पुन्हा प्रयत्नासाठी टॅप करा'),
+  login: r('लॉग इन', 'Login', 'ਲੌਗਇਨ', 'लॉगिन'),
+  register: r('नया खाता बनाएं', 'Create Account', 'ਨਵਾਂ ਖਾਤਾ ਬਣਾਓ', 'नवीन खाते तयार करा'),
+  sendOtp: r('ओटीपी भेजें', 'Send OTP', 'OTP ਭੇਜੋ', 'OTP पाठवा'),
+  verifyOtp: r('सत्यापित करें', 'Verify & Proceed', 'ਪੁਸ਼ਟੀ ਕਰੋ', 'सत्यापित करा'),
+  namaste: r('नमस्ते', 'Namaste', 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ', 'नमस्कार'),
+  quintal: r('क्विंटल', 'quintal', 'ਕੁਇੰਟਲ', 'क्विंटल'),
+  quintalShort: r('क्विं.', 'qtl', 'ਕੁਇੰ.', 'क्विं.'),
+  perQuintal: r('/ क्विंटल', '/ quintal', '/ ਕੁਇੰਟਲ', '/ क्विंटल'),
+  minutes: r('मिनट', 'min', 'ਮਿੰਟ', 'मिनिटे'),
+  hours: r('घंटे', 'hr', 'ਘੰਟੇ', 'तास'),
+  today: r('आज', 'Today', 'ਅੱਜ', 'आज'),
+  tomorrow: r('कल', 'Tomorrow', 'ਕੱਲ੍ਹ', 'उद्या'),
+  vehicle: r('वाहन', 'Vehicle', 'ਵਾਹਨ', 'वाहन'),
+  vehicleNumber: r('वाहन नंबर', 'Vehicle Number', 'ਵਾਹਨ ਨੰਬਰ', 'वाहन क्रमांक'),
+  vehiclePending: r('वाहन लंबित', 'Vehicle pending', 'ਵਾਹਨ ਬਾਕੀ', 'वाहन प्रलंबित'),
+  crop: r('फसल', 'Crop', 'ਫਸਲ', 'पीक'),
+  farmer: r('किसान', 'Farmer', 'ਕਿਸਾਨ', 'शेतकरी'),
+  mandi: r('मंडी', 'Mandi', 'ਮੰਡੀ', 'मंडी'),
+  date: r('तारीख', 'Date', 'ਤਾਰੀਖ', 'तारीख'),
+  time: r('समय', 'Time', 'ਸਮਾਂ', 'वेळ'),
+  grade: r('ग्रेड', 'Grade', 'ਗ੍ਰੇਡ', 'ग्रेड'),
+  moisture: r('नमी', 'Moisture', 'ਨਮੀ', 'ओलावा'),
+  foreignMatter: r('अन्य पदार्थ', 'Foreign matter', 'ਹੋਰ ਪਦਾਰਥ', 'इतर पदार्थ'),
+  quantity: r('मात्रा', 'Quantity', 'ਮਾਤਰਾ', 'प्रमाण'),
+  approxQuantity: r('अनुमानित मात्रा', 'Approx. quantity', 'ਅਨੁਮਾਨਿਤ ਮਾਤਰਾ', 'अंदाजे प्रमाण'),
+  rate: r('दर', 'Rate', 'ਦਰ', 'दर'),
+  price: r('भाव', 'Price', 'ਭਾਅ', 'भाव'),
+  mobile: r('मोबाइल', 'Mobile', 'ਮੋਬਾਈਲ', 'मोबाइल'),
+  name: r('नाम', 'Name', 'ਨਾਮ', 'नाव'),
+  address: r('पता', 'Address', 'ਪਤਾ', 'पत्ता'),
+  token: r('टोकन', 'Token', 'ਟੋਕਨ', 'टोकन'),
+  lot: r('लॉट', 'Lot', 'ਲਾਟ', 'लॉट'),
+  msp: r('MSP', 'MSP', 'MSP', 'MSP'),
+  notes: r('टिप्पणी', 'Notes', 'ਟਿੱਪਣੀ', 'टीप'),
+  optional: r('वैकल्पिक', 'optional', 'ਵਿਕਲਪਿਕ', 'ऐच्छिक'),
+  pleaseRetry: r('कृपया दोबारा प्रयास करें।', 'Please try again.', 'ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।', 'कृपया पुन्हा प्रयत्न करा.'),
+  loginRequired: r('लॉग इन आवश्यक', 'Login required', 'ਲੌਗਇਨ ਜ਼ਰੂਰੀ', 'लॉगिन आवश्यक'),
+  loginAgain: r('कृपया दोबारा लॉग इन करें।', 'Please log in again.', 'ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਲੌਗਇਨ ਕਰੋ।', 'कृपया पुन्हा लॉगिन करा.'),
+  pdfFailed: r('PDF नहीं बना', 'Could not create PDF', 'PDF ਨਹੀਂ ਬਣੀ', 'PDF तयार झाली नाही'),
+  notSaved: r('सहेजा नहीं जा सका।', 'Could not save.', 'ਸੰਭਾਲ ਨਹੀਂ ਸਕੇ।', 'जतन करता आले नाही.'),
+  notRecorded: r('दर्ज नहीं हुआ।', 'Could not record.', 'ਦਰਜ ਨਹੀਂ ਹੋਇਆ।', 'नोंद झाली नाही.'),
+  recorded: r('दर्ज हो गया', 'Recorded', 'ਦਰਜ ਹੋ ਗਿਆ', 'नोंद झाली'),
+  noneFound: r('कोई मंडी नहीं मिली।', 'No mandi found.', 'ਕੋਈ ਮੰਡੀ ਨਹੀਂ ਮਿਲੀ।', 'मंडी सापडली नाही.'),
+  noneFoundContactAdmin: r('कोई मंडी नहीं मिली। कृपया व्यवस्थापक से संपर्क करें।', 'No mandi found. Please contact the administrator.', 'ਕੋਈ ਮੰਡੀ ਨਹੀਂ ਮਿਲੀ। ਪ੍ਰਬੰਧਕ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।', 'मंडी सापडली नाही. कृपया प्रशासकाशी संपर्क साधा.'),
 
-  // Role Selection (3 Roles: Farmer, Mandi Officer, Trader)
-  selectRole: { hi: 'अपनी भूमिका चुनें', en: 'Select Your Role', pa: 'ਭੂਮਿਕਾ ਚੁਣੋ', mr: 'भूमिका निवडा', gu: 'ભૂમિકા પસંદ કરો' },
-  roleFarmer: { hi: 'किसान', en: 'Farmer', pa: 'ਕਿਸਾਨ', mr: 'शेतकरी', gu: 'ખેડૂત' },
-  roleFarmerSub: { hi: 'गेट स्लॉट बुक करें, कतार टोकन देखें और बैंक रसीद पाएं', en: 'Book gate slots, track queue tokens & bank receipts', pa: 'ਸਲਾਟ ਬੁੱਕ ਕਰੋ, ਟੋਕਨ ਅਤੇ ਰਸੀਦ ਵੇਖੋ', mr: 'स्लॉट बुक करा, टोकन व पावती पहा', gu: 'સ્લોટ બુક કરો, ટોકન અને રસીદ જુઓ' },
-  roleOfficer: { hi: 'मंडी अधिकारी / स्टाफ', en: 'Mandi Officer / Staff', pa: 'ਮੰਡੀ ਅਧਿਕਾਰੀ', mr: 'मंडी अधिकारी', gu: 'મંડી અધિકારી' },
-  roleOfficerSub: { hi: 'गेट प्रवेश, तौल, ग्रेडिंग और भुगतान प्रबंधन', en: 'Manage gate entries, weighment, grading & payouts', pa: 'ਗੇਟ ਆਮਦ, ਤੋਲ ਅਤੇ ਭੁਗਤਾਨ ਪ੍ਰਬੰਧਿਤ ਕਰੋ', mr: 'गेट आगमन, वजन आणि पेमेंट व्यवस्थापित करा', gu: 'ગેટ આગમન, વજન અને ચુકવણી મેનેજ કરો' },
-  roleTrader: { hi: 'व्यापारी / आढ़तिया', en: 'Trader / Buyer', pa: 'ਵਪਾਰੀ', mr: 'व्यापारी / खरेदीदार', gu: 'વેપારી' },
-  roleTraderSub: { hi: 'नीलामी में बोली लगाएं और खरीदी गई फसल की रसीदें देखें', en: 'Participate in crop bidding auctions & track lots', pa: 'ਨੀਲਾਮੀ ਵਿੱਚ ਬੋਲੀ ਲਗਾਓ', mr: 'लिलावात बोली लावा', gu: 'હરાજીમાં બોલી લગાવો' },
+  /* ------------------------------------------------------------ */
+  /* Welcome / role / auth                                         */
+  /* ------------------------------------------------------------ */
+  welcome_headline: r('स्मार्ट मंडी खरीद', 'Smart Mandi Procurement', 'ਸਮਾਰਟ ਮੰਡੀ ਖਰੀਦ', 'स्मार्ट मंडी खरेदी'),
+  welcome_sub: r('बिना लाइन, बिना इंतजार', 'No queues, no waiting', 'ਨਾ ਲਾਈਨ, ਨਾ ਉਡੀਕ', 'रांग नाही, प्रतीक्षा नाही'),
+  welcome_footer: r('कृषि मंत्रालय आधारित डिजिटल मंडी पहल', 'A digital mandi initiative', 'ਡਿਜੀਟਲ ਮੰਡੀ ਪਹਿਲ', 'डिजिटल मंडी उपक्रम'),
 
-  // Dashboards
-  namaste: { hi: 'नमस्ते', en: 'Namaste', pa: 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ', mr: 'नमस्कार', gu: 'નમસ્ਤੇ' },
-  noActiveBooking: { hi: 'कोई सक्रिय बुकिंग नहीं', en: 'No Active Booking', pa: 'ਕੋਈ ਬੁਕਿੰਗ ਨਹੀਂ', mr: 'सक्रिय बुकिंग नाही', gu: 'કોઈ સક્રિય બુકિંગ નથી' },
-  noActiveBookingSub: { hi: 'मंडी में बिना इंतजार एंट्री के लिए अभी गेट स्लॉट बुक करें', en: 'Book a gate slot now for zero waiting mandi entry', pa: 'ਮੰਡੀ ਜਾਣ ਲਈ ਹੁਣੇ ਸਲਾਟ ਬੁੱਕ ਕਰੋ', mr: 'मंडीत जाण्यासाठी आता स्लॉट बुक करा', gu: 'મંડી જવા માટે અત્યારે સ્લોਟ બુક કરો' },
-  bookASlot: { hi: 'स्लॉट बुक करें →', en: 'Book a slot →', pa: 'ਸਲਾਟ ਬੁੱਕ ਕਰੋ →', mr: 'स्लॉट बुक करा →', gu: 'સ્લોਟ બુક કરો →' },
-  bookSlot: { hi: 'स्लॉट बुक करें', en: 'Book Slot', pa: 'ਸਲਾਟ ਬੁੱਕ', mr: 'ਸਲਾਟ ਬੁੱਕ', gu: 'સ્લોਟ બુક' },
-  myToken: { hi: 'मेरा टोकन', en: 'My Token', pa: 'ਮੇਰਾ ਟੋਕਨ', mr: 'माझे टोकन', gu: 'મારું ટોਕન' },
-  payments: { hi: 'भुगतान व रसीद', en: 'Payments & Receipts', pa: 'ਭੁਗਤਾਨ ਅਤੇ ਰਸੀਦ', mr: 'पेमेंट व पावती', gu: 'ચુકવણી અને રસીદ' },
-  history: { hi: 'पुराना इतिहास', en: 'Booking History', pa: 'ਇਤਿਹਾਸ', mr: 'इतिहास', gu: 'ઇતિહાસ' },
-  myCrops: { hi: 'मेरी फसलें', en: 'My Saved Crops', pa: 'ਮੇਰੀਆਂ ਫਸਲਾਂ', mr: 'माझी पिके', gu: 'મારા પાક' },
-  help: { hi: 'सहायता केंद्र', en: 'Helpline & Support', pa: 'ਮਦਦ ਕੇਂਦਰ', mr: 'मदत केंद्र', gu: 'મદદ કેન્દ્ર' },
-  activeBooking: { hi: 'सक्रिय बुकिंग', en: 'Active Booking', pa: 'ਸਰਗਰਮ ਬੁਕਿੰਗ', mr: 'सक्रिय बुकिंग', gu: 'સક્રિય બુકિંગ' },
-  trackStatus: { hi: 'गेट स्थिति देखें', en: 'Track Gate Status', pa: 'ਗੇਟ ਹਾਲਤ ਵੇਖੋ', mr: 'गेट स्थिती पहा', gu: 'ગેટ સ્થિતિ' },
-  vehiclesAhead: { hi: 'आगे वाहन', en: 'Vehicles Ahead', pa: 'ਅੱਗੇ ਵਾਹਨ', mr: 'पुढे वाहने', gu: 'આગળ વાહન' },
-  estTurn: { hi: 'अनुमानित बारी', en: 'Est. Turn', pa: 'ਅਨੁਮਾਨਿਤ ਵਾਰੀ', mr: 'अंदाजे पाळी', gu: 'અંદાજਿਤ વારો' },
+  selectRole: r('अपनी भूमिका चुनें', 'Select Your Role', 'ਆਪਣੀ ਭੂਮਿਕਾ ਚੁਣੋ', 'तुमची भूमिका निवडा'),
+  roleFarmer: r('किसान', 'Farmer', 'ਕਿਸਾਨ', 'शेतकरी'),
+  roleFarmerSub: r('गेट स्लॉट बुक करें, कतार टोकन देखें और बैंक रसीद पाएं', 'Book gate slots, track queue tokens & get receipts', 'ਗੇਟ ਸਲਾਟ ਬੁੱਕ ਕਰੋ, ਟੋਕਨ ਵੇਖੋ ਅਤੇ ਰਸੀਦ ਲਓ', 'गेट स्लॉट बुक करा, टोकन पहा व पावती मिळवा'),
+  roleOfficer: r('मंडी अधिकारी / स्टाफ', 'Mandi Officer / Staff', 'ਮੰਡੀ ਅਧਿਕਾਰੀ / ਸਟਾਫ', 'मंडी अधिकारी / कर्मचारी'),
+  roleOfficerSub: r('गेट प्रवेश, जांच, तौल और भुगतान प्रबंधन', 'Manage gate entry, assay, weighing & payments', 'ਗੇਟ ਐਂਟਰੀ, ਜਾਂਚ, ਤੋਲ ਅਤੇ ਭੁਗਤਾਨ', 'गेट प्रवेश, तपासणी, वजन व पेमेंट व्यवस्थापन'),
+  roleTrader: r('व्यापारी / आढ़तिया', 'Trader / Buyer', 'ਵਪਾਰੀ / ਆੜ੍ਹਤੀਆ', 'व्यापारी / खरेदीदार'),
+  roleTraderSub: r('नीलामी में बोली लगाएं और खरीदी गई फसल देखें', 'Bid in live auctions & track your purchases', 'ਨੀਲਾਮੀ ਵਿੱਚ ਬੋਲੀ ਲਗਾਓ ਅਤੇ ਖਰੀਦ ਵੇਖੋ', 'लिलावात बोली लावा व खरेदी पहा'),
 
-  // Booking Flow Steps
-  selectCrop: { hi: 'चरण 1: फसल चुनें', en: 'Step 1: Select Crop', pa: 'ਪਗ 1: ਫਸਲ ਚੁਣੋ', mr: 'पायरी 1: पीक निवडा', gu: 'પગલું 1: પાક પસંદ કરો' },
-  selectCropSub: { hi: 'आज मंडी में बेचने वाली फसल चुनें', en: 'Choose the crop you will sell at the mandi today', pa: 'ਅੱਜ ਮੰਡੀ ਵਿੱਚ ਵੇਚਣ ਵਾਲੀ ਫਸਲ ਚੁਣੋ', mr: 'आज मंडीत विकायचे पीक निवडा', gu: 'આજે મંડીમાં વેચવાનો પાક પસંદ કરો' },
-  selectCentre: { hi: 'चरण 2: मंडी चुनें', en: 'Step 2: Select Mandi', pa: 'ਪਗ 2: ਮੰਡੀ ਚੁਣੋ', mr: 'पायरी 2: मंडी निवडा', gu: 'પગલું 2: મંડી' },
-  selectCentreSub: { hi: 'अपनी फसल लेने वाला निकटतम एपीएमसी केंद्र चुनें', en: 'Pick the nearest APMC centre accepting your crop', pa: 'ਆਪਣੀ ਫਸਲ ਲੈਣ ਵਾਲੀ ਨਜ਼ਦੀਕੀ ਮੰਡੀ ਚੁਣੋ', mr: 'तुमचे पीक स्वीकारणारी जवळची मंडी निवडा', gu: 'તમારો પાક લે તેવી નજીકની મંડી પસંદ કરો' },
-  selectSlot: { hi: 'चरण 3: आगमन समय', en: 'Step 3: Arrival Window', pa: 'ਪਗ 3: ਆਮਦ ਸਮਾਂ', mr: 'पायरी 3: आगमन वेळ', gu: 'પગલું 3: આગમન સમય' },
-  selectSlotSub: { hi: 'गेट पर पहुँचने की तारीख और समय चुनें', en: 'Choose date and time window to arrive at the gate', pa: 'ਗੇਟ ਤੇ ਪਹੁੰਚਣ ਦੀ ਤਾਰੀਖ ਅਤੇ ਸਮਾਂ ਚੁਣੋ', mr: 'गेटवर येण्याची तारीख व वेळ निवडा', gu: 'ગેટ પર આવવાની તારીખ અને સમય પસંદ કરો' },
-  nearest: { hi: 'निकटतम', en: 'Nearest', pa: 'ਨਜ਼ਦੀਕੀ', mr: 'जवळचे', gu: 'નજીક' },
-  available: { hi: 'उपलब्ध', en: 'AVAILABLE', pa: 'ਉਪਲਬਧ', mr: 'उपलब्ध', gu: 'ઉપલબ્ਧ' },
-  waitlist: { hi: 'प्रतीक्षा सूची', en: 'WAITLIST', pa: 'ਉਡੀਕ ਸੂਚੀ', mr: 'प्रतीक्षा यादी', gu: 'રાહ યાદી' },
-  confirmToken: { hi: 'पुष्टि करें और टोकन लें', en: 'Confirm & Get Gate Token', pa: 'ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਟੋਕਨ ਲਓ', mr: 'पुष्टी करा आणि टोकन घ्या', gu: 'પુષ્ટિ કરો અને ટોકન લો' },
-  tokenGenerated: { hi: 'गेट टोकन जनरेट हुआ', en: 'Gate Token Generated', pa: 'ਗੇਟ ਟੋਕਨ ਬਣ ਗਿਆ', mr: 'गेट टोकन तयार', gu: 'ગેટ ટોકન બન્યું' },
-  goDashboard: { hi: 'डैशबोर्ड पर जाएं', en: 'Go to Dashboard', pa: 'ਡੈਸ਼ਬੋਰਡ', mr: 'डॅशबोर्ड', gu: 'ਡેશਬੋਰਡ' },
-  recordedAtGate: { hi: 'गेट प्रवेश पर दर्ज किया जाएगा', en: 'Will be recorded at gate entry', pa: 'ਗੇਟ ਤੇ ਦਰਜ ਹੋਵੇਗਾ', mr: 'गेटवर नोंद होईल', gu: 'ગેટ પર નોંધાશે' },
+  status_title: r('खाता विकल्प', 'Account', 'ਖਾਤਾ ਵਿਕਲਪ', 'खाते पर्याय'),
+  status_sub: r('लॉग इन या नया पंजीकरण', 'Log in or register', 'ਲੌਗਇਨ ਜਾਂ ਨਵੀਂ ਰਜਿਸਟ੍ਰੇਸ਼ਨ', 'लॉगिन किंवा नवीन नोंदणी'),
+  status_loginSub: r('पंजीकृत मोबाइल से लॉग इन', 'Log in with registered mobile', 'ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ ਨਾਲ ਲੌਗਇਨ', 'नोंदणीकृत मोबाइलने लॉगिन'),
+  status_registerSub: r('नया पंजीकरण', 'New registration', 'ਨਵੀਂ ਰਜਿਸਟ੍ਰੇਸ਼ਨ', 'नवीन नोंदणी'),
 
-  // Officer / Queue
-  gateQueue: { hi: 'आज की गेट कतार', en: "Today's Gate Queue", pa: 'ਅੱਜ ਦੀ ਗੇਟ ਕਤਾਰ', mr: 'आजची गेट रांग', gu: 'આજની ગેટ કતਾਰ' },
-  markArrived: { hi: 'आगमन दर्ज करें', en: 'Mark Arrived', pa: 'ਆਮਦ ਦਰਜ ਕਰੋ', mr: 'आगमन नोंदवा', gu: 'આગમન નોંધો' },
-  markNoShow: { hi: 'अनुपस्थित', en: 'No Show', pa: 'ਗੈਰਹਾਜ਼ਰ', mr: 'गैरहजर', gu: 'ગેરਹਾજર' },
-  processPayment: { hi: 'भुगतान रसीद जनरेट करें', en: 'Process Payment & Receipt', pa: 'ਭੁਗਤਾਨ ਪ੍ਰਕਿਰਿਆ', mr: 'पेमेंट प्रक्रिया', gu: 'ચુકવણી પ્રક્રિયા' },
-  enterVehicle: { hi: 'वाहन नंबर दर्ज करें', en: 'Enter Vehicle Plate Number', pa: 'ਵਾਹਨ ਨੰਬਰ ਦਰਜ ਕਰੋ', mr: 'वाहन क्रमांक टाका', gu: 'વાહન નંબર નાખો' },
-  confirmArrival: { hi: 'आगमन पुष्टि करें', en: 'Confirm Gate Arrival', pa: 'ਆਮਦ ਪੁਸ਼ਟੀ', mr: 'आगमन पुष्टी', gu: 'આગਮન પુષ્ટિ' },
+  login_title: r('मोबाइल लॉग इन', 'Mobile Login', 'ਮੋਬਾਈਲ ਲੌਗਇਨ', 'मोबाइल लॉगिन'),
+  login_sub: r('पंजीकृत मोबाइल से लॉग इन करें', 'Log in with your registered mobile', 'ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ ਨਾਲ ਲੌਗਇਨ ਕਰੋ', 'नोंदणीकृत मोबाइलने लॉगिन करा'),
+  login_mobile: r('मोबाइल नंबर', 'Mobile number', 'ਮੋਬਾਈਲ ਨੰਬਰ', 'मोबाइल क्रमांक'),
+  login_badNumber: r('गलत नंबर', 'Invalid number', 'ਗਲਤ ਨੰਬਰ', 'चुकीचा क्रमांक'),
+  login_badNumberSub: r('कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।', 'Please enter a 10-digit mobile number.', '10 ਅੰਕਾਂ ਦਾ ਮੋਬਾਈਲ ਨੰਬਰ ਦਰਜ ਕਰੋ।', 'कृपया 10 अंकी मोबाइल क्रमांक टाका.'),
 
-  // Spoken Voice Guidance Scripts (Conversational help for low-literacy users)
-  audio_welcome: {
-    hi: 'एग्रोब्रिज किसान सेतु में आपका स्वागत है। यह ऐप किसानों को मंडी गेट स्लॉट बुक करने और घंटों के इंतजार से बचाने के लिए बनाया गया है। आगे बढ़ने के लिए नीचे दिए गए नारंगी बटन पर टैप करें।',
-    en: 'Welcome to Agrobridge KisanSetu. This app helps farmers book mandi gate slots to avoid long waiting lines. Tap Get Started to continue.',
-    pa: 'ਐਗਰੋਬ੍ਰਿਜ ਕਿਸਾਨ ਸੇਤੁ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ। ਇਹ ਐਪ ਮੰਡੀ ਵਿੱਚ ਬਿਨਾਂ ਉਡੀਕ ਫਸਲ ਵੇਚਣ ਵਿੱਚ ਮਦਦ ਕਰਦੀ ਹੈ। ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਬਟਨ ਦਬਾਓ।',
-    mr: 'अॅग्रोब्रिज किसान सेतु मध्ये स्वागत. मंडीत विना प्रतीक्षा पीक विकण्यासाठी सुरू करा बटण दाबा.',
-    gu: 'એગ્રોબ્રિજ કિસાન સેતુમાં સ્વાગત. મંડીમાં વિના રાહ જોયે પાક વેચવા શરૂ કરો બਟન દબાવો.'
-  },
-  audio_role: {
-    hi: 'अपनी भूमिका चुनें। यदि आप फसल बेचने वाले किसान हैं, तो किसान चुनें। यदि आप मंडी में गेट, तौल या खाता संभालते हैं, तो मंडी अधिकारी चुनें। यदि आप फसल खरीदने वाले व्यापारी हैं, तो व्यापारी चुनें।',
-    en: 'Select your role. If you are a farmer, tap Farmer. If you work at the mandi, tap Mandi Officer. If you are a crop buyer, tap Trader.',
-    pa: 'ਆਪਣੀ ਭੂਮਿਕਾ ਚੁਣੋ। ਕਿਸਾਨ, ਮੰਡੀ ਅਧਿਕਾਰੀ ਜਾਂ ਵਪਾਰੀ ਵਿੱਚੋਂ ਇੱਕ ਚੁਣੋ।',
-    mr: 'तुमची भूमिका निवडा. शेतकरी, मंडी अधिकारी किंवा व्यापारी.',
-    gu: 'તમારી ભૂમિકા પસંદ કરો. ખેડૂત, મંડી અધિકારી અથવા વેપારી.'
-  },
-  audio_farmer_dashboard: {
-    hi: 'यह आपका मुख्य किसान पेज है। मंडी जाने के लिए स्लॉट बुक करें बटन पर टैप करें। अपनी सक्रिय टोकन स्थिति, वाहन कतार और संभावित समय आप ऊपर देख सकते हैं। किसी भी सहायता के लिए हेल्प बटन दबाएं।',
-    en: 'This is your farmer home page. Tap Book Slot to select a mandi and arrival window. Your active token status and live queue ETA are shown at the top.',
-    pa: 'ਇਹ ਤੁਹਾਡਾ ਹੋਮ ਪੇਜ ਹੈ। ਮੰਡੀ ਜਾਣ ਲਈ ਸਲਾਟ ਬੁੱਕ ਦਬਾਓ। ਆਪਣਾ ਟੋਕਨ ਅਤੇ ਲਾਈਵ ਕਤਾਰ ਉੱਪਰ ਵੇਖੋ।',
-    mr: 'हे तुमचे होम पेज आहे. मंडीत जाण्यासाठी स्लॉट बुक करा. टोकन व रांग वर दिसेल.',
-    gu: 'આ તમારું હોમ પેજ છે. મંડી જવા માટે સ્લોਟ બુક દબાવો. ટોકન અને લાઈવ કતાર ઉપર જુઓ.'
-  },
-  audio_crop: {
-    hi: 'पहला चरण। वह फसल चुनें जिसे आप आज मंडी में बेचने जा रहे हैं। फसल कार्ड चुनने के बाद नीचे आगे बढ़ें बटन पर टैप करें।',
-    en: 'Step one. Select the crop you will bring to the mandi today. Tap a crop card and then tap continue below.',
-    pa: 'ਪਹਿਲਾ ਪਗ। ਜੋ ਫਸਲ ਵੇਚਣੀ ਹੈ ਉਸਨੂੰ ਚੁਣੋ ਅਤੇ ਹੇਠਾਂ ਅੱਗੇ ਵਧੋ ਦਬਾਓ।',
-    mr: 'पायरी एक. विकायचे पीक निवडा आणि पुढे जा बटण दाबा.',
-    gu: 'પગલું એક. વેચવાનો પાક પસંદ કરો અને આગળ વધો દબાવો.'
-  },
-  audio_centre: {
-    hi: 'दूसरा चरण। अपनी निकटतम मंडी चुनें। सबसे पास की मंडी अपने आप ऊपर चिन्हित की गई है। अपनी पसंद का केंद्र चुनें और समय चुनने के लिए बटन दबाएं।',
-    en: 'Step two. Select your preferred APMC Mandi centre. The nearest centre is auto-highlighted based on your location.',
-    pa: 'ਦੂਜਾ ਪਗ। ਆਪਣੀ ਨਜ਼ਦੀਕੀ ਮੰਡੀ ਚੁਣੋ। ਸਭ ਤੋਂ ਨੇੜਲੀ ਮੰਡੀ ਉੱਪਰ ਦਿਖਾਈ ਗਈ ਹੈ।',
-    mr: 'पायरी दोन. जवळची मंडी निवडा. सर्वात जवळची मंडी वर हायलाइट केली आहे.',
-    gu: 'પગલું બે. નજીકની મંડી પસંદ કરો. સૌથી નજીકની મંડી ઉપર દર્શાવેલ છે.'
-  },
-  audio_slot: {
-    hi: 'तीसरा चरण। अपनी सुविधा अनुसार आगमन की तारीख और समय चुनें। हरे रंग के स्लॉट तुरंत उपलब्ध हैं। भरे स्लॉट पर आप प्रतीक्षा सूची का टोकन ले सकते हैं।',
-    en: 'Step three. Choose your preferred arrival date and time window. Green slots are available. Red slots offer a waitlist ticket.',
-    pa: 'ਤੀਜਾ ਪਗ। ਆਮਦ ਦੀ ਤਾਰੀਖ ਅਤੇ ਸਮਾਂ ਚੁਣੋ।',
-    mr: 'पायरी तीन. येण्याची तारीख व वेळ निवडा.',
-    gu: 'પગલું ત્રણ. આગમનની તારીખ અને સમય પસંદ કરો.'
-  },
-  audio_officer_queue: {
-    hi: 'मंडी गेट कतार। जब किसान का वाहन गेट पर पहुंचे, तो आगमन दर्ज करें बटन दबाएं और वाहन नंबर लिखें। इसके बाद तौल और दर दर्ज करके रसीद जनरेट करें।',
-    en: 'Mandi Gate Queue. When a farmer vehicle arrives, tap Mark Arrived and log the vehicle plate number.',
-    pa: 'ਮੰਡੀ ਗੇਟ ਕਤਾਰ। ਕਿਸਾਨ ਦੇ ਆਉਣ ਤੇ ਆਮਦ ਦਰਜ ਕਰੋ ਅਤੇ ਵਾਹਨ ਨੰਬਰ ਲਿਖੋ।',
-    mr: 'मंडी गेट रांग. शेतकरी आल्यावर आगमन नोंदवा आणि वाहन क्रमांक टाका.',
-    gu: 'મંਡੀ ગેટ કતਾਰ. ખેડૂત આવે ત્યારે આગમન નોંધો અને વાહન નંબર લખો.'
-  }
+  otp_title: r('ओटीपी सत्यापन', 'OTP Verification', 'OTP ਪੁਸ਼ਟੀ', 'OTP पडताळणी'),
+  otp_test: r('टेस्ट मोड: OTP 1234', 'Test mode: OTP 1234', 'ਟੈਸਟ ਮੋਡ: OTP 1234', 'चाचणी मोड: OTP 1234'),
+  otp_wrong: r('गलत OTP', 'Wrong OTP', 'ਗਲਤ OTP', 'चुकीचा OTP'),
+  otp_wrongSub: r('टेस्ट मोड में OTP 1234 है।', 'In test mode the OTP is 1234.', 'ਟੈਸਟ ਮੋਡ ਵਿੱਚ OTP 1234 ਹੈ।', 'चाचणी मोडमध्ये OTP 1234 आहे.'),
+  otp_verify: r('पुष्टि करें और आगे बढ़ें', 'Verify & continue', 'ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਅੱਗੇ ਵਧੋ', 'पुष्टी करा आणि पुढे जा'),
+  otp_problem: r('समस्या', 'Problem', 'ਸਮੱਸਿਆ', 'समस्या'),
+  otp_genericError: r('कुछ गलत हो गया। कृपया दोबारा प्रयास करें।', 'Something went wrong. Please try again.', 'ਕੁਝ ਗਲਤ ਹੋ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।', 'काहीतरी चूक झाली. पुन्हा प्रयत्न करा.'),
+
+  reg_title: r('नया खाता', 'New Account', 'ਨਵਾਂ ਖਾਤਾ', 'नवीन खाते'),
+  reg_sub: r('अपना विवरण दर्ज करें', 'Enter your details', 'ਆਪਣਾ ਵੇਰਵਾ ਦਰਜ ਕਰੋ', 'तुमचा तपशील टाका'),
+  reg_fullName: r('पूरा नाम *', 'Full name *', 'ਪੂਰਾ ਨਾਮ *', 'पूर्ण नाव *'),
+  reg_mobile: r('मोबाइल *', 'Mobile *', 'ਮੋਬਾਈਲ *', 'मोबाइल *'),
+  reg_tenDigits: r('10 अंक', '10 digits', '10 ਅੰਕ', '10 अंक'),
+  reg_empId: r('कर्मचारी आईडी *', 'Employee ID *', 'ਕਰਮਚਾਰੀ ID *', 'कर्मचारी ID *'),
+  reg_yourMandi: r('आपकी मंडी *', 'Your mandi *', 'ਤੁਹਾਡੀ ਮੰਡੀ *', 'तुमची मंडी *'),
+  reg_yourMandiHelp: r('आप जिस मंडी में तैनात हैं वही चुनें। आपको केवल उसी मंडी के टोकन दिखाई देंगे।', 'Choose the mandi you are posted at. You will only see tokens from that mandi.', 'ਜਿਸ ਮੰਡੀ ਵਿੱਚ ਤੁਸੀਂ ਤਾਇਨਾਤ ਹੋ ਉਹੀ ਚੁਣੋ। ਤੁਹਾਨੂੰ ਸਿਰਫ਼ ਉਸੇ ਮੰਡੀ ਦੇ ਟੋਕਨ ਦਿਖਣਗੇ।', 'तुम्ही जिथे नियुक्त आहात ती मंडी निवडा. तुम्हाला फक्त त्याच मंडीचे टोकन दिसतील.'),
+  reg_duty: r('ड्यूटी पद *', 'Duty *', 'ਡਿਊਟੀ *', 'कर्तव्य *'),
+  reg_license: r('लाइसेंस नंबर *', 'Licence number *', 'ਲਾਇਸੈਂਸ ਨੰਬਰ *', 'परवाना क्रमांक *'),
+  reg_licensePh: r('लाइसेंस नंबर', 'Licence number', 'ਲਾਇਸੈਂਸ ਨੰਬਰ', 'परवाना क्रमांक'),
+  reg_firm: r('फर्म नाम *', 'Firm name *', 'ਫਰਮ ਦਾ ਨਾਮ *', 'फर्मचे नाव *'),
+  reg_firmPh: r('फर्म का नाम', 'Firm name', 'ਫਰਮ ਦਾ ਨਾਮ', 'फर्मचे नाव'),
+  reg_tradeMandi: r('व्यापार की मंडी *', 'Trading mandi *', 'ਵਪਾਰ ਦੀ ਮੰਡੀ *', 'व्यापाराची मंडी *'),
+  reg_tradeMandiHelp: r('जिस मंडी में आपका लाइसेंस है वही चुनें। आपको उसी मंडी की नीलामी दिखेंगी।', 'Choose the mandi your licence is for. You will see auctions from that mandi.', 'ਜਿਸ ਮੰਡੀ ਦਾ ਲਾਇਸੈਂਸ ਹੈ ਉਹੀ ਚੁਣੋ। ਤੁਹਾਨੂੰ ਉਸੇ ਮੰਡੀ ਦੀ ਨੀਲਾਮੀ ਦਿਖੇਗੀ।', 'ज्या मंडीचा परवाना आहे ती निवडा. तुम्हाला त्याच मंडीचे लिलाव दिसतील.'),
+  reg_goOtp: r('ओटीपी पर जाएं', 'Continue to OTP', 'OTP ਤੇ ਜਾਓ', 'OTP कडे जा'),
+
+  /* ------------------------------------------------------------ */
+  /* Duties (officer)                                              */
+  /* ------------------------------------------------------------ */
+  duty_gate: r('गेट अधिकारी (Gate Entry)', 'Gate Officer', 'ਗੇਟ ਅਧਿਕਾਰੀ', 'गेट अधिकारी'),
+  duty_gate_desc: r('गेट आगमन और वाहन प्रविष्टि', 'Gate arrival & vehicle entry', 'ਗੇਟ ਆਮਦ ਅਤੇ ਵਾਹਨ ਐਂਟਰੀ', 'गेट आगमन व वाहन प्रवेश'),
+  duty_assay: r('गुणवत्ता निरीक्षक (Assay / QC)', 'Quality Inspector (Assay / QC)', 'ਗੁਣਵੱਤਾ ਨਿਰੀਖਕ (ਜਾਂਚ)', 'गुणवत्ता निरीक्षक (तपासणी)'),
+  duty_assay_desc: r('नमूना, नमी, ग्रेड तय करना', 'Sample, moisture, grade', 'ਨਮੂਨਾ, ਨਮੀ, ਗ੍ਰੇਡ', 'नमुना, ओलावा, ग्रेड'),
+  duty_weighbridge: r('तौल अधिकारी (Weighbridge)', 'Weighbridge Officer', 'ਤੋਲ ਅਧਿਕਾਰੀ', 'वजन अधिकारी'),
+  duty_weighbridge_desc: r('भाव तय होने के बाद वजन माप', 'Weighing after price is fixed', 'ਭਾਅ ਤੈਅ ਹੋਣ ਬਾਅਦ ਤੋਲ', 'भाव ठरल्यानंतर वजन'),
+  duty_accounts: r('लेखा व भुगतान (Cashier)', 'Accounts & Payment (Cashier)', 'ਲੇਖਾ ਅਤੇ ਭੁਗਤਾਨ (ਕੈਸ਼ੀਅਰ)', 'लेखा व पेमेंट (कॅशियर)'),
+  duty_accounts_desc: r('भुगतान और बैंक रसीद', 'Payment & bank receipt', 'ਭੁਗਤਾਨ ਅਤੇ ਬੈਂਕ ਰਸੀਦ', 'पेमेंट व बँक पावती'),
+  duty_admin: r('मंडी प्रशासक (Admin)', 'Mandi Admin', 'ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਕ', 'मंडी प्रशासक'),
+  duty_admin_desc: r('समस्त नियंत्रण व विलंब प्रबंधन', 'Full control & delay management', 'ਪੂਰਾ ਨਿਯੰਤਰਣ ਅਤੇ ਦੇਰੀ ਪ੍ਰਬੰਧਨ', 'संपूर्ण नियंत्रण व विलंब व्यवस्थापन'),
+  dutyShort_gate: r('गेट अधिकारी', 'Gate Officer', 'ਗੇਟ ਅਧਿਕਾਰੀ', 'गेट अधिकारी'),
+  dutyShort_assay: r('गुणवत्ता निरीक्षक', 'Quality Inspector', 'ਗੁਣਵੱਤਾ ਨਿਰੀਖਕ', 'गुणवत्ता निरीक्षक'),
+  dutyShort_weighbridge: r('तौल अधिकारी', 'Weighbridge Officer', 'ਤੋਲ ਅਧਿਕਾਰੀ', 'वजन अधिकारी'),
+  dutyShort_accounts: r('लेखा व भुगतान', 'Accounts', 'ਲੇਖਾ ਅਤੇ ਭੁਗਤਾਨ', 'लेखा व पेमेंट'),
+  dutyShort_admin: r('मंडी प्रशासक', 'Mandi Admin', 'ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਕ', 'मंडी प्रशासक'),
+
+  /* ------------------------------------------------------------ */
+  /* Crops & grades                                                */
+  /* ------------------------------------------------------------ */
+  crop_wheat: r('गेहूँ', 'Wheat', 'ਕਣਕ', 'गहू'),
+  crop_paddy: r('धान', 'Paddy', 'ਝੋਨਾ', 'भात'),
+  crop_mustard: r('सरसों', 'Mustard', 'ਸਰ੍ਹੋਂ', 'मोहरी'),
+  crop_cotton: r('कपास', 'Cotton', 'ਕਪਾਹ', 'कापूस'),
+  crop_maize: r('मक्का', 'Maize', 'ਮੱਕੀ', 'मका'),
+  crop_gram: r('चना', 'Gram', 'ਛੋਲੇ', 'हरभरा'),
+  grade_FAQ: r('FAQ', 'FAQ', 'FAQ', 'FAQ'),
+  grade_GRADE_A: r('ग्रेड A', 'Grade A', 'ਗ੍ਰੇਡ A', 'ग्रेड A'),
+  grade_GRADE_B: r('ग्रेड B', 'Grade B', 'ਗ੍ਰੇਡ B', 'ग्रेड B'),
+  grade_REJECTED: r('अस्वीकृत', 'Rejected', 'ਅਸਵੀਕਾਰ', 'नाकारले'),
+
+  /* ------------------------------------------------------------ */
+  /* Booking statuses (badges)                                     */
+  /* ------------------------------------------------------------ */
+  st_booked: r('बुक', 'BOOKED', 'ਬੁੱਕ', 'बुक'),
+  'st_in-gate': r('गेट अंदर', 'IN GATE', 'ਗੇਟ ਅੰਦਰ', 'गेटच्या आत'),
+  st_assay: r('जांच पूरी', 'ASSAYED', 'ਜਾਂਚ ਪੂਰੀ', 'तपासणी पूर्ण'),
+  'st_price-fixed': r('भाव तय', 'PRICE FIXED', 'ਭਾਅ ਤੈਅ', 'भाव निश्चित'),
+  st_weighing: r('तौल', 'WEIGHED', 'ਤੋਲ', 'वजन'),
+  'st_payment-processing': r('भुगतान बाकी', 'PAYMENT DUE', 'ਭੁਗਤਾਨ ਬਾਕੀ', 'पेमेंट बाकी'),
+  st_paid: r('भुगतान', 'PAID', 'ਭੁਗਤਾਨ', 'पेमेंट'),
+  st_rejected: r('अस्वीकृत', 'REJECTED', 'ਅਸਵੀਕਾਰ', 'नाकारले'),
+  'st_no-show': r('अनुपस्थित', 'NO SHOW', 'ਗੈਰਹਾਜ਼ਰ', 'गैरहजर'),
+  st_cancelled: r('रद्द', 'CANCELLED', 'ਰੱਦ', 'रद्द'),
+  st_waitlisted: r('प्रतीक्षा', 'WAITLIST', 'ਉਡੀਕ', 'प्रतीक्षा'),
+  st_appeared: r('मंडी में', 'AT MANDI', 'ਮੰਡੀ ਵਿੱਚ', 'मंडीत'),
+
+  /* ------------------------------------------------------------ */
+  /* Farmer dashboard                                              */
+  /* ------------------------------------------------------------ */
+  noActiveBooking: r('कोई सक्रिय बुकिंग नहीं', 'No Active Booking', 'ਕੋਈ ਸਰਗਰਮ ਬੁਕਿੰਗ ਨਹੀਂ', 'सक्रिय बुकिंग नाही'),
+  noActiveBookingSub: r('मंडी में बिना इंतजार एंट्री के लिए अभी गेट स्लॉट बुक करें', 'Book a gate slot now for zero-wait mandi entry', 'ਮੰਡੀ ਵਿੱਚ ਬਿਨਾਂ ਉਡੀਕ ਐਂਟਰੀ ਲਈ ਹੁਣੇ ਸਲਾਟ ਬੁੱਕ ਕਰੋ', 'मंडीत विना प्रतीक्षा प्रवेशासाठी आता स्लॉट बुक करा'),
+  bookASlot: r('स्लॉट बुक करें →', 'Book a slot →', 'ਸਲਾਟ ਬੁੱਕ ਕਰੋ →', 'स्लॉट बुक करा →'),
+  bookSlot: r('स्लॉट बुक करें', 'Book Slot', 'ਸਲਾਟ ਬੁੱਕ', 'स्लॉट बुक'),
+  myToken: r('मेरा टोकन', 'My Token', 'ਮੇਰਾ ਟੋਕਨ', 'माझे टोकन'),
+  payments: r('भुगतान व रसीद', 'Payments & Receipts', 'ਭੁਗਤਾਨ ਅਤੇ ਰਸੀਦ', 'पेमेंट व पावती'),
+  history: r('इतिहास', 'History', 'ਇਤਿਹਾਸ', 'इतिहास'),
+  myCrops: r('मेरी फसलें', 'My Crops', 'ਮੇਰੀਆਂ ਫਸਲਾਂ', 'माझी पिके'),
+  help: r('सहायता', 'Help', 'ਮਦਦ', 'मदत'),
+  activeBooking: r('सक्रिय बुकिंग', 'Active Booking', 'ਸਰਗਰਮ ਬੁਕਿੰਗ', 'सक्रिय बुकिंग'),
+  trackStatus: r('पूरा विवरण देखें', 'View full details', 'ਪੂਰਾ ਵੇਰਵਾ ਵੇਖੋ', 'संपूर्ण तपशील पहा'),
+  fd_cropLine: r('फसल: {crop} • {qty} क्विंटल', 'Crop: {crop} • {qty} qtl', 'ਫਸਲ: {crop} • {qty} ਕੁਇੰਟਲ', 'पीक: {crop} • {qty} क्विंटल'),
+
+  /* ------------------------------------------------------------ */
+  /* Queue status card (traffic light)                             */
+  /* ------------------------------------------------------------ */
+  q_nowServing: r('अभी चल रहा है', 'Now serving', 'ਹੁਣ ਚੱਲ ਰਿਹਾ', 'सध्या सुरू'),
+  q_yourToken: r('आपका टोकन', 'Your token', 'ਤੁਹਾਡਾ ਟੋਕਨ', 'तुमचे टोकन'),
+  q_ahead: r('आपसे पहले', 'Ahead of you', 'ਤੁਹਾਡੇ ਤੋਂ ਪਹਿਲਾਂ', 'तुमच्या आधी'),
+  q_etaWait: r('अनुमानित प्रतीक्षा: {eta}', 'Estimated wait: {eta}', 'ਅਨੁਮਾਨਿਤ ਉਡੀਕ: {eta}', 'अंदाजे प्रतीक्षा: {eta}'),
+  q_etaNote: r('(अनुमान मात्र)', '(estimate only)', '(ਸਿਰਫ਼ ਅਨੁਮਾਨ)', '(फक्त अंदाज)'),
+  q_aboutMin: r('लगभग {m} मिनट', 'about {m} min', 'ਲਗਭਗ {m} ਮਿੰਟ', 'सुमारे {m} मिनिटे'),
+  q_aboutHr: r('लगभग {h} घंटे', 'about {h} hr', 'ਲਗਭਗ {h} ਘੰਟੇ', 'सुमारे {h} तास'),
+  q_aboutHrMin: r('लगभग {h} घंटे {m} मिनट', 'about {h} hr {m} min', 'ਲਗਭਗ {h} ਘੰਟੇ {m} ਮਿੰਟ', 'सुमारे {h} तास {m} मिनिटे'),
+  q_comeToGate: r('कृपया अपना वाहन लेकर गेट पर आएं', 'Please bring your vehicle to the gate', 'ਕਿਰਪਾ ਕਰਕੇ ਵਾਹਨ ਲੈ ਕੇ ਗੇਟ ਤੇ ਆਓ', 'कृपया वाहन घेऊन गेटवर या'),
+  // headlines/details produced by buildQueueView
+  qv_action_h: r('जांच पूरी — भाव तय करें', 'Assay done — fix your price', 'ਜਾਂਚ ਪੂਰੀ — ਭਾਅ ਤੈਅ ਕਰੋ', 'तपासणी पूर्ण — भाव ठरवा'),
+  qv_action_d: r('ग्रेड {grade} • MSP पर बेचें या नीलामी शुरू करें। टैप करें →', 'Grade {grade} • Sell at MSP or start an auction. Tap →', 'ਗ੍ਰੇਡ {grade} • MSP ਤੇ ਵੇਚੋ ਜਾਂ ਨੀਲਾਮੀ ਸ਼ੁਰੂ ਕਰੋ। ਟੈਪ ਕਰੋ →', 'ग्रेड {grade} • MSP ला विका किंवा लिलाव सुरू करा. टॅप करा →'),
+  qv_inside_h: r('आप मंडी के अंदर हैं', 'You are inside the mandi', 'ਤੁਸੀਂ ਮੰਡੀ ਦੇ ਅੰਦਰ ਹੋ', 'तुम्ही मंडीच्या आत आहात'),
+  qv_inside_d: r('गुणवत्ता जांच की प्रतीक्षा करें', 'Waiting for quality check', 'ਗੁਣਵੱਤਾ ਜਾਂਚ ਦੀ ਉਡੀਕ ਕਰੋ', 'गुणवत्ता तपासणीची प्रतीक्षा'),
+  qv_priceFixed_h: r('भाव तय: ₹{rate} / क्विंटल', 'Price fixed: ₹{rate} / qtl', 'ਭਾਅ ਤੈਅ: ₹{rate} / ਕੁਇੰਟਲ', 'भाव निश्चित: ₹{rate} / क्विंटल'),
+  qv_priceFixed_d: r('खरीदार: {buyer} • अब तौल के लिए जाएँ', 'Buyer: {buyer} • proceed to weighbridge', 'ਖਰੀਦਦਾਰ: {buyer} • ਹੁਣ ਤੋਲ ਲਈ ਜਾਓ', 'खरेदीदार: {buyer} • आता वजनासाठी जा'),
+  qv_weighed_h: r('तौल पूरा — भुगतान की प्रतीक्षा', 'Weighed — awaiting payment', 'ਤੋਲ ਪੂਰਾ — ਭੁਗਤਾਨ ਦੀ ਉਡੀਕ', 'वजन पूर्ण — पेमेंटची प्रतीक्षा'),
+  qv_weighed_d: r('{qty} क्विंटल × ₹{rate}', '{qty} qtl × ₹{rate}', '{qty} ਕੁਇੰਟਲ × ₹{rate}', '{qty} क्विंटल × ₹{rate}'),
+  qv_payPending_h: r('भुगतान तैयार हो रहा है', 'Payment being prepared', 'ਭੁਗਤਾਨ ਤਿਆਰ ਹੋ ਰਿਹਾ ਹੈ', 'पेमेंट तयार होत आहे'),
+  qv_payPending_d: r('कैशियर रसीद बना रहा है', 'Cashier is preparing the receipt', 'ਕੈਸ਼ੀਅਰ ਰਸੀਦ ਬਣਾ ਰਿਹਾ ਹੈ', 'कॅशियर पावती तयार करत आहे'),
+  qv_paid_h: r('भुगतान पूरा हुआ', 'Payment complete', 'ਭੁਗਤਾਨ ਪੂਰਾ ਹੋਇਆ', 'पेमेंट पूर्ण'),
+  qv_noShow_h: r('आप उपस्थित नहीं हुए', 'You did not show up', 'ਤੁਸੀਂ ਹਾਜ਼ਰ ਨਹੀਂ ਹੋਏ', 'तुम्ही हजर झाला नाहीत'),
+  qv_closed_h: r('यह टोकन बंद है', 'This token is closed', 'ਇਹ ਟੋਕਨ ਬੰਦ ਹੈ', 'हे टोकन बंद आहे'),
+  qv_notStarted_h: r('कतार अभी शुरू नहीं हुई', 'Queue has not started yet', 'ਕਤਾਰ ਅਜੇ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋਈ', 'रांग अजून सुरू झाली नाही'),
+  qv_notStarted_d: r('आपका टोकन {token}', 'Your token {token}', 'ਤੁਹਾਡਾ ਟੋਕਨ {token}', 'तुमचे टोकन {token}'),
+  qv_go_h: r('गेट पर पहुंचें - आपकी बारी है', 'Go to the gate — it is your turn', 'ਗੇਟ ਤੇ ਪਹੁੰਚੋ - ਤੁਹਾਡੀ ਵਾਰੀ ਹੈ', 'गेटवर जा - तुमची पाळी आहे'),
+  qv_go_d: r('अभी टोकन {token} चल रहा है • अंदर {n} वाहन', 'Now serving {token} • {n} inside', 'ਹੁਣ ਟੋਕਨ {token} ਚੱਲ ਰਿਹਾ • ਅੰਦਰ {n} ਵਾਹਨ', 'सध्या टोकन {token} सुरू • आत {n} वाहने'),
+  qv_go_empty: r('गेट खाली है', 'The gate is free', 'ਗੇਟ ਖਾਲੀ ਹੈ', 'गेट रिकामे आहे'),
+  qv_ready_h: r('तैयार हो जाइए', 'Get ready', 'ਤਿਆਰ ਹੋ ਜਾਓ', 'तयार व्हा'),
+  qv_wait_h: r('अभी समय है', 'Still some time', 'ਅਜੇ ਸਮਾਂ ਹੈ', 'अजून वेळ आहे'),
+  qv_aheadLine: r('आपसे पहले {n} किसान • अंदर {inside} वाहन', '{n} farmers ahead • {inside} inside', 'ਤੁਹਾਡੇ ਤੋਂ ਪਹਿਲਾਂ {n} ਕਿਸਾਨ • ਅੰਦਰ {inside} ਵਾਹਨ', 'तुमच्या आधी {n} शेतकरी • आत {inside} वाहने'),
+
+  /* ------------------------------------------------------------ */
+  /* Crop / centre / slot selection                                */
+  /* ------------------------------------------------------------ */
+  selectCrop: r('चरण 1: फसल चुनें', 'Step 1: Select Crop', 'ਪੜਾਅ 1: ਫਸਲ ਚੁਣੋ', 'पायरी 1: पीक निवडा'),
+  selectCropSub: r('आज मंडी में बेचने वाली फसल चुनें', 'Choose the crop you will sell today', 'ਅੱਜ ਮੰਡੀ ਵਿੱਚ ਵੇਚਣ ਵਾਲੀ ਫਸਲ ਚੁਣੋ', 'आज मंडीत विकायचे पीक निवडा'),
+  selectCentre: r('चरण 2: मंडी चुनें', 'Step 2: Select Mandi', 'ਪੜਾਅ 2: ਮੰਡੀ ਚੁਣੋ', 'पायरी 2: मंडी निवडा'),
+  selectCentreSub: r('अपनी फसल लेने वाला निकटतम केंद्र चुनें', 'Pick the nearest centre accepting your crop', 'ਆਪਣੀ ਫਸਲ ਲੈਣ ਵਾਲੀ ਨਜ਼ਦੀਕੀ ਮੰਡੀ ਚੁਣੋ', 'तुमचे पीक स्वीकारणारी जवळची मंडी निवडा'),
+  selectSlot: r('चरण 3: आगमन समय', 'Step 3: Arrival Time', 'ਪੜਾਅ 3: ਆਮਦ ਸਮਾਂ', 'पायरी 3: आगमन वेळ'),
+  cs_locating: r('आपकी लोकेशन से मंडियों की दूरी पता की जा रही है...', 'Finding mandi distances from your location...', 'ਤੁਹਾਡੀ ਲੋਕੇਸ਼ਨ ਤੋਂ ਮੰਡੀਆਂ ਦੀ ਦੂਰੀ ਪਤਾ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ...', 'तुमच्या स्थानापासून मंडींचे अंतर शोधत आहे...'),
+  cs_nearestByLocation: r('📍 आपके स्थान के अनुसार निकटतम मंडियां', '📍 Nearest mandis by your location', '📍 ਤੁਹਾਡੀ ਲੋਕੇਸ਼ਨ ਅਨੁਸਾਰ ਨਜ਼ਦੀਕੀ ਮੰਡੀਆਂ', '📍 तुमच्या स्थानानुसार जवळच्या मंडी'),
+  cs_noPermission: r('लोकेशन अनुमति नहीं मिली।', 'Location permission denied.', 'ਲੋਕੇਸ਼ਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਮਿਲੀ।', 'स्थान परवानगी मिळाली नाही.'),
+  cs_noLocation: r('आपकी वर्तमान लोकेशन नहीं मिल सकी।', 'Could not get your current location.', 'ਤੁਹਾਡੀ ਮੌਜੂਦਾ ਲੋਕੇਸ਼ਨ ਨਹੀਂ ਮਿਲੀ।', 'तुमचे सध्याचे स्थान मिळाले नाही.'),
+  cs_locError: r('लोकेशन प्राप्त नहीं हो सकी।', 'Location unavailable.', 'ਲੋਕੇਸ਼ਨ ਨਹੀਂ ਮਿਲੀ।', 'स्थान मिळाले नाही.'),
+  cs_loadFail: r('मंडी लोड नहीं हुई', 'Could not load mandis', 'ਮੰਡੀ ਲੋਡ ਨਹੀਂ ਹੋਈ', 'मंडी लोड झाली नाही'),
+  cs_loadFailSub: r('मंडियों की जानकारी प्राप्त नहीं हो सकी।', 'Mandi information could not be fetched.', 'ਮੰਡੀਆਂ ਦੀ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।', 'मंडींची माहिती मिळाली नाही.'),
+  cs_noneForCrop: r('इस फसल के लिए कोई मंडी उपलब्ध नहीं है।', 'No mandi available for this crop.', 'ਇਸ ਫਸਲ ਲਈ ਕੋਈ ਮੰਡੀ ਉਪਲਬਧ ਨਹੀਂ।', 'या पिकासाठी मंडी उपलब्ध नाही.'),
+  cs_noneForCropSub: r('कृपया बाद में पुनः प्रयास करें या दूसरी फसल चुनें।', 'Please try later or choose another crop.', 'ਬਾਅਦ ਵਿੱਚ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਜਾਂ ਹੋਰ ਫਸਲ ਚੁਣੋ।', 'नंतर प्रयत्न करा किंवा दुसरे पीक निवडा.'),
+  cs_nearest: r('सबसे नजदीकी', 'Nearest', 'ਸਭ ਤੋਂ ਨੇੜੇ', 'सर्वात जवळ'),
+  cs_lanes: r('🛣️ {n} लेन', '🛣️ {n} lanes', '🛣️ {n} ਲੇਨ', '🛣️ {n} लेन'),
+  cs_minPerVehicle: r('⏱️ {n} मिनट/वाहन', '⏱️ {n} min/vehicle', '⏱️ {n} ਮਿੰਟ/ਵਾਹਨ', '⏱️ {n} मिनिटे/वाहन'),
+  cs_hours: r('समय: {a} - {b}', 'Hours: {a} - {b}', 'ਸਮਾਂ: {a} - {b}', 'वेळ: {a} - {b}'),
+
+  ss_testBanner: r('🧪 टेस्टिंग मोड: आज के सभी स्लॉट पूरे दिन खुले हैं', '🧪 Testing mode: all of today\'s slots are open all day', '🧪 ਟੈਸਟਿੰਗ ਮੋਡ: ਅੱਜ ਦੇ ਸਾਰੇ ਸਲਾਟ ਪੂਰਾ ਦਿਨ ਖੁੱਲ੍ਹੇ ਹਨ', '🧪 चाचणी मोड: आजचे सर्व स्लॉट दिवसभर खुले'),
+  ss_pickDate: r('तारीख चुनें', 'Choose date', 'ਤਾਰੀਖ ਚੁਣੋ', 'तारीख निवडा'),
+  ss_selected: r('(चुनी हुई: {label} {date})', '(selected: {label} {date})', '(ਚੁਣੀ: {label} {date})', '(निवडलेली: {label} {date})'),
+  ss_pickSlot: r('स्लॉट चुनें', 'Choose slot', 'ਸਲਾਟ ਚੁਣੋ', 'स्लॉट निवडा'),
+  ss_noneToday: r('आज के बचे हुए स्लॉट खत्म हो गए। कल के लिए बुक करें।', 'No slots left today. Book for tomorrow.', 'ਅੱਜ ਦੇ ਸਲਾਟ ਖ਼ਤਮ। ਕੱਲ੍ਹ ਲਈ ਬੁੱਕ ਕਰੋ।', 'आजचे स्लॉट संपले. उद्यासाठी बुक करा.'),
+  ss_noneDay: r('इस दिन कोई स्लॉट उपलब्ध नहीं है।', 'No slots available on this day.', 'ਇਸ ਦਿਨ ਕੋਈ ਸਲਾਟ ਉਪਲਬਧ ਨਹੀਂ।', 'या दिवशी स्लॉट उपलब्ध नाही.'),
+  ss_full: r('क्षमता पूरी', 'Full', 'ਸਮਰੱਥਾ ਪੂਰੀ', 'क्षमता पूर्ण'),
+  ss_available: r('{a} / {b} स्थान उपलब्ध', '{a} / {b} places available', '{a} / {b} ਥਾਂ ਉਪਲਬਧ', '{a} / {b} जागा उपलब्ध'),
+  ss_qtyTitle: r('अनुमानित मात्रा', 'Approximate quantity', 'ਅਨੁਮਾਨਿਤ ਮਾਤਰਾ', 'अंदाजे प्रमाण'),
+  ss_qtyLabel: r('फसल की मात्रा', 'Crop quantity', 'ਫਸਲ ਦੀ ਮਾਤਰਾ', 'पिकाचे प्रमाण'),
+  ss_loadFail: r('स्लॉट लोड नहीं हुए', 'Could not load slots', 'ਸਲਾਟ ਲੋਡ ਨਹੀਂ ਹੋਏ', 'स्लॉट लोड झाले नाहीत'),
+  ss_pickOne: r('कृपया एक स्लॉट चुनें।', 'Please choose a slot.', 'ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਸਲਾਟ ਚੁਣੋ।', 'कृपया एक स्लॉट निवडा.'),
+  ss_isFull: r('स्लॉट पूरा है', 'Slot is full', 'ਸਲਾਟ ਭਰ ਗਿਆ', 'स्लॉट भरला आहे'),
+  ss_isFullSub: r('यह स्लॉट उपलब्ध नहीं है। कृपया दूसरा स्लॉट चुनें।', 'This slot is unavailable. Please choose another.', 'ਇਹ ਸਲਾਟ ਉਪਲਬਧ ਨਹੀਂ। ਹੋਰ ਚੁਣੋ।', 'हा स्लॉट उपलब्ध नाही. दुसरा निवडा.'),
+  ss_enterQty: r('कृपया अनुमानित मात्रा दर्ज करें।', 'Please enter an approximate quantity.', 'ਅਨੁਮਾਨਿਤ ਮਾਤਰਾ ਦਰਜ ਕਰੋ।', 'अंदाजे प्रमाण टाका.'),
+  ss_bookFail: r('बुकिंग असफल', 'Booking failed', 'ਬੁਕਿੰਗ ਅਸਫਲ', 'बुकिंग अयशस्वी'),
+  ss_bookFailSub: r('बुकिंग करते समय समस्या हुई।', 'There was a problem while booking.', 'ਬੁਕਿੰਗ ਵਿੱਚ ਸਮੱਸਿਆ ਆਈ।', 'बुकिंग करताना समस्या आली.'),
+  confirmToken: r('पुष्टि करें और टोकन लें', 'Confirm & Get Token', 'ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਟੋਕਨ ਲਓ', 'पुष्टी करा आणि टोकन घ्या'),
+
+  /* ------------------------------------------------------------ */
+  /* Token confirmation + gate pass                                */
+  /* ------------------------------------------------------------ */
+  tc_booked: r('टोकन बुक हो गया!', 'Token booked!', 'ਟੋਕਨ ਬੁੱਕ ਹੋ ਗਿਆ!', 'टोकन बुक झाले!'),
+  tc_yourToken: r('आपका टोकन नंबर', 'Your token number', 'ਤੁਹਾਡਾ ਟੋਕਨ ਨੰਬਰ', 'तुमचा टोकन क्रमांक'),
+  tc_eta: r('अनुमानित बारी: {t}', 'Estimated turn: {t}', 'ਅਨੁਮਾਨਿਤ ਵਾਰੀ: {t}', 'अंदाजे पाळी: {t}'),
+  tc_savePass: r('⬇  गेट पास PDF सेव करें', '⬇  Save gate pass PDF', '⬇  ਗੇਟ ਪਾਸ PDF ਸੰਭਾਲੋ', '⬇  गेट पास PDF जतन करा'),
+  tc_whatAtGate: r('गेट पर क्या करें?', 'What to do at the gate?', 'ਗੇਟ ਤੇ ਕੀ ਕਰਨਾ ਹੈ?', 'गेटवर काय करावे?'),
+  tc_tip1: r('1. यह QR या 6-अंकों का गेट पास नंबर दिखाएँ', '1. Show this QR or the 6-digit gate pass number', '1. ਇਹ QR ਜਾਂ 6-ਅੰਕਾਂ ਦਾ ਗੇਟ ਪਾਸ ਨੰਬਰ ਦਿਖਾਓ', '1. हा QR किंवा 6-अंकी गेट पास क्रमांक दाखवा'),
+  tc_tip2: r('2. अपना वाहन नंबर बताएँ', '2. Tell your vehicle number', '2. ਆਪਣਾ ਵਾਹਨ ਨੰਬਰ ਦੱਸੋ', '2. तुमचा वाहन क्रमांक सांगा'),
+  tc_tip3: r('3. गेट अधिकारी आपको अंदर भेजेंगे', '3. The gate officer will let you in', '3. ਗੇਟ ਅਧਿਕਾਰੀ ਤੁਹਾਨੂੰ ਅੰਦਰ ਭੇਜਣਗੇ', '3. गेट अधिकारी तुम्हाला आत पाठवतील'),
+  tc_tipNote: r('यह गेट पास आपके टोकन पेज पर भी हमेशा उपलब्ध रहेगा।', 'This gate pass is always available on your token page.', 'ਇਹ ਗੇਟ ਪਾਸ ਤੁਹਾਡੇ ਟੋਕਨ ਪੇਜ ਤੇ ਹਮੇਸ਼ਾ ਉਪਲਬਧ ਰਹੇਗਾ।', 'हा गेट पास तुमच्या टोकन पेजवर नेहमी उपलब्ध असेल.'),
+  tc_noBooking: r('बुकिंग जानकारी नहीं मिली', 'Booking details not found', 'ਬੁਕਿੰਗ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ', 'बुकिंग माहिती सापडली नाही'),
+  goDashboard: r('डैशबोर्ड पर जाएँ', 'Go to Dashboard', 'ਡੈਸ਼ਬੋਰਡ ਤੇ ਜਾਓ', 'डॅशबोर्डवर जा'),
+  gp_title: r('🎫 गेट पास / GATE PASS', '🎫 GATE PASS', '🎫 ਗੇਟ ਪਾਸ / GATE PASS', '🎫 गेट पास / GATE PASS'),
+  gp_number: r('गेट पास नंबर', 'Gate pass number', 'ਗੇਟ ਪਾਸ ਨੰਬਰ', 'गेट पास क्रमांक'),
+  gp_dateTime: r('तारीख • समय', 'Date • Time', 'ਤਾਰੀਖ • ਸਮਾਂ', 'तारीख • वेळ'),
+  gp_hint: r('गेट पर यह QR या नंबर और वाहन नंबर दिखाएँ', 'Show this QR or number with your vehicle number at the gate', 'ਗੇਟ ਤੇ ਇਹ QR ਜਾਂ ਨੰਬਰ ਅਤੇ ਵਾਹਨ ਨੰਬਰ ਦਿਖਾਓ', 'गेटवर हा QR किंवा क्रमांक आणि वाहन क्रमांक दाखवा'),
+
+  /* ------------------------------------------------------------ */
+  /* Token detail                                                  */
+  /* ------------------------------------------------------------ */
+  td_notFound: r('टोकन नहीं मिला', 'Token not found', 'ਟੋਕਨ ਨਹੀਂ ਮਿਲਿਆ', 'टोकन सापडले नाही'),
+  td_yourToken: r('आपका टोकन', 'Your token', 'ਤੁਹਾਡਾ ਟੋਕਨ', 'तुमचे टोकन'),
+  td_downloadPass: r('⬇  गेट पास PDF डाउनलोड करें', '⬇  Download gate pass PDF', '⬇  ਗੇਟ ਪਾਸ PDF ਡਾਊਨਲੋਡ ਕਰੋ', '⬇  गेट पास PDF डाउनलोड करा'),
+  td_progress: r('प्रगति', 'Progress', 'ਪ੍ਰਗਤੀ', 'प्रगती'),
+  stage_booked: r('बुकिंग हुई', 'Booked', 'ਬੁਕਿੰਗ ਹੋਈ', 'बुकिंग झाली'),
+  stage_gate: r('गेट प्रवेश', 'Gate entry', 'ਗੇਟ ਐਂਟਰੀ', 'गेट प्रवेश'),
+  stage_assay: r('गुणवत्ता जांच', 'Quality check', 'ਗੁਣਵੱਤਾ ਜਾਂਚ', 'गुणवत्ता तपासणी'),
+  stage_price: r('भाव तय (MSP / नीलामी)', 'Price fixed (MSP / auction)', 'ਭਾਅ ਤੈਅ (MSP / ਨੀਲਾਮੀ)', 'भाव निश्चित (MSP / लिलाव)'),
+  stage_weigh: r('तौल', 'Weighing', 'ਤੋਲ', 'वजन'),
+  stage_payReady: r('भुगतान तैयार', 'Payment ready', 'ਭੁਗਤਾਨ ਤਿਆਰ', 'पेमेंट तयार'),
+  stage_paid: r('भुगतान पूरा', 'Paid', 'ਭੁਗਤਾਨ ਪੂਰਾ', 'पेमेंट पूर्ण'),
+  stage_done: r('पूरा हुआ', 'Done', 'ਪੂਰਾ ਹੋਇਆ', 'पूर्ण'),
+  stage_now: r('अभी चल रहा है', 'In progress', 'ਹੁਣ ਚੱਲ ਰਿਹਾ', 'सुरू आहे'),
+  stage_pending: r('बाकी', 'Pending', 'ਬਾਕੀ', 'बाकी'),
+  td_bookingDetails: r('बुकिंग विवरण', 'Booking details', 'ਬੁਕਿੰਗ ਵੇਰਵਾ', 'बुकिंग तपशील'),
+  td_atGate: r('गेट पर दर्ज होगा', 'Recorded at gate', 'ਗੇਟ ਤੇ ਦਰਜ ਹੋਵੇਗਾ', 'गेटवर नोंद होईल'),
+  td_fixPrice: r('भाव तय करें', 'Fix your price', 'ਭਾਅ ਤੈਅ ਕਰੋ', 'भाव ठरवा'),
+  td_fixPriceHint: r('जांच पूरी हो गई (ग्रेड {grade})। अब बताएं कि आप कैसे बेचना चाहते हैं। भाव तय होने के बाद ही तौल होगा।', 'Assay is done (grade {grade}). Choose how you want to sell. Weighing happens only after the price is fixed.', 'ਜਾਂਚ ਪੂਰੀ (ਗ੍ਰੇਡ {grade})। ਦੱਸੋ ਕਿਵੇਂ ਵੇਚਣਾ ਹੈ। ਭਾਅ ਤੈਅ ਹੋਣ ਬਾਅਦ ਹੀ ਤੋਲ ਹੋਵੇਗਾ।', 'तपासणी पूर्ण (ग्रेड {grade}). कसे विकायचे ते निवडा. भाव ठरल्यानंतरच वजन होईल.'),
+  td_mspTitle: r('सरकारी खरीद (MSP)', 'Government purchase (MSP)', 'ਸਰਕਾਰੀ ਖਰੀਦ (MSP)', 'शासकीय खरेदी (MSP)'),
+  td_mspSub: r('निश्चित भाव, तुरंत आगे बढ़ें', 'Fixed price, proceed immediately', 'ਪੱਕਾ ਭਾਅ, ਤੁਰੰਤ ਅੱਗੇ ਵਧੋ', 'निश्चित भाव, लगेच पुढे जा'),
+  td_sellMsp: r('MSP पर बेचें', 'Sell at MSP', 'MSP ਤੇ ਵੇਚੋ', 'MSP ला विका'),
+  td_sellMspConfirm: r('MSP पर बेचें?', 'Sell at MSP?', 'MSP ਤੇ ਵੇਚੀਏ?', 'MSP ला विकायचे?'),
+  td_sellMspConfirmSub: r('₹{msp} प्रति क्विंटल पर सरकारी एजेंसी को बेचने की पुष्टि करें। इसके बाद तौल होगा।', 'Confirm sale to the government agency at ₹{msp} per quintal. Weighing follows.', '₹{msp} ਪ੍ਰਤੀ ਕੁਇੰਟਲ ਤੇ ਸਰਕਾਰੀ ਏਜੰਸੀ ਨੂੰ ਵੇਚਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ। ਫਿਰ ਤੋਲ ਹੋਵੇਗਾ।', '₹{msp} प्रति क्विंटल शासकीय संस्थेला विक्रीची पुष्टी करा. नंतर वजन होईल.'),
+  td_yesMsp: r('हाँ, MSP पर बेचें', 'Yes, sell at MSP', 'ਹਾਂ, MSP ਤੇ ਵੇਚੋ', 'होय, MSP ला विका'),
+  td_priceFail: r('भाव तय नहीं हुआ।', 'Could not fix price.', 'ਭਾਅ ਤੈਅ ਨਹੀਂ ਹੋਇਆ।', 'भाव ठरला नाही.'),
+  td_auctionTitle: r('व्यापारी नीलामी (e-Auction)', 'Trader auction (e-Auction)', 'ਵਪਾਰੀ ਨੀਲਾਮੀ (e-Auction)', 'व्यापारी लिलाव (e-Auction)'),
+  td_auctionSub: r('10 मिनट लाइव बोली • न्यूनतम भाव MSP ₹{msp}', '10-minute live bidding • floor price MSP ₹{msp}', '10 ਮਿੰਟ ਲਾਈਵ ਬੋਲੀ • ਘੱਟੋ-ਘੱਟ MSP ₹{msp}', '10 मिनिटे लाइव्ह बोली • किमान भाव MSP ₹{msp}'),
+  td_prevRejected: r('पिछली नीलामी अस्वीकार की गई', 'Previous auction was rejected', 'ਪਿਛਲੀ ਨੀਲਾਮੀ ਅਸਵੀਕਾਰ ਕੀਤੀ', 'मागील लिलाव नाकारला'),
+  td_startAuction: r('नीलामी शुरू', 'Start auction', 'ਨੀਲਾਮੀ ਸ਼ੁਰੂ', 'लिलाव सुरू'),
+  td_reAuction: r('दोबारा नीलामी', 'Re-auction', 'ਦੁਬਾਰਾ ਨੀਲਾਮੀ', 'पुन्हा लिलाव'),
+  td_startConfirm: r('नीलामी शुरू करें?', 'Start the auction?', 'ਨੀਲਾਮੀ ਸ਼ੁਰੂ ਕਰੀਏ?', 'लिलाव सुरू करायचा?'),
+  td_startConfirmSub: r('10 मिनट की लाइव बोली शुरू होगी। न्यूनतम भाव MSP ₹{msp} रहेगा। बाद में आप बोली स्वीकार या अस्वीकार कर सकते हैं।', 'A 10-minute live auction will start. Floor price is MSP ₹{msp}. You can accept or reject bids afterwards.', '10 ਮਿੰਟ ਦੀ ਲਾਈਵ ਬੋਲੀ ਸ਼ੁਰੂ ਹੋਵੇਗੀ। ਘੱਟੋ-ਘੱਟ ਭਾਅ MSP ₹{msp}। ਬਾਅਦ ਵਿੱਚ ਬੋਲੀ ਸਵੀਕਾਰ ਜਾਂ ਅਸਵੀਕਾਰ ਕਰ ਸਕਦੇ ਹੋ।', '10 मिनिटांची लाइव्ह बोली सुरू होईल. किमान भाव MSP ₹{msp}. नंतर बोली स्वीकारू किंवा नाकारू शकता.'),
+  td_yesStart: r('हाँ, शुरू करें', 'Yes, start', 'ਹਾਂ, ਸ਼ੁਰੂ ਕਰੋ', 'होय, सुरू करा'),
+  td_startFail: r('नीलामी शुरू नहीं हुई।', 'Could not start auction.', 'ਨੀਲਾਮੀ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋਈ।', 'लिलाव सुरू झाला नाही.'),
+  td_live: r('🔴 नीलामी चालू', '🔴 Auction live', '🔴 ਨੀਲਾਮੀ ਚਾਲੂ', '🔴 लिलाव सुरू'),
+  td_ended: r('⏹ नीलामी समाप्त', '⏹ Auction ended', '⏹ ਨੀਲਾਮੀ ਖ਼ਤਮ', '⏹ लिलाव संपला'),
+  td_highest: r('सबसे ऊँची बोली: {who} • कुल {n} बोलियाँ', 'Highest bid: {who} • {n} bids', 'ਸਭ ਤੋਂ ਉੱਚੀ ਬੋਲੀ: {who} • ਕੁੱਲ {n} ਬੋਲੀਆਂ', 'सर्वाधिक बोली: {who} • एकूण {n} बोली'),
+  td_aboveMsp: r('MSP से ₹{d} अधिक', '₹{d} above MSP', 'MSP ਤੋਂ ₹{d} ਵੱਧ', 'MSP पेक्षा ₹{d} जास्त'),
+  td_noBids: r('अभी तक कोई बोली नहीं आई', 'No bids yet', 'ਅਜੇ ਕੋਈ ਬੋਲੀ ਨਹੀਂ', 'अजून बोली नाही'),
+  td_acceptBid: r('बोली स्वीकार करें', 'Accept bid', 'ਬੋਲੀ ਸਵੀਕਾਰ ਕਰੋ', 'बोली स्वीकारा'),
+  td_acceptConfirm: r('बोली स्वीकार करें?', 'Accept this bid?', 'ਬੋਲੀ ਸਵੀਕਾਰ ਕਰੀਏ?', 'बोली स्वीकारायची?'),
+  td_acceptConfirmSub: r('{who} — ₹{amt} / क्विंटल। इसके बाद तौल होगा।', '{who} — ₹{amt} / qtl. Weighing follows.', '{who} — ₹{amt} / ਕੁਇੰਟਲ। ਫਿਰ ਤੋਲ ਹੋਵੇਗਾ।', '{who} — ₹{amt} / क्विंटल. नंतर वजन होईल.'),
+  td_accept: r('स्वीकार', 'Accept', 'ਸਵੀਕਾਰ', 'स्वीकारा'),
+  td_acceptFail: r('स्वीकार नहीं हुआ।', 'Could not accept.', 'ਸਵੀਕਾਰ ਨਹੀਂ ਹੋਇਆ।', 'स्वीकारता आले नाही.'),
+  td_more5: r('5 मिनट और', '5 more min', '5 ਮਿੰਟ ਹੋਰ', 'आणखी 5 मिनिटे'),
+  td_reject: r('अस्वीकार', 'Reject', 'ਅਸਵੀਕਾਰ', 'नाकारा'),
+  td_rejectConfirm: r('बोली अस्वीकार?', 'Reject bids?', 'ਬੋਲੀ ਅਸਵੀਕਾਰ?', 'बोली नाकारायची?'),
+  td_rejectConfirmSub: r('आप फिर MSP पर बेच सकते हैं या दोबारा नीलामी कर सकते हैं।', 'You can then sell at MSP or re-auction.', 'ਫਿਰ ਤੁਸੀਂ MSP ਤੇ ਵੇਚ ਸਕਦੇ ਹੋ ਜਾਂ ਦੁਬਾਰਾ ਨੀਲਾਮੀ ਕਰ ਸਕਦੇ ਹੋ।', 'नंतर तुम्ही MSP ला विकू शकता किंवा पुन्हा लिलाव करू शकता.'),
+  td_failed: r('असफल।', 'Failed.', 'ਅਸਫਲ।', 'अयशस्वी.'),
+  td_fixedPrice: r('तय भाव', 'Fixed price', 'ਤੈਅ ਭਾਅ', 'निश्चित भाव'),
+  td_mode: r('माध्यम', 'Mode', 'ਮਾਧਿਅਮ', 'माध्यम'),
+  td_auction: r('नीलामी', 'Auction', 'ਨੀਲਾਮੀ', 'लिलाव'),
+  td_buyer: r('खरीदार', 'Buyer', 'ਖਰੀਦਦਾਰ', 'खरेदीदार'),
+  td_govBuyer: r('सरकारी खरीद एजेंसी (MSP)', 'Government agency (MSP)', 'ਸਰਕਾਰੀ ਖਰੀਦ ਏਜੰਸੀ (MSP)', 'शासकीय खरेदी संस्था (MSP)'),
+  td_weighing: r('तौल', 'Weighing', 'ਤੋਲ', 'वजन'),
+  td_gross: r('कुल वजन', 'Gross weight', 'ਕੁੱਲ ਵਜ਼ਨ', 'एकूण वजन'),
+  td_tare: r('खाली वाहन', 'Empty vehicle', 'ਖਾਲੀ ਵਾਹਨ', 'रिकामे वाहन'),
+  td_net: r('शुद्ध वजन', 'Net weight', 'ਸ਼ੁੱਧ ਵਜ਼ਨ', 'निव्वळ वजन'),
+  td_receipt: r('भुगतान रसीद', 'Payment receipt', 'ਭੁਗਤਾਨ ਰਸੀਦ', 'पेमेंट पावती'),
+  td_receiptNo: r('रसीद क्रमांक', 'Receipt no.', 'ਰਸੀਦ ਨੰਬਰ', 'पावती क्रमांक'),
+  td_total: r('कुल राशि', 'Gross amount', 'ਕੁੱਲ ਰਕਮ', 'एकूण रक्कम'),
+  td_mandiFee: r('मंडी शुल्क', 'Mandi fee', 'ਮੰਡੀ ਫੀਸ', 'मंडी शुल्क'),
+  td_commission: r('आढ़त', 'Commission', 'ਆੜ੍ਹਤ', 'अडत'),
+  td_hamali: r('हमाली', 'Hamali (labour)', 'ਹਮਾਲੀ', 'हमाली'),
+  td_netPay: r('नेट भुगतान', 'Net payment', 'ਨੈੱਟ ਭੁਗਤਾਨ', 'निव्वळ पेमेंट'),
+  td_ref: r('संदर्भ संख्या: {ref}', 'Reference: {ref}', 'ਸੰਦਰਭ ਨੰਬਰ: {ref}', 'संदर्भ क्रमांक: {ref}'),
+  td_downloadReceipt: r('⬇  रसीद PDF डाउनलोड करें', '⬇  Download receipt PDF', '⬇  ਰਸੀਦ PDF ਡਾਊਨਲੋਡ ਕਰੋ', '⬇  पावती PDF डाउनलोड करा'),
+  td_cancelBooking: r('बुकिंग रद्द करें', 'Cancel booking', 'ਬੁਕਿੰਗ ਰੱਦ ਕਰੋ', 'बुकिंग रद्द करा'),
+  td_cancelConfirm: r('बुकिंग रद्द करें?', 'Cancel this booking?', 'ਬੁਕਿੰਗ ਰੱਦ ਕਰੀਏ?', 'बुकिंग रद्द करायची?'),
+  td_cancelConfirmSub: r('यह टोकन रद्द हो जाएगा।', 'This token will be cancelled.', 'ਇਹ ਟੋਕਨ ਰੱਦ ਹੋ ਜਾਵੇਗਾ।', 'हे टोकन रद्द होईल.'),
+  td_yesCancel: r('हाँ, रद्द करें', 'Yes, cancel', 'ਹਾਂ, ਰੱਦ ਕਰੋ', 'होय, रद्द करा'),
+  td_cancelFail: r('रद्द नहीं हो सका।', 'Could not cancel.', 'ਰੱਦ ਨਹੀਂ ਹੋ ਸਕਿਆ।', 'रद्द करता आले नाही.'),
+
+  /* ------------------------------------------------------------ */
+  /* History / payments                                            */
+  /* ------------------------------------------------------------ */
+  hist_sub: r('आपकी सभी मंडी बुकिंग', 'All your mandi bookings', 'ਤੁਹਾਡੀਆਂ ਸਾਰੀਆਂ ਬੁਕਿੰਗਾਂ', 'तुमच्या सर्व मंडी बुकिंग'),
+  hist_empty: r('अभी कोई बुकिंग नहीं है।', 'No bookings yet.', 'ਅਜੇ ਕੋਈ ਬੁਕਿੰਗ ਨਹੀਂ।', 'अजून बुकिंग नाही.'),
+  hist_emptySub: r('आपकी नई बुकिंग यहां दिखाई देगी।', 'Your new bookings will appear here.', 'ਤੁਹਾਡੀ ਨਵੀਂ ਬੁਕਿੰਗ ਇੱਥੇ ਦਿਖੇਗੀ।', 'तुमची नवीन बुकिंग येथे दिसेल.'),
+  hist_view: r('विवरण देखें →', 'View details →', 'ਵੇਰਵਾ ਵੇਖੋ →', 'तपशील पहा →'),
+  pay_title: r('भुगतान रसीदें', 'Payment receipts', 'ਭੁਗਤਾਨ ਰਸੀਦਾਂ', 'पेमेंट पावत्या'),
+  pay_sub: r('बैंक/ऋण के लिए आधिकारिक रसीद', 'Official receipts for bank / loans', 'ਬੈਂਕ/ਕਰਜ਼ੇ ਲਈ ਅਧਿਕਾਰਤ ਰਸੀਦ', 'बँक / कर्जासाठी अधिकृत पावती'),
+  pay_empty: r('अभी कोई भुगतान नहीं', 'No payments yet', 'ਅਜੇ ਕੋਈ ਭੁਗਤਾਨ ਨਹੀਂ', 'अजून पेमेंट नाही'),
+  pay_net: r('नेट: ₹{n}', 'Net: ₹{n}', 'ਨੈੱਟ: ₹{n}', 'निव्वळ: ₹{n}'),
+
+  /* ------------------------------------------------------------ */
+  /* Officer dashboard                                             */
+  /* ------------------------------------------------------------ */
+  od_portal: r('मंडी अधिकारी पोर्टल', 'Mandi Officer Portal', 'ਮੰਡੀ ਅਧਿਕਾਰੀ ਪੋਰਟਲ', 'मंडी अधिकारी पोर्टल'),
+  od_officer: r('अधिकारी', 'Officer', 'ਅਧਿਕਾਰੀ', 'अधिकारी'),
+  od_noCentre: r('मंडी नहीं चुनी', 'No mandi selected', 'ਮੰਡੀ ਨਹੀਂ ਚੁਣੀ', 'मंडी निवडली नाही'),
+  od_setupTitle: r('अपनी मंडी चुनें', 'Choose your mandi', 'ਆਪਣੀ ਮੰਡੀ ਚੁਣੋ', 'तुमची मंडी निवडा'),
+  od_setupSub: r('मंडी चुने बिना आपको कोई टोकन नहीं दिखेगा। सेट करने के लिए टैप करें।', 'You will not see any tokens until you choose a mandi. Tap to set.', 'ਮੰਡੀ ਚੁਣੇ ਬਿਨਾਂ ਕੋਈ ਟੋਕਨ ਨਹੀਂ ਦਿਖੇਗਾ। ਸੈੱਟ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।', 'मंडी निवडल्याशिवाय टोकन दिसणार नाहीत. सेट करण्यासाठी टॅप करा.'),
+  od_noWork: r('कोई काम बाकी नहीं', 'Nothing pending', 'ਕੋਈ ਕੰਮ ਬਾਕੀ ਨਹੀਂ', 'काही प्रलंबित नाही'),
+  od_pending: r('{n} वाहन आपके पास लंबित', '{n} vehicles pending with you', '{n} ਵਾਹਨ ਤੁਹਾਡੇ ਕੋਲ ਬਾਕੀ', '{n} वाहने तुमच्याकडे प्रलंबित'),
+  od_todayLine: r('आज कुल {total} टोकन • अंदर {inside}', 'Today {total} tokens • {inside} inside', 'ਅੱਜ ਕੁੱਲ {total} ਟੋਕਨ • ਅੰਦਰ {inside}', 'आज एकूण {total} टोकन • आत {inside}'),
+  od_yourWork: r('आपका काम', 'Your work', 'ਤੁਹਾਡਾ ਕੰਮ', 'तुमचे काम'),
+  od_summary: r('आज का सारांश', "Today's summary", 'ਅੱਜ ਦਾ ਸਾਰ', 'आजचा सारांश'),
+  od_totalTokens: r('कुल टोकन', 'Total tokens', 'ਕੁੱਲ ਟੋਕਨ', 'एकूण टोकन'),
+  od_waiting: r('प्रतीक्षित', 'Waiting', 'ਉਡੀਕ ਵਿੱਚ', 'प्रतीक्षेत'),
+  od_inside: r('अंदर', 'Inside', 'ਅੰਦਰ', 'आत'),
+  od_paid: r('भुगतान', 'Paid', 'ਭੁਗਤਾਨ', 'पेमेंट'),
+  od_absent: r('अनुपस्थित', 'Absent', 'ਗੈਰਹਾਜ਼ਰ', 'गैरहजर'),
+  od_other: r('अन्य', 'Other', 'ਹੋਰ', 'इतर'),
+  od_fullQueue: r('पूरी कतार देखें', 'View full queue', 'ਪੂਰੀ ਕਤਾਰ ਵੇਖੋ', 'संपूर्ण रांग पहा'),
+  od_dailyReport: r('दैनिक रिपोर्ट', 'Daily report', 'ਰੋਜ਼ਾਨਾ ਰਿਪੋਰਟ', 'दैनिक अहवाल'),
+  od_delayReport: r('विलंब रिपोर्ट', 'Delay report', 'ਦੇਰੀ ਰਿਪੋਰਟ', 'विलंब अहवाल'),
+  od_changePosting: r('मंडी / ड्यूटी / पहचान बदलें', 'Change mandi / duty / ID', 'ਮੰਡੀ / ਡਿਊਟੀ / ਪਛਾਣ ਬਦਲੋ', 'मंडी / कर्तव्य / ओळख बदला'),
+  // stage cards (from DUTY_STAGES)
+  stg_gate_t: r('गेट प्रवेश', 'Gate entry', 'ਗੇਟ ਐਂਟਰੀ', 'गेट प्रवेश'),
+  stg_gate_s: r('वाहन को अंदर भेजें', 'Let vehicles in', 'ਵਾਹਨ ਨੂੰ ਅੰਦਰ ਭੇਜੋ', 'वाहन आत पाठवा'),
+  stg_gate_a: r('गेट प्रवेश', 'Gate entry', 'ਗੇਟ ਐਂਟਰੀ', 'गेट प्रवेश'),
+  stg_assay_t: r('गुणवत्ता जांच', 'Quality check', 'ਗੁਣਵੱਤਾ ਜਾਂਚ', 'गुणवत्ता तपासणी'),
+  stg_assay_s: r('नमूना, नमी, ग्रेड और अन्य पदार्थ', 'Sample, moisture, grade & foreign matter', 'ਨਮੂਨਾ, ਨਮੀ, ਗ੍ਰੇਡ ਅਤੇ ਹੋਰ ਪਦਾਰਥ', 'नमुना, ओलावा, ग्रेड व इतर पदार्थ'),
+  stg_assay_a: r('जांच करें', 'Inspect', 'ਜਾਂਚ ਕਰੋ', 'तपासा'),
+  stg_weighing_t: r('तौल', 'Weighing', 'ਤੋਲ', 'वजन'),
+  stg_weighing_s: r('केवल भाव तय हो चुके वाहन', 'Only vehicles with price fixed', 'ਸਿਰਫ਼ ਭਾਅ ਤੈਅ ਹੋਏ ਵਾਹਨ', 'फक्त भाव ठरलेली वाहने'),
+  stg_weighing_a: r('तौल करें', 'Weigh', 'ਤੋਲ ਕਰੋ', 'वजन करा'),
+  stg_payment_t: r('भुगतान', 'Payment', 'ਭੁਗਤਾਨ', 'पेमेंट'),
+  stg_payment_s: r('कटौती और रसीद', 'Deductions & receipt', 'ਕਟੌਤੀ ਅਤੇ ਰਸੀਦ', 'कपात व पावती'),
+  stg_payment_a: r('भुगतान करें', 'Pay', 'ਭੁਗਤਾਨ ਕਰੋ', 'पेमेंट करा'),
+
+  /* ------------------------------------------------------------ */
+  /* Stage queue / gate scan                                       */
+  /* ------------------------------------------------------------ */
+  sq_notFound: r('चरण नहीं मिला', 'Stage not found', 'ਪੜਾਅ ਨਹੀਂ ਮਿਲਿਆ', 'टप्पा सापडला नाही'),
+  sq_pendingLine: r('{n} वाहन लंबित • {sub}', '{n} vehicles pending • {sub}', '{n} ਵਾਹਨ ਬਾਕੀ • {sub}', '{n} वाहने प्रलंबित • {sub}'),
+  sq_scanBtn: r('गेट पास स्कैन करें / नंबर डालें', 'Scan gate pass / enter number', 'ਗੇਟ ਪਾਸ ਸਕੈਨ ਕਰੋ / ਨੰਬਰ ਪਾਓ', 'गेट पास स्कॅन करा / क्रमांक टाका'),
+  sq_clear: r('इस चरण में कोई काम बाकी नहीं', 'Nothing pending at this stage', 'ਇਸ ਪੜਾਅ ਵਿੱਚ ਕੋਈ ਕੰਮ ਬਾਕੀ ਨਹੀਂ', 'या टप्प्यात काही प्रलंबित नाही'),
+  sq_next: r('अगला', 'NEXT', 'ਅਗਲਾ', 'पुढील'),
+  sq_gatePass: r('गेट पास: {code}', 'Gate pass: {code}', 'ਗੇਟ ਪਾਸ: {code}', 'गेट पास: {code}'),
+  sq_gradeLine: r('ग्रेड: {g} • नमी {m}%', 'Grade: {g} • moisture {m}%', 'ਗ੍ਰੇਡ: {g} • ਨਮੀ {m}%', 'ग्रेड: {g} • ओलावा {m}%'),
+  sq_priceLine: r('भाव ₹{rate}/क्विं. • {mode}', 'Price ₹{rate}/qtl • {mode}', 'ਭਾਅ ₹{rate}/ਕੁਇੰ. • {mode}', 'भाव ₹{rate}/क्विं. • {mode}'),
+  sq_auctionBy: r('नीलामी • {who}', 'Auction • {who}', 'ਨੀਲਾਮੀ • {who}', 'लिलाव • {who}'),
+  sq_scanShort: r('गेट पास स्कैन', 'Scan pass', 'ਗੇਟ ਪਾਸ ਸਕੈਨ', 'गेट पास स्कॅन'),
+  noShowQ: r('अनुपस्थित?', 'No show?', 'ਗੈਰਹਾਜ਼ਰ?', 'गैरहजर?'),
+  noShowSub: r('क्या किसान नहीं आया?', 'Did the farmer not arrive?', 'ਕੀ ਕਿਸਾਨ ਨਹੀਂ ਆਇਆ?', 'शेतकरी आला नाही का?'),
+  markNoShow: r('अनुपस्थित', 'No show', 'ਗੈਰਹਾਜ਼ਰ', 'गैरहजर'),
+
+  gs_title: r('गेट पास स्कैन', 'Scan gate pass', 'ਗੇਟ ਪਾਸ ਸਕੈਨ', 'गेट पास स्कॅन'),
+  gs_expected: r('प्रतीक्षित टोकन', 'Expected token', 'ਉਮੀਦ ਕੀਤਾ ਟੋਕਨ', 'अपेक्षित टोकन'),
+  gs_expectHint: r('किसान का गेट पास स्कैन करें या नंबर टाइप करें — बिना पास प्रवेश नहीं', "Scan the farmer's gate pass or type the number — no entry without a pass", 'ਕਿਸਾਨ ਦਾ ਗੇਟ ਪਾਸ ਸਕੈਨ ਕਰੋ ਜਾਂ ਨੰਬਰ ਟਾਈਪ ਕਰੋ — ਬਿਨਾਂ ਪਾਸ ਐਂਟਰੀ ਨਹੀਂ', 'शेतकऱ्याचा गेट पास स्कॅन करा किंवा क्रमांक टाका — पासशिवाय प्रवेश नाही'),
+  gs_noPassHint: r('बिना गेट पास (QR / 6-अंक) के प्रवेश नहीं दिया जा सकता', 'Entry is not possible without a gate pass (QR / 6 digits)', 'ਬਿਨਾਂ ਗੇਟ ਪਾਸ (QR / 6-ਅੰਕ) ਐਂਟਰੀ ਨਹੀਂ', 'गेट पासशिवाय (QR / 6 अंक) प्रवेश नाही'),
+  gs_camPerm: r('कैमरा अनुमति चाहिए', 'Camera permission needed', 'ਕੈਮਰਾ ਇਜਾਜ਼ਤ ਚਾਹੀਦੀ ਹੈ', 'कॅमेरा परवानगी हवी'),
+  gs_allow: r('अनुमति दें', 'Allow', 'ਇਜਾਜ਼ਤ ਦਿਓ', 'परवानगी द्या'),
+  gs_typeNumber: r('या गेट पास नंबर टाइप करें', 'Or type the gate pass number', 'ਜਾਂ ਗੇਟ ਪਾਸ ਨੰਬਰ ਟਾਈਪ ਕਰੋ', 'किंवा गेट पास क्रमांक टाका'),
+  gs_placeholder: r('6 अंक  (या A-03)', '6 digits  (or A-03)', '6 ਅੰਕ  (ਜਾਂ A-03)', '6 अंक  (किंवा A-03)'),
+  gs_waitingCount: r('आज की कतार में {n} वाहन प्रतीक्षा में', '{n} vehicles waiting in today\'s queue', 'ਅੱਜ ਦੀ ਕਤਾਰ ਵਿੱਚ {n} ਵਾਹਨ ਉਡੀਕ ਵਿੱਚ', 'आजच्या रांगेत {n} वाहने प्रतीक्षेत'),
+  gs_verified: r('✓ सत्यापित टोकन', '✓ Verified token', '✓ ਪ੍ਰਮਾਣਿਤ ਟੋਕਨ', '✓ सत्यापित टोकन'),
+  gs_passOk: r('गेट पास सही है ({how})', 'Gate pass valid ({how})', 'ਗੇਟ ਪਾਸ ਸਹੀ ਹੈ ({how})', 'गेट पास बरोबर ({how})'),
+  gs_byQr: r('QR', 'QR', 'QR', 'QR'),
+  gs_byNumber: r('नंबर', 'number', 'ਨੰਬਰ', 'क्रमांक'),
+  gs_admit: r('प्रवेश दें  →', 'Admit  →', 'ਐਂਟਰੀ ਦਿਓ  →', 'प्रवेश द्या  →'),
+  gs_rescan: r('रद्द / दोबारा स्कैन', 'Cancel / scan again', 'ਰੱਦ / ਦੁਬਾਰਾ ਸਕੈਨ', 'रद्द / पुन्हा स्कॅन'),
+  gs_notFound: r('गेट पास नहीं मिला', 'Gate pass not found', 'ਗੇਟ ਪਾਸ ਨਹੀਂ ਮਿਲਿਆ', 'गेट पास सापडला नाही'),
+  gs_notFoundSub: r('आज की कतार में यह पास नहीं है। नंबर जाँचें या मंडी/तारीख देखें।', 'This pass is not in today\'s queue. Check the number or mandi/date.', 'ਅੱਜ ਦੀ ਕਤਾਰ ਵਿੱਚ ਇਹ ਪਾਸ ਨਹੀਂ। ਨੰਬਰ ਜਾਂ ਮੰਡੀ/ਤਾਰੀਖ ਜਾਂਚੋ।', 'आजच्या रांगेत हा पास नाही. क्रमांक किंवा मंडी/तारीख तपासा.'),
+  gs_already: r('पहले से प्रवेश', 'Already inside', 'ਪਹਿਲਾਂ ਹੀ ਅੰਦਰ', 'आधीच आत'),
+  gs_alreadySub: r('टोकन {t} पहले ही अंदर है।', 'Token {t} is already inside.', 'ਟੋਕਨ {t} ਪਹਿਲਾਂ ਹੀ ਅੰਦਰ ਹੈ।', 'टोकन {t} आधीच आत आहे.'),
+  gs_otherToken: r('दूसरा टोकन', 'Different token', 'ਹੋਰ ਟੋਕਨ', 'दुसरे टोकन'),
+  gs_otherTokenSub: r('यह पास {a} का है, आपने {b} चुना था। फिर भी {a} को प्रवेश दें?', 'This pass belongs to {a}, you selected {b}. Admit {a} anyway?', 'ਇਹ ਪਾਸ {a} ਦਾ ਹੈ, ਤੁਸੀਂ {b} ਚੁਣਿਆ ਸੀ। ਫਿਰ ਵੀ {a} ਨੂੰ ਐਂਟਰੀ ਦਿਓ?', 'हा पास {a} चा आहे, तुम्ही {b} निवडले होते. तरीही {a} ला प्रवेश द्यायचा?'),
+  gs_enterVehicle: r('कृपया वाहन नंबर दर्ज करें।', 'Please enter the vehicle number.', 'ਕਿਰਪਾ ਕਰਕੇ ਵਾਹਨ ਨੰਬਰ ਦਰਜ ਕਰੋ।', 'कृपया वाहन क्रमांक टाका.'),
+  gs_admitted: r('प्रवेश दर्ज ✓', 'Entry recorded ✓', 'ਐਂਟਰੀ ਦਰਜ ✓', 'प्रवेश नोंदला ✓'),
+  gs_nextScan: r('अगला स्कैन', 'Next scan', 'ਅਗਲਾ ਸਕੈਨ', 'पुढील स्कॅन'),
+  gs_entryFail: r('गेट प्रवेश दर्ज नहीं हुआ।', 'Could not record gate entry.', 'ਗੇਟ ਐਂਟਰੀ ਦਰਜ ਨਹੀਂ ਹੋਈ।', 'गेट प्रवेश नोंदला नाही.'),
+
+  /* ------------------------------------------------------------ */
+  /* Today's queue                                                 */
+  /* ------------------------------------------------------------ */
+  gateQueue: r('आज की गेट कतार', "Today's Gate Queue", 'ਅੱਜ ਦੀ ਗੇਟ ਕਤਾਰ', 'आजची गेट रांग'),
+  tq_nowInside: r('अभी अंदर', 'Now inside', 'ਹੁਣ ਅੰਦਰ', 'सध्या आत'),
+  tq_inQueue: r('कतार में {n}', '{n} in queue', 'ਕਤਾਰ ਵਿੱਚ {n}', 'रांगेत {n}'),
+  tq_empty: r('कतार खाली है', 'Queue is empty', 'ਕਤਾਰ ਖਾਲੀ ਹੈ', 'रांग रिकामी आहे'),
+  tq_timeLine: r('समय: {slot} • अनुमानित {eta}', 'Slot: {slot} • est. {eta}', 'ਸਮਾਂ: {slot} • ਅਨੁਮਾਨਿਤ {eta}', 'वेळ: {slot} • अंदाजे {eta}'),
+  tq_qtyLine: r('अनुमानित मात्रा: {q} क्विंटल', 'Approx. quantity: {q} qtl', 'ਅਨੁਮਾਨਿਤ ਮਾਤਰਾ: {q} ਕੁਇੰਟਲ', 'अंदाजे प्रमाण: {q} क्विंटल'),
+  tq_gateEntry: r('गेट प्रवेश', 'Gate entry', 'ਗੇਟ ਐਂਟਰੀ', 'गेट प्रवेश'),
+  tq_proceed: r('आगे बढ़ें', 'Proceed', 'ਅੱਗੇ ਵਧੋ', 'पुढे जा'),
+  tq_useScan: r('गेट प्रवेश केवल गेट पास स्कैन से होगा। गेट अधिकारी कार्ड से स्कैन खोलें।', 'Gate entry is only via gate pass scan. Open the scanner from the Gate card.', 'ਗੇਟ ਐਂਟਰੀ ਸਿਰਫ਼ ਗੇਟ ਪਾਸ ਸਕੈਨ ਨਾਲ। ਗੇਟ ਕਾਰਡ ਤੋਂ ਸਕੈਨਰ ਖੋਲ੍ਹੋ।', 'गेट प्रवेश फक्त गेट पास स्कॅनने. गेट कार्डमधून स्कॅनर उघडा.'),
+
+  /* ------------------------------------------------------------ */
+  /* Assay / weighing / payment screens                            */
+  /* ------------------------------------------------------------ */
+  as_title: r('गुणवत्ता जांच', 'Quality check', 'ਗੁਣਵੱਤਾ ਜਾਂਚ', 'गुणवत्ता तपासणी'),
+  tokenAndName: r('टोकन {t} • {n}', 'Token {t} • {n}', 'ਟੋਕਨ {t} • {n}', 'टोकन {t} • {n}'),
+  as_cropLine: r('फसल: {c}', 'Crop: {c}', 'ਫਸਲ: {c}', 'पीक: {c}'),
+  as_vehicleLine: r('वाहन: {v}', 'Vehicle: {v}', 'ਵਾਹਨ: {v}', 'वाहन: {v}'),
+  as_moisture: r('नमी % (Moisture)', 'Moisture %', 'ਨਮੀ % (Moisture)', 'ओलावा % (Moisture)'),
+  as_moistureHint: r('गेहूँ के लिए सामान्य सीमा 12% तक', 'Normal limit for wheat is up to 12%', 'ਕਣਕ ਲਈ ਆਮ ਸੀਮਾ 12% ਤੱਕ', 'गव्हासाठी सामान्य मर्यादा 12% पर्यंत'),
+  as_foreign: r('अन्य पदार्थ % (Foreign Matter)', 'Foreign matter %', 'ਹੋਰ ਪਦਾਰਥ % (Foreign Matter)', 'इतर पदार्थ % (Foreign Matter)'),
+  as_notes: r('टिप्पणी (वैकल्पिक)', 'Notes (optional)', 'ਟਿੱਪਣੀ (ਵਿਕਲਪਿਕ)', 'टीप (ऐच्छिक)'),
+  as_notesPh: r('कोई विशेष बात', 'Anything notable', 'ਕੋਈ ਖ਼ਾਸ ਗੱਲ', 'काही विशेष'),
+  as_range: r('कृपया 0 से 100 के बीच सही मान दर्ज करें।', 'Please enter a value between 0 and 100.', '0 ਤੋਂ 100 ਵਿਚਕਾਰ ਸਹੀ ਮੁੱਲ ਦਰਜ ਕਰੋ।', 'कृपया 0 ते 100 दरम्यान योग्य मूल्य टाका.'),
+  as_rejected: r('अस्वीकृत', 'Rejected', 'ਅਸਵੀਕਾਰ', 'नाकारले'),
+  as_rejectedSub: r('यह लॉट अस्वीकृत कर दिया गया।', 'This lot has been rejected.', 'ਇਹ ਲਾਟ ਅਸਵੀਕਾਰ ਕਰ ਦਿੱਤਾ ਗਿਆ।', 'हा लॉट नाकारला गेला.'),
+  as_recordedSub: r('अब किसान भाव तय करेगा (MSP / नीलामी)।', 'The farmer will now fix the price (MSP / auction).', 'ਹੁਣ ਕਿਸਾਨ ਭਾਅ ਤੈਅ ਕਰੇਗਾ (MSP / ਨੀਲਾਮੀ)।', 'आता शेतकरी भाव ठरवेल (MSP / लिलाव).'),
+  as_rejectQ: r('लॉट अस्वीकार करें?', 'Reject this lot?', 'ਲਾਟ ਅਸਵੀਕਾਰ ਕਰੀਏ?', 'लॉट नाकारायचा?'),
+  as_rejectQSub: r('किसान को भुगतान नहीं होगा।', 'The farmer will not be paid.', 'ਕਿਸਾਨ ਨੂੰ ਭੁਗਤਾਨ ਨਹੀਂ ਹੋਵੇਗਾ।', 'शेतकऱ्याला पेमेंट होणार नाही.'),
+  as_yesReject: r('हाँ, अस्वीकार', 'Yes, reject', 'ਹਾਂ, ਅਸਵੀਕਾਰ', 'होय, नाकारा'),
+  as_rejectBtn: r('अस्वीकार करें', 'Reject', 'ਅਸਵੀਕਾਰ ਕਰੋ', 'नाकारा'),
+  as_submit: r('जांच पूरी - आगे भेजें', 'Complete check - send forward', 'ਜਾਂਚ ਪੂਰੀ - ਅੱਗੇ ਭੇਜੋ', 'तपासणी पूर्ण - पुढे पाठवा'),
+
+  wg_title: r('तौल (Weighbridge)', 'Weighing (Weighbridge)', 'ਤੋਲ (Weighbridge)', 'वजन (Weighbridge)'),
+  wg_declared: r('किसान द्वारा बताई मात्रा: {q} क्विंटल', 'Declared by farmer: {q} qtl', 'ਕਿਸਾਨ ਵੱਲੋਂ ਦੱਸੀ ਮਾਤਰਾ: {q} ਕੁਇੰਟਲ', 'शेतकऱ्याने सांगितलेले प्रमाण: {q} क्विंटल'),
+  wg_gradeLine: r('ग्रेड: {g}', 'Grade: {g}', 'ਗ੍ਰੇਡ: {g}', 'ग्रेड: {g}'),
+  wg_priceLine: r('भाव: ₹{r}/क्विंटल • {buyer}', 'Price: ₹{r}/qtl • {buyer}', 'ਭਾਅ: ₹{r}/ਕੁਇੰਟਲ • {buyer}', 'भाव: ₹{r}/क्विंटल • {buyer}'),
+  wg_gross: r('कुल वजन / भरा वाहन (क्विंटल)', 'Gross weight / loaded vehicle (qtl)', 'ਕੁੱਲ ਵਜ਼ਨ / ਭਰਿਆ ਵਾਹਨ (ਕੁਇੰਟਲ)', 'एकूण वजन / भरलेले वाहन (क्विंटल)'),
+  wg_tare: r('खाली वाहन का वजन (क्विंटल)', 'Empty vehicle weight (qtl)', 'ਖਾਲੀ ਵਾਹਨ ਦਾ ਵਜ਼ਨ (ਕੁਇੰਟਲ)', 'रिकाम्या वाहनाचे वजन (क्विंटल)'),
+  wg_tareHint: r('यदि केवल फसल तौली गई है तो 0 रखें', 'Keep 0 if only the crop was weighed', 'ਜੇ ਸਿਰਫ਼ ਫਸਲ ਤੋਲੀ ਹੈ ਤਾਂ 0 ਰੱਖੋ', 'फक्त पीक तोलले असल्यास 0 ठेवा'),
+  wg_net: r('शुद्ध वजन', 'Net weight', 'ਸ਼ੁੱਧ ਵਜ਼ਨ', 'निव्वळ वजन'),
+  wg_variance: r('बताई मात्रा से {v}%', '{v}% vs declared', 'ਦੱਸੀ ਮਾਤਰਾ ਤੋਂ {v}%', 'सांगितलेल्या प्रमाणापेक्षा {v}%'),
+  wg_warn: r('चेतावनी: बताई गई मात्रा से 20% से अधिक अंतर है। कृपया दोबारा जांचें।', 'Warning: more than 20% difference from declared quantity. Please re-check.', 'ਚੇਤਾਵਨੀ: ਦੱਸੀ ਮਾਤਰਾ ਤੋਂ 20% ਵੱਧ ਫ਼ਰਕ। ਦੁਬਾਰਾ ਜਾਂਚੋ।', 'इशारा: सांगितलेल्या प्रमाणापेक्षा 20% पेक्षा जास्त फरक. पुन्हा तपासा.'),
+  wg_netZero: r('शुद्ध वजन शून्य से अधिक होना चाहिए।', 'Net weight must be more than zero.', 'ਸ਼ੁੱਧ ਵਜ਼ਨ ਸਿਫ਼ਰ ਤੋਂ ਵੱਧ ਹੋਣਾ ਚਾਹੀਦਾ।', 'निव्वळ वजन शून्यापेक्षा जास्त हवे.'),
+  wg_recordedSub: r('अब भुगतान की प्रक्रिया करें।', 'Now process the payment.', 'ਹੁਣ ਭੁਗਤਾਨ ਦੀ ਪ੍ਰਕਿਰਿਆ ਕਰੋ।', 'आता पेमेंट प्रक्रिया करा.'),
+  wg_submit: r('तौल दर्ज करें', 'Record weight', 'ਤੋਲ ਦਰਜ ਕਰੋ', 'वजन नोंदवा'),
+  weight: r('वजन', 'Weight', 'ਵਜ਼ਨ', 'वजन'),
+
+  mp_title: r('भुगतान अंतिम', 'Final payment', 'ਅੰਤਿਮ ਭੁਗਤਾਨ', 'अंतिम पेमेंट'),
+  mp_noCentre: r('मंडी की जानकारी नहीं मिली। कटौती 0 मानी जाएगी।', 'Mandi details not found. Deductions will be 0.', 'ਮੰਡੀ ਦੀ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ। ਕਟੌਤੀ 0 ਮੰਨੀ ਜਾਵੇਗੀ।', 'मंडी माहिती सापडली नाही. कपात 0 धरली जाईल.'),
+  mp_actualQty: r('वास्तविक तौल (क्विंटल)', 'Actual weight (qtl)', 'ਅਸਲ ਤੋਲ (ਕੁਇੰਟਲ)', 'प्रत्यक्ष वजन (क्विंटल)'),
+  mp_rate: r('दर प्रति क्विंटल (₹)', 'Rate per quintal (₹)', 'ਦਰ ਪ੍ਰਤੀ ਕੁਇੰਟਲ (₹)', 'दर प्रति क्विंटल (₹)'),
+  mp_rateLocked: r('• तय भाव, बदला नहीं जा सकता', '• fixed price, cannot be changed', '• ਤੈਅ ਭਾਅ, ਬਦਲਿਆ ਨਹੀਂ ਜਾ ਸਕਦਾ', '• निश्चित भाव, बदलता येणार नाही'),
+  mp_preview: r('कटौती सहित गणना', 'Calculation with deductions', 'ਕਟੌਤੀ ਸਮੇਤ ਗਣਨਾ', 'कपातीसह गणना'),
+  mp_gross: r('कुल राशि: ₹{n}', 'Gross: ₹{n}', 'ਕੁੱਲ ਰਕਮ: ₹{n}', 'एकूण रक्कम: ₹{n}'),
+  mp_fee: r('मंडी शुल्क ({p}%): −₹{n}', 'Mandi fee ({p}%): −₹{n}', 'ਮੰਡੀ ਫੀਸ ({p}%): −₹{n}', 'मंडी शुल्क ({p}%): −₹{n}'),
+  mp_comm: r('आढ़त ({p}%): −₹{n}', 'Commission ({p}%): −₹{n}', 'ਆੜ੍ਹਤ ({p}%): −₹{n}', 'अडत ({p}%): −₹{n}'),
+  mp_hamali: r('हमाली (₹{p}/क्विंटल): −₹{n}', 'Hamali (₹{p}/qtl): −₹{n}', 'ਹਮਾਲੀ (₹{p}/ਕੁਇੰਟਲ): −₹{n}', 'हमाली (₹{p}/क्विंटल): −₹{n}'),
+  mp_net: r('नेट देय: ₹{n}', 'Net payable: ₹{n}', 'ਨੈੱਟ ਦੇਣਯੋਗ: ₹{n}', 'निव्वळ देय: ₹{n}'),
+  mp_badQty: r('कृपया सही मात्रा दर्ज करें।', 'Please enter a valid quantity.', 'ਸਹੀ ਮਾਤਰਾ ਦਰਜ ਕਰੋ।', 'योग्य प्रमाण टाका.'),
+  mp_badRate: r('कृपया सही दर दर्ज करें।', 'Please enter a valid rate.', 'ਸਹੀ ਦਰ ਦਰਜ ਕਰੋ।', 'योग्य दर टाका.'),
+  mp_success: r('सफल', 'Success', 'ਸਫਲ', 'यशस्वी'),
+  mp_successSub: r('रसीद जनरेट हो गई', 'Receipt generated', 'ਰਸੀਦ ਬਣ ਗਈ', 'पावती तयार झाली'),
+  mp_fail: r('भुगतान दर्ज नहीं हुआ।', 'Could not record payment.', 'ਭੁਗਤਾਨ ਦਰਜ ਨਹੀਂ ਹੋਇਆ।', 'पेमेंट नोंदले नाही.'),
+  mp_submit: r('आधिकारिक रसीद बनाएं', 'Generate official receipt', 'ਅਧਿਕਾਰਤ ਰਸੀਦ ਬਣਾਓ', 'अधिकृत पावती तयार करा'),
+
+  /* ------------------------------------------------------------ */
+  /* Officer profile / reports / delay                             */
+  /* ------------------------------------------------------------ */
+  profile: r('प्रोफ़ाइल', 'Profile', 'ਪ੍ਰੋਫ਼ਾਈਲ', 'प्रोफाइल'),
+  op_title: r('अधिकारी प्रोफ़ाइल', 'Officer profile', 'ਅਧਿਕਾਰੀ ਪ੍ਰੋਫ਼ਾਈਲ', 'अधिकारी प्रोफाइल'),
+  op_sub: r('मंडी, ड्यूटी और पहचान', 'Mandi, duty and ID', 'ਮੰਡੀ, ਡਿਊਟੀ ਅਤੇ ਪਛਾਣ', 'मंडी, कर्तव्य व ओळख'),
+  op_mustPick: r('काम शुरू करने से पहले अपनी मंडी चुनें।', 'Choose your mandi before starting work.', 'ਕੰਮ ਸ਼ੁਰੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਆਪਣੀ ਮੰਡੀ ਚੁਣੋ।', 'काम सुरू करण्यापूर्वी तुमची मंडी निवडा.'),
+  op_empId: r('कर्मचारी आईडी', 'Employee ID', 'ਕਰਮਚਾਰੀ ID', 'कर्मचारी ID'),
+  op_verification: r('सत्यापन', 'Verification', 'ਤਸਦੀਕ', 'पडताळणी'),
+  op_verified: r('सत्यापित', 'Verified', 'ਤਸਦੀਕਸ਼ੁਦਾ', 'सत्यापित'),
+  op_pending: r('लंबित', 'Pending', 'ਬਾਕੀ', 'प्रलंबित'),
+  op_yourMandi: r('आपकी मंडी', 'Your mandi', 'ਤੁਹਾਡੀ ਮੰਡੀ', 'तुमची मंडी'),
+  op_yourMandiHelp: r('आपको केवल इसी मंडी के टोकन और काम दिखाई देंगे।', 'You will only see tokens and work from this mandi.', 'ਤੁਹਾਨੂੰ ਸਿਰਫ਼ ਇਸੇ ਮੰਡੀ ਦੇ ਟੋਕਨ ਦਿਖਣਗੇ।', 'तुम्हाला फक्त याच मंडीचे टोकन दिसतील.'),
+  op_duty: r('ड्यूटी पद', 'Duty', 'ਡਿਊਟੀ', 'कर्तव्य'),
+  op_savePosting: r('मंडी और ड्यूटी सहेजें', 'Save mandi & duty', 'ਮੰਡੀ ਅਤੇ ਡਿਊਟੀ ਸੰਭਾਲੋ', 'मंडी व कर्तव्य जतन करा'),
+  op_savedSub: r('आपकी मंडी और ड्यूटी अपडेट हो गई।', 'Your mandi and duty are updated.', 'ਤੁਹਾਡੀ ਮੰਡੀ ਅਤੇ ਡਿਊਟੀ ਅੱਪਡੇਟ ਹੋ ਗਈ।', 'तुमची मंडी व कर्तव्य अद्ययावत झाले.'),
+  op_pickMandi: r('मंडी चुनें', 'Choose mandi', 'ਮੰਡੀ ਚੁਣੋ', 'मंडी निवडा'),
+  op_pickMandiSub: r('कृपया अपनी मंडी चुनें।', 'Please choose your mandi.', 'ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀ ਮੰਡੀ ਚੁਣੋ।', 'कृपया तुमची मंडी निवडा.'),
+  op_idTitle: r('पहचान सत्यापन', 'Identity verification', 'ਪਛਾਣ ਤਸਦੀਕ', 'ओळख पडताळणी'),
+  op_idHelp: r('आधार संख्या दर्ज करें। सरकारी सत्यापन बाद में जोड़ा जाएगा।', 'Enter your Aadhaar number. Government verification will be added later.', 'ਆਧਾਰ ਨੰਬਰ ਦਰਜ ਕਰੋ। ਸਰਕਾਰੀ ਤਸਦੀਕ ਬਾਅਦ ਵਿੱਚ ਜੋੜੀ ਜਾਵੇਗੀ।', 'आधार क्रमांक टाका. शासकीय पडताळणी नंतर जोडली जाईल.'),
+  op_idPh: r('12 अंकों की आधार संख्या', '12-digit Aadhaar number', '12 ਅੰਕਾਂ ਦਾ ਆਧਾਰ ਨੰਬਰ', '12 अंकी आधार क्रमांक'),
+  op_saveId: r('पहचान सहेजें', 'Save ID', 'ਪਛਾਣ ਸੰਭਾਲੋ', 'ओळख जतन करा'),
+  op_idSaved: r('पहचान संख्या दर्ज हो गई।', 'ID number saved.', 'ਪਛਾਣ ਨੰਬਰ ਦਰਜ ਹੋ ਗਿਆ।', 'ओळख क्रमांक जतन झाला.'),
+
+  rp_title: r('दैनिक रिपोर्ट', 'Daily report', 'ਰੋਜ਼ਾਨਾ ਰਿਪੋਰਟ', 'दैनिक अहवाल'),
+  rp_pickFirst: r('रिपोर्ट देखने के लिए पहले अपनी मंडी चुनें।', 'Choose your mandi first to see the report.', 'ਰਿਪੋਰਟ ਵੇਖਣ ਲਈ ਪਹਿਲਾਂ ਮੰਡੀ ਚੁਣੋ।', 'अहवाल पाहण्यासाठी आधी मंडी निवडा.'),
+  rp_tokens: r('टोकन', 'Tokens', 'ਟੋਕਨ', 'टोकन'),
+  rp_paidCount: r('भुगतान हुआ', 'Paid', 'ਭੁਗਤਾਨ ਹੋਇਆ', 'पेमेंट झाले'),
+  rp_procurement: r('खरीद', 'Procurement', 'ਖਰੀਦ', 'खरेदी'),
+  rp_totalProcured: r('कुल खरीद', 'Total procured', 'ਕੁੱਲ ਖਰੀਦ', 'एकूण खरेदी'),
+  rp_disbursed: r('वितरित राशि', 'Amount disbursed', 'ਵੰਡੀ ਰਕਮ', 'वितरित रक्कम'),
+  rp_nowInside: r('अभी अंदर', 'Now inside', 'ਹੁਣ ਅੰਦਰ', 'सध्या आत'),
+
+  dl_title: r('विलंब रिपोर्ट (एडमिन)', 'Delay report (admin)', 'ਦੇਰੀ ਰਿਪੋਰਟ (ਐਡਮਿਨ)', 'विलंब अहवाल (प्रशासक)'),
+  dl_sub: r('सभी शेष ETA अपने आप शिफ्ट होंगे', 'All remaining ETAs shift automatically', 'ਸਾਰੇ ਬਾਕੀ ETA ਆਪਣੇ ਆਪ ਬਦਲ ਜਾਣਗੇ', 'सर्व उर्वरित ETA आपोआप बदलतील'),
+  dl_minutes: r('अतिरिक्त मिनट', 'Extra minutes', 'ਵਾਧੂ ਮਿੰਟ', 'अतिरिक्त मिनिटे'),
+  dl_reason: r('कारण', 'Reason', 'ਕਾਰਨ', 'कारण'),
+  dl_reasonDefault: r('वर्षा / तौल मशीन', 'Rain / weighbridge', 'ਮੀਂਹ / ਤੋਲ ਮਸ਼ੀਨ', 'पाऊस / वजन काटा'),
+  dl_submit: r('विलंब प्रसारित करें', 'Broadcast delay', 'ਦੇਰੀ ਪ੍ਰਸਾਰਿਤ ਕਰੋ', 'विलंब प्रसारित करा'),
+  dl_doneSub: r('+{m} मिनट विलंब दर्ज', '+{m} min delay recorded', '+{m} ਮਿੰਟ ਦੇਰੀ ਦਰਜ', '+{m} मिनिटे विलंब नोंदला'),
+  dl_pickFirst: r('पहले अपनी मंडी चुनें।', 'Choose your mandi first.', 'ਪਹਿਲਾਂ ਆਪਣੀ ਮੰਡੀ ਚੁਣੋ।', 'आधी तुमची मंडी निवडा.'),
+
+  /* ------------------------------------------------------------ */
+  /* Trader                                                        */
+  /* ------------------------------------------------------------ */
+  tr_trader: r('व्यापारी', 'Trader', 'ਵਪਾਰੀ', 'व्यापारी'),
+  tr_hello: r('नमस्ते, {n}', 'Hello, {n}', 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ, {n}', 'नमस्कार, {n}'),
+  tr_pickMandi: r('मंडी चुनें', 'Choose mandi', 'ਮੰਡੀ ਚੁਣੋ', 'मंडी निवडा'),
+  tr_licenseLine: r('लाइसेंस {l}', 'Licence {l}', 'ਲਾਇਸੈਂਸ {l}', 'परवाना {l}'),
+  tr_needMandi: r('नीलामी देखने के लिए पहले अपनी मंडी चुनें →', 'Choose your mandi to see auctions →', 'ਨੀਲਾਮੀ ਵੇਖਣ ਲਈ ਪਹਿਲਾਂ ਮੰਡੀ ਚੁਣੋ →', 'लिलाव पाहण्यासाठी आधी मंडी निवडा →'),
+  tr_wonToday: r('🏆 आज {n} लॉट जीते', '🏆 Won {n} lots today', '🏆 ਅੱਜ {n} ਲਾਟ ਜਿੱਤੇ', '🏆 आज {n} लॉट जिंकले'),
+  tr_liveAuction: r('लाइव नीलामी', 'Live auction', 'ਲਾਈਵ ਨੀਲਾਮੀ', 'लाइव्ह लिलाव'),
+  tr_openLots: r('{n} लॉट पर बोली चालू', 'Bidding open on {n} lots', '{n} ਲਾਟ ਤੇ ਬੋਲੀ ਚਾਲੂ', '{n} लॉटवर बोली सुरू'),
+  tr_leading: r(' • {n} में आप आगे', ' • you lead {n}', ' • {n} ਵਿੱਚ ਤੁਸੀਂ ਅੱਗੇ', ' • {n} मध्ये तुम्ही पुढे'),
+  tr_noOpen: r('अभी कोई लॉट खुला नहीं', 'No lots open right now', 'ਹੁਣ ਕੋਈ ਲਾਟ ਖੁੱਲ੍ਹਾ ਨਹੀਂ', 'सध्या कोणताही लॉट खुला नाही'),
+  tr_totalLots: r('कुल लॉट', 'Total lots', 'ਕੁੱਲ ਲਾਟ', 'एकूण लॉट'),
+  tr_bidOpen: r('बोली चालू', 'Bidding open', 'ਬੋਲੀ ਚਾਲੂ', 'बोली सुरू'),
+  tr_won: r('जीते', 'Won', 'ਜਿੱਤੇ', 'जिंकले'),
+  tr_qtlBought: r('क्विंटल खरीद', 'Quintals bought', 'ਕੁਇੰਟਲ ਖਰੀਦ', 'क्विंटल खरेदी'),
+  tr_myPurchases: r('मेरी खरीद', 'My purchases', 'ਮੇਰੀ ਖਰੀਦ', 'माझी खरेदी'),
+  tr_mandiProfile: r('मंडी / प्रोफ़ाइल', 'Mandi / profile', 'ਮੰਡੀ / ਪ੍ਰੋਫ਼ਾਈਲ', 'मंडी / प्रोफाइल'),
+  tr_profileTitle: r('व्यापारी प्रोफ़ाइल', 'Trader profile', 'ਵਪਾਰੀ ਪ੍ਰੋਫ਼ਾਈਲ', 'व्यापारी प्रोफाइल'),
+  tr_firm: r('फर्म', 'Firm', 'ਫਰਮ', 'फर्म'),
+  tr_license: r('लाइसेंस', 'Licence', 'ਲਾਇਸੈਂਸ', 'परवाना'),
+  tr_tradeMandi: r('व्यापार की मंडी', 'Trading mandi', 'ਵਪਾਰ ਦੀ ਮੰਡੀ', 'व्यापाराची मंडी'),
+  tr_mandiSaved: r('आपकी मंडी अपडेट हो गई।', 'Your mandi is updated.', 'ਤੁਹਾਡੀ ਮੰਡੀ ਅੱਪਡੇਟ ਹੋ ਗਈ।', 'तुमची मंडी अद्ययावत झाली.'),
+
+  ab_title: r('नीलामी बोर्ड', 'Auction board', 'ਨੀਲਾਮੀ ਬੋਰਡ', 'लिलाव फलक'),
+  ab_sub: r('{c} • {n} लॉट चालू', '{c} • {n} lots live', '{c} • {n} ਲਾਟ ਚਾਲੂ', '{c} • {n} लॉट सुरू'),
+  ab_pickFirst: r('पहले प्रोफ़ाइल में मंडी चुनें।', 'Choose a mandi in your profile first.', 'ਪਹਿਲਾਂ ਪ੍ਰੋਫ਼ਾਈਲ ਵਿੱਚ ਮੰਡੀ ਚੁਣੋ।', 'आधी प्रोफाइलमध्ये मंडी निवडा.'),
+  ab_empty: r('आज अभी कोई लॉट नीलामी में नहीं आया', 'No lots up for auction yet today', 'ਅੱਜ ਅਜੇ ਕੋਈ ਲਾਟ ਨੀਲਾਮੀ ਵਿੱਚ ਨਹੀਂ', 'आज अजून कोणताही लॉट लिलावात नाही'),
+  ab_emptySub: r('गुणवत्ता जांच के बाद किसान लॉट खोलेगा, वह यहाँ तुरंत दिखेगा।', 'After the quality check a farmer opens the lot; it appears here instantly.', 'ਗੁਣਵੱਤਾ ਜਾਂਚ ਬਾਅਦ ਕਿਸਾਨ ਲਾਟ ਖੋਲ੍ਹੇਗਾ, ਇੱਥੇ ਤੁਰੰਤ ਦਿਖੇਗਾ।', 'गुणवत्ता तपासणीनंतर शेतकरी लॉट उघडेल, तो येथे लगेच दिसेल.'),
+  ab_live: r('🔴 चालू', '🔴 Live', '🔴 ਚਾਲੂ', '🔴 सुरू'),
+  ab_past: r('पुराने / बंद', 'Past / closed', 'ਪੁਰਾਣੇ / ਬੰਦ', 'जुने / बंद'),
+  ab_lotLine: r('{crop} • ग्रेड {g} • ~{q} क्विं.', '{crop} • grade {g} • ~{q} qtl', '{crop} • ਗ੍ਰੇਡ {g} • ~{q} ਕੁਇੰ.', '{crop} • ग्रेड {g} • ~{q} क्विं.'),
+  ab_metaLine: r('नमी {m}% • अन्य पदार्थ {f}% • MSP ₹{msp}', 'Moisture {m}% • foreign {f}% • MSP ₹{msp}', 'ਨਮੀ {m}% • ਹੋਰ ਪਦਾਰਥ {f}% • MSP ₹{msp}', 'ओलावा {m}% • इतर {f}% • MSP ₹{msp}'),
+  ab_highest: r('सबसे ऊँची बोली', 'Highest bid', 'ਸਭ ਤੋਂ ਉੱਚੀ ਬੋਲੀ', 'सर्वाधिक बोली'),
+  ab_bids: r('{n} बोलियाँ', '{n} bids', '{n} ਬੋਲੀਆਂ', '{n} बोली'),
+  ab_youWon: r('🏆 आपने जीता', '🏆 You won', '🏆 ਤੁਸੀਂ ਜਿੱਤੇ', '🏆 तुम्ही जिंकलात'),
+  ab_youLead: r('● आप आगे हैं', '● You are leading', '● ਤੁਸੀਂ ਅੱਗੇ ਹੋ', '● तुम्ही पुढे आहात'),
+  ast_open: r('बोली चालू', 'Bidding open', 'ਬੋਲੀ ਚਾਲੂ', 'बोली सुरू'),
+  ast_closed: r('समय समाप्त', 'Time over', 'ਸਮਾਂ ਖ਼ਤਮ', 'वेळ संपली'),
+  ast_accepted: r('बिक गया', 'Sold', 'ਵਿਕ ਗਿਆ', 'विकले'),
+  ast_rejected: r('अस्वीकृत', 'Rejected', 'ਅਸਵੀਕਾਰ', 'नाकारले'),
+  ast_cancelled: r('रद्द', 'Cancelled', 'ਰੱਦ', 'रद्द'),
+
+  bd_notFound: r('लॉट नहीं मिला', 'Lot not found', 'ਲਾਟ ਨਹੀਂ ਮਿਲਿਆ', 'लॉट सापडला नाही'),
+  bd_lotTitle: r('लॉट {t}', 'Lot {t}', 'ਲਾਟ {t}', 'लॉट {t}'),
+  bd_closesIn: r('बोली बंद होने में', 'Bidding closes in', 'ਬੋਲੀ ਬੰਦ ਹੋਣ ਵਿੱਚ', 'बोली बंद होण्यास'),
+  bd_sold: r('बिक गया', 'Sold', 'ਵਿਕ ਗਿਆ', 'विकले'),
+  bd_closed: r('नीलामी बंद', 'Auction closed', 'ਨੀਲਾਮੀ ਬੰਦ', 'लिलाव बंद'),
+  bd_yourHighest: r('● आपकी बोली सबसे ऊँची है', '● Your bid is the highest', '● ਤੁਹਾਡੀ ਬੋਲੀ ਸਭ ਤੋਂ ਉੱਚੀ ਹੈ', '● तुमची बोली सर्वाधिक आहे'),
+  bd_needMore: r('{who} • आपको ₹{n} या अधिक लगानी होगी', '{who} • you need ₹{n} or more', '{who} • ਤੁਹਾਨੂੰ ₹{n} ਜਾਂ ਵੱਧ ਲਗਾਉਣੀ ਪਵੇਗੀ', '{who} • तुम्हाला ₹{n} किंवा जास्त लावावी लागेल'),
+  bd_noBidsFloor: r('कोई बोली नहीं • शुरुआती भाव MSP ₹{n}', 'No bids • starting price MSP ₹{n}', 'ਕੋਈ ਬੋਲੀ ਨਹੀਂ • ਸ਼ੁਰੂਆਤੀ ਭਾਅ MSP ₹{n}', 'बोली नाही • सुरुवातीचा भाव MSP ₹{n}'),
+  bd_lotDetails: r('लॉट विवरण', 'Lot details', 'ਲਾਟ ਵੇਰਵਾ', 'लॉट तपशील'),
+  bd_assayNotes: r('जांच टिप्पणी', 'Assay notes', 'ਜਾਂਚ ਟਿੱਪਣੀ', 'तपासणी टीप'),
+  bd_placeBid: r('बोली लगाएँ', 'Place a bid', 'ਬੋਲੀ ਲਗਾਓ', 'बोली लावा'),
+  bd_minimum: r('न्यूनतम', 'minimum', 'ਘੱਟੋ-ਘੱਟ', 'किमान'),
+  bd_orMore: r('₹{n} या अधिक', '₹{n} or more', '₹{n} ਜਾਂ ਵੱਧ', '₹{n} किंवा जास्त'),
+  bd_bid: r('बोली', 'Bid', 'ਬੋਲੀ', 'बोली'),
+  bd_leadNote: r('आप पहले से आगे हैं। दूसरा व्यापारी ऊपर जाए तो आप फिर लगा सकते हैं।', 'You are already leading. You can bid again if another trader outbids you.', 'ਤੁਸੀਂ ਪਹਿਲਾਂ ਹੀ ਅੱਗੇ ਹੋ। ਕੋਈ ਹੋਰ ਉੱਪਰ ਜਾਵੇ ਤਾਂ ਫਿਰ ਲਗਾ ਸਕਦੇ ਹੋ।', 'तुम्ही आधीच पुढे आहात. दुसरा व्यापारी पुढे गेल्यास पुन्हा लावू शकता.'),
+  bd_stepNote: r('न्यूनतम बढ़त ₹{s}। बोली लगाने के बाद वापस नहीं ली जा सकती।', 'Minimum increment ₹{s}. Bids cannot be withdrawn.', 'ਘੱਟੋ-ਘੱਟ ਵਾਧਾ ₹{s}। ਬੋਲੀ ਵਾਪਸ ਨਹੀਂ ਲਈ ਜਾ ਸਕਦੀ।', 'किमान वाढ ₹{s}. बोली मागे घेता येणार नाही.'),
+  bd_congrats: r('बधाई! आपने ₹{n}/क्विं. पर जीता', 'Congratulations! You won at ₹{n}/qtl', 'ਵਧਾਈਆਂ! ਤੁਸੀਂ ₹{n}/ਕੁਇੰ. ਤੇ ਜਿੱਤੇ', 'अभिनंदन! तुम्ही ₹{n}/क्विं. ला जिंकलात'),
+  bd_boughtBy: r('{who} ने ₹{n} पर खरीदा', '{who} bought at ₹{n}', '{who} ਨੇ ₹{n} ਤੇ ਖਰੀਦਿਆ', '{who} ने ₹{n} ला खरेदी केले'),
+  bd_farmerRejected: r('किसान ने बोलियाँ अस्वीकार कीं', 'The farmer rejected the bids', 'ਕਿਸਾਨ ਨੇ ਬੋਲੀਆਂ ਅਸਵੀਕਾਰ ਕੀਤੀਆਂ', 'शेतकऱ्याने बोली नाकारल्या'),
+  bd_awaitFarmer: r('समय समाप्त — किसान के निर्णय की प्रतीक्षा', 'Time over — awaiting the farmer\'s decision', 'ਸਮਾਂ ਖ਼ਤਮ — ਕਿਸਾਨ ਦੇ ਫ਼ੈਸਲੇ ਦੀ ਉਡੀਕ', 'वेळ संपली — शेतकऱ्याच्या निर्णयाची प्रतीक्षा'),
+  bd_history: r('बोली इतिहास', 'Bid history', 'ਬੋਲੀ ਇਤਿਹਾਸ', 'बोली इतिहास'),
+  bd_you: r('आप', 'You', 'ਤੁਸੀਂ', 'तुम्ही'),
+  bd_amount: r('राशि', 'Amount', 'ਰਕਮ', 'रक्कम'),
+  bd_badAmount: r('सही राशि दर्ज करें।', 'Enter a valid amount.', 'ਸਹੀ ਰਕਮ ਦਰਜ ਕਰੋ।', 'योग्य रक्कम टाका.'),
+  bd_bidFailed: r('बोली नहीं लगी', 'Bid not placed', 'ਬੋਲੀ ਨਹੀਂ ਲੱਗੀ', 'बोली लागली नाही'),
+
+  mpu_sub: r('{n} लॉट • {q} क्विंटल • ₹{rs}', '{n} lots • {q} qtl • ₹{rs}', '{n} ਲਾਟ • {q} ਕੁਇੰਟਲ • ₹{rs}', '{n} लॉट • {q} क्विंटल • ₹{rs}'),
+  mpu_empty: r('अभी कोई खरीद नहीं', 'No purchases yet', 'ਅਜੇ ਕੋਈ ਖਰੀਦ ਨਹੀਂ', 'अजून खरेदी नाही'),
+  mpu_cropLine: r('{crop} • ग्रेड {g} • {f}', '{crop} • grade {g} • {f}', '{crop} • ਗ੍ਰੇਡ {g} • {f}', '{crop} • ग्रेड {g} • {f}'),
+  mpu_weighed: r('{q} क्विं. (तौला)', '{q} qtl (weighed)', '{q} ਕੁਇੰ. (ਤੋਲਿਆ)', '{q} क्विं. (तोलले)'),
+  mpu_approx: r('~{q} क्विं.', '~{q} qtl', '~{q} ਕੁਇੰ.', '~{q} क्विं.'),
+  mpu_total: r('कुल', 'Total', 'ਕੁੱਲ', 'एकूण'),
+  mpu_weighPending: r('— तौल बाकी', '— weighing pending', '— ਤੋਲ ਬਾਕੀ', '— वजन बाकी'),
+  mpu_awaitWeigh: r('⏳ तौल की प्रतीक्षा', '⏳ Awaiting weighing', '⏳ ਤੋਲ ਦੀ ਉਡੀਕ', '⏳ वजनाची प्रतीक्षा'),
+  mpu_awaitPay: r('⚖️ तौल हो गया, भुगतान बाकी', '⚖️ Weighed, payment pending', '⚖️ ਤੋਲ ਹੋ ਗਿਆ, ਭੁਗਤਾਨ ਬਾਕੀ', '⚖️ वजन झाले, पेमेंट बाकी'),
+  mpu_complete: r('✅ सौदा पूरा', '✅ Deal complete', '✅ ਸੌਦਾ ਪੂਰਾ', '✅ व्यवहार पूर्ण'),
+
+  /* ------------------------------------------------------------ */
+  /* Service errors (thrown with .key)                             */
+  /* ------------------------------------------------------------ */
+  'err.generic': r('कुछ गलत हो गया।', 'Something went wrong.', 'ਕੁਝ ਗਲਤ ਹੋ ਗਿਆ।', 'काहीतरी चूक झाली.'),
+  'err.slotFull': r('यह स्लॉट अभी-अभी भर गया। कृपया दूसरा समय चुनें।', 'This slot just filled up. Please choose another time.', 'ਇਹ ਸਲਾਟ ਹੁਣੇ ਭਰ ਗਿਆ। ਹੋਰ ਸਮਾਂ ਚੁਣੋ।', 'हा स्लॉट आत्ताच भरला. दुसरी वेळ निवडा.'),
+  'err.priceAfterAssay': r('भाव तभी तय हो सकता है जब गुणवत्ता जांच पूरी हो चुकी हो।', 'Price can only be fixed after the quality check.', 'ਭਾਅ ਤਾਂ ਹੀ ਤੈਅ ਹੋ ਸਕਦਾ ਹੈ ਜਦੋਂ ਜਾਂਚ ਪੂਰੀ ਹੋਵੇ।', 'गुणवत्ता तपासणी पूर्ण झाल्यावरच भाव ठरू शकतो.'),
+  'err.weighBeforePrice': r('भाव तय होने से पहले तौल नहीं हो सकता।', 'Weighing is not allowed before the price is fixed.', 'ਭਾਅ ਤੈਅ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਤੋਲ ਨਹੀਂ ਹੋ ਸਕਦਾ।', 'भाव ठरण्यापूर्वी वजन होऊ शकत नाही.'),
+  'err.lotGone': r('यह लॉट अब उपलब्ध नहीं है।', 'This lot is no longer available.', 'ਇਹ ਲਾਟ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ।', 'हा लॉट आता उपलब्ध नाही.'),
+  'err.auctionClosed': r('यह नीलामी बंद हो चुकी है।', 'This auction is closed.', 'ਇਹ ਨੀਲਾਮੀ ਬੰਦ ਹੋ ਚੁੱਕੀ ਹੈ।', 'हा लिलाव बंद झाला आहे.'),
+  'err.timeOver': r('समय समाप्त — बोली स्वीकार नहीं।', 'Time is over — bid not accepted.', 'ਸਮਾਂ ਖ਼ਤਮ — ਬੋਲੀ ਸਵੀਕਾਰ ਨਹੀਂ।', 'वेळ संपली — बोली स्वीकारली नाही.'),
+  'err.belowMsp': r('बोली MSP ₹{n} से कम नहीं हो सकती।', 'Bid cannot be below MSP ₹{n}.', 'ਬੋਲੀ MSP ₹{n} ਤੋਂ ਘੱਟ ਨਹੀਂ ਹੋ ਸਕਦੀ।', 'बोली MSP ₹{n} पेक्षा कमी असू शकत नाही.'),
+  'err.bidMin': r('बोली कम से कम ₹{n} होनी चाहिए।', 'Bid must be at least ₹{n}.', 'ਬੋਲੀ ਘੱਟੋ-ਘੱਟ ₹{n} ਹੋਣੀ ਚਾਹੀਦੀ।', 'बोली किमान ₹{n} हवी.'),
+  'err.alreadyHighest': r('आपकी बोली पहले से सबसे ऊँची है।', 'Your bid is already the highest.', 'ਤੁਹਾਡੀ ਬੋਲੀ ਪਹਿਲਾਂ ਹੀ ਸਭ ਤੋਂ ਉੱਚੀ ਹੈ।', 'तुमची बोली आधीच सर्वाधिक आहे.'),
+  'err.notYourLot': r('यह आपका लॉट नहीं है।', 'This is not your lot.', 'ਇਹ ਤੁਹਾਡਾ ਲਾਟ ਨਹੀਂ ਹੈ।', 'हा तुमचा लॉट नाही.'),
+  'err.noBids': r('कोई बोली नहीं आई।', 'No bids were received.', 'ਕੋਈ ਬੋਲੀ ਨਹੀਂ ਆਈ।', 'बोली आली नाही.'),
+  'err.auctionDecided': r('यह नीलामी पहले ही तय हो चुकी है।', 'This auction has already been decided.', 'ਇਹ ਨੀਲਾਮੀ ਪਹਿਲਾਂ ਹੀ ਤੈਅ ਹੋ ਚੁੱਕੀ ਹੈ।', 'हा लिलाव आधीच ठरला आहे.'),
+  'err.cannotReopen': r('यह नीलामी तय हो चुकी है, दोबारा नहीं खुल सकती।', 'This auction is decided and cannot be reopened.', 'ਇਹ ਨੀਲਾਮੀ ਤੈਅ ਹੋ ਚੁੱਕੀ ਹੈ, ਦੁਬਾਰਾ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕਦੀ।', 'हा लिलाव ठरला आहे, पुन्हा उघडू शकत नाही.'),
+  'err.lotNotFound': r('लॉट नहीं मिला।', 'Lot not found.', 'ਲਾਟ ਨਹੀਂ ਮਿਲਿਆ।', 'लॉट सापडला नाही.'),
+  'err.badBid': r('सही बोली राशि दर्ज करें।', 'Enter a valid bid amount.', 'ਸਹੀ ਬੋਲੀ ਰਕਮ ਦਰਜ ਕਰੋ।', 'योग्य बोली रक्कम टाका.'),
+  'err.badRate': r('सही दर प्रति क्विंटल आवश्यक है।', 'A valid rate per quintal is required.', 'ਸਹੀ ਦਰ ਪ੍ਰਤੀ ਕੁਇੰਟਲ ਜ਼ਰੂਰੀ ਹੈ।', 'योग्य दर प्रति क्विंटल आवश्यक.'),
+  'err.enterName': r('नाम दर्ज करें।', 'Enter your name.', 'ਨਾਮ ਦਰਜ ਕਰੋ।', 'नाव टाका.'),
+  'err.badPhone': r('कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें।', 'Please enter a valid 10-digit mobile number.', 'ਸਹੀ 10 ਅੰਕਾਂ ਦਾ ਮੋਬਾਈਲ ਨੰਬਰ ਦਰਜ ਕਰੋ।', 'योग्य 10 अंकी मोबाइल क्रमांक टाका.'),
+  'err.exists': r('इस मोबाइल नंबर से खाता पहले से मौजूद है। कृपया लॉग इन करें।', 'An account already exists for this number. Please log in.', 'ਇਸ ਨੰਬਰ ਨਾਲ ਖਾਤਾ ਪਹਿਲਾਂ ਹੀ ਹੈ। ਲੌਗਇਨ ਕਰੋ।', 'या क्रमांकाचे खाते आधीच आहे. कृपया लॉगिन करा.'),
+  'err.enterEmpId': r('कर्मचारी आईडी दर्ज करें।', 'Enter your employee ID.', 'ਕਰਮਚਾਰੀ ID ਦਰਜ ਕਰੋ।', 'कर्मचारी ID टाका.'),
+  'err.pickMandi': r('कृपया अपनी मंडी चुनें।', 'Please choose your mandi.', 'ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀ ਮੰਡੀ ਚੁਣੋ।', 'कृपया तुमची मंडी निवडा.'),
+  'err.traderFields': r('लाइसेंस नंबर और फर्म नाम दर्ज करें।', 'Enter licence number and firm name.', 'ਲਾਇਸੈਂਸ ਨੰਬਰ ਅਤੇ ਫਰਮ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।', 'परवाना क्रमांक व फर्मचे नाव टाका.'),
+  'err.traderMandi': r('कृपया वह मंडी चुनें जहाँ आप व्यापार करते हैं।', 'Please choose the mandi where you trade.', 'ਉਹ ਮੰਡੀ ਚੁਣੋ ਜਿੱਥੇ ਤੁਸੀਂ ਵਪਾਰ ਕਰਦੇ ਹੋ।', 'तुम्ही जिथे व्यापार करता ती मंडी निवडा.'),
+  'err.notRegistered': r('यह मोबाइल नंबर पंजीकृत नहीं है। कृपया नया खाता बनाएं।', 'This number is not registered. Please create an account.', 'ਇਹ ਨੰਬਰ ਰਜਿਸਟਰਡ ਨਹੀਂ। ਨਵਾਂ ਖਾਤਾ ਬਣਾਓ।', 'हा क्रमांक नोंदणीकृत नाही. नवीन खाते तयार करा.'),
+  'err.wrongRole': r('यह खाता {role} के रूप में पंजीकृत है। सही भूमिका चुनें।', 'This account is registered as {role}. Choose the right role.', 'ਇਹ ਖਾਤਾ {role} ਵਜੋਂ ਰਜਿਸਟਰਡ ਹੈ। ਸਹੀ ਭੂਮਿਕਾ ਚੁਣੋ।', 'हे खाते {role} म्हणून नोंदणीकृत आहे. योग्य भूमिका निवडा.'),
+
+  'err.cannotCancel': r('यह बुकिंग अब रद्द नहीं की जा सकती।', 'This booking can no longer be cancelled.', 'ਇਹ ਬੁਕਿੰਗ ਹੁਣ ਰੱਦ ਨਹੀਂ ਹੋ ਸਕਦੀ।', 'ही बुकिंग आता रद्द करता येणार नाही.'),
+  'err.mandiNotFound': r('मंडी की जानकारी नहीं मिली।', 'Mandi not found.', 'ਮੰਡੀ ਦੀ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।', 'मंडी माहिती सापडली नाही.'),
+  'err.tokenNotFound': r('टोकन नहीं मिला।', 'Token not found.', 'ਟੋਕਨ ਨਹੀਂ ਮਿਲਿਆ।', 'टोकन सापडले नाही.'),
+  'err.aadhaar12': r('आधार संख्या 12 अंकों की होनी चाहिए।', 'Aadhaar number must be 12 digits.', 'ਆਧਾਰ ਨੰਬਰ 12 ਅੰਕਾਂ ਦਾ ਹੋਣਾ ਚਾਹੀਦਾ।', 'आधार क्रमांक 12 अंकी हवा.'),
+  'err.enterId': r('कृपया पहचान संख्या दर्ज करें।', 'Please enter the ID number.', 'ਕਿਰਪਾ ਕਰਕੇ ਪਛਾਣ ਨੰਬਰ ਦਰਜ ਕਰੋ।', 'कृपया ओळख क्रमांक टाका.'),
+  // PDF documents
+  pdf_receiptTitle: r('भुगतान रसीद / PAYMENT RECEIPT', 'PAYMENT RECEIPT', 'ਭੁਗਤਾਨ ਰਸੀਦ / PAYMENT RECEIPT', 'पेमेंट पावती / PAYMENT RECEIPT'),
+  pdf_gatePassTitle: r('गेट पास / GATE PASS', 'GATE PASS', 'ਗੇਟ ਪਾਸ / GATE PASS', 'गेट पास / GATE PASS'),
+  pdf_generated: r('यह रसीद AGROBRIDGE द्वारा डिजिटल रूप से बनाई गई है।', 'This receipt was generated digitally by AGROBRIDGE.', 'ਇਹ ਰਸੀਦ AGROBRIDGE ਵੱਲੋਂ ਡਿਜੀਟਲ ਰੂਪ ਵਿੱਚ ਬਣਾਈ ਗਈ ਹੈ।', 'ही पावती AGROBRIDGE ने डिजिटल स्वरूपात तयार केली आहे.'),
+  pdf_farmerCopy: r('किसान प्रति', 'Farmer copy', 'ਕਿਸਾਨ ਕਾਪੀ', 'शेतकरी प्रत'),
+  pdf_paidOn: r('भुगतान तिथि', 'Paid on', 'ਭੁਗਤਾਨ ਮਿਤੀ', 'पेमेंट दिनांक'),
+  pdf_deductions: r('कटौती', 'Deductions', 'ਕਟੌਤੀ', 'कपात'),
+  pdf_scanAtGate: r('गेट पर स्कैन करें', 'Scan at the gate', 'ਗੇਟ ਤੇ ਸਕੈਨ ਕਰੋ', 'गेटवर स्कॅन करा'),
+  pdf_gatePassNo: r('गेट पास नंबर', 'Gate pass no.', 'ਗੇਟ ਪਾਸ ਨੰਬਰ', 'गेट पास क्रमांक'),
+  pdf_slot: r('स्लॉट', 'Slot', 'ਸਲਾਟ', 'स्लॉट'),
+  centreLabel_gate: r('गेट पर', 'At the gate', 'ਗੇਟ ਤੇ', 'गेटवर'),
+
+  /* ------------------------------------------------------------ */
+  /* Voice guidance                                                */
+  /* ------------------------------------------------------------ */
+
+  // ---- Payment basis + arhtiya parchi (install12) ----
+  pb_title: r('भुगतान का आधार', 'Payment basis', 'ਭੁਗਤਾਨ ਦਾ ਆਧਾਰ', 'देयकाचा आधार'),
+  pb_hint: r('इस रसीद के लिए भाव कैसे तय हुआ था?', 'How was the price for this receipt decided?', 'ਇਸ ਰਸੀਦ ਲਈ ਭਾਅ ਕਿਵੇਂ ਤੈਅ ਹੋਇਆ ਸੀ?', 'या पावतीसाठी भाव कसा ठरला होता?'),
+  pb_msp: r('सरकारी खरीद (MSP)', 'MSP purchase', 'ਸਰਕਾਰੀ ਖਰੀਦ (MSP)', 'शासकीय खरेदी (MSP)'),
+  pb_msp_d: r('निश्चित सरकारी भाव', 'Fixed government price', 'ਨਿਸ਼ਚਿਤ ਸਰਕਾਰੀ ਭਾਅ', 'निश्चित शासकीय भाव'),
+  pb_ebid: r('ई-बोली (ऐप नीलामी)', 'e-Bid (app auction)', 'ਈ-ਬੋਲੀ (ਐਪ ਨਿਲਾਮੀ)', 'ई-बोली (अ‍ॅप लिलाव)'),
+  pb_ebid_d: r('भाव ऐप में दर्ज है, पर्ची की ज़रूरत नहीं', 'Price is recorded in the app, no parchi needed', 'ਭਾਅ ਐਪ ਵਿੱਚ ਦਰਜ ਹੈ, ਪਰਚੀ ਦੀ ਲੋੜ ਨਹੀਂ', 'भाव अ‍ॅपमध्ये नोंदलेला आहे, पर्चीची गरज नाही'),
+  pb_offline: r('ऑफलाइन बोली (आढ़ती)', 'Offline bid (arhtiya)', 'ਆਫਲਾਈਨ ਬੋਲੀ (ਆੜ੍ਹਤੀ)', 'ऑफलाइन बोली (अडते)'),
+  pb_offline_d: r('मुनीम की पर्ची की फोटो ज़रूरी', 'Photo of the munim\'s parchi is required', 'ਮੁਨੀਮ ਦੀ ਪਰਚੀ ਦੀ ਫੋਟੋ ਜ਼ਰੂਰੀ', 'मुनीमच्या पर्चीचा फोटो आवश्यक'),
+  pc_title: r('मुनीम की पर्ची', 'Munim\'s parchi', 'ਮੁਨੀਮ ਦੀ ਪਰਚੀ', 'मुनीमची पर्ची'),
+  pc_hint: r('किसान से आढ़ती की पर्ची लें और उसकी फोटो खींचें। यह किसान के लिए दूसरी पुष्टि है कि उसे वही भाव मिल रहा है जो बोली में बताया गया था।', 'Take the arhtiya\'s parchi from the farmer and photograph it. It is the farmer\'s second confirmation that he is paid the rate he was told at the bid.', 'ਕਿਸਾਨ ਤੋਂ ਆੜ੍ਹਤੀ ਦੀ ਪਰਚੀ ਲਓ ਅਤੇ ਉਸਦੀ ਫੋਟੋ ਖਿੱਚੋ। ਇਹ ਕਿਸਾਨ ਲਈ ਦੂਜੀ ਪੁਸ਼ਟੀ ਹੈ ਕਿ ਉਸਨੂੰ ਉਹੀ ਭਾਅ ਮਿਲ ਰਿਹਾ ਹੈ ਜੋ ਬੋਲੀ ਵਿੱਚ ਦੱਸਿਆ ਗਿਆ ਸੀ।', 'शेतकऱ्याकडून अडत्याची पर्ची घ्या आणि तिचा फोटो काढा. बोलीत सांगितलेलाच भाव मिळतो आहे याची ही शेतकऱ्यासाठी दुसरी खात्री आहे.'),
+  pc_takePhoto: r('📷 फोटो खींचें', '📷 Take photo', '📷 ਫੋਟੋ ਖਿੱਚੋ', '📷 फोटो काढा'),
+  pc_gallery: r('गैलरी से चुनें', 'Choose from gallery', 'ਗੈਲਰੀ ਤੋਂ ਚੁਣੋ', 'गॅलरीतून निवडा'),
+  pc_retake: r('दोबारा खींचें', 'Retake', 'ਦੁਬਾਰਾ ਖਿੱਚੋ', 'पुन्हा काढा'),
+  pc_remove: r('हटाएँ', 'Remove', 'ਹਟਾਓ', 'काढून टाका'),
+  pc_rate: r('पर्ची पर लिखा भाव (₹ / क्विंटल)', 'Rate written on the parchi (₹ / qtl)', 'ਪਰਚੀ ਉੱਤੇ ਲਿਖਿਆ ਭਾਅ (₹ / ਕੁਇੰਟਲ)', 'पर्चीवर लिहिलेला भाव (₹ / क्विंटल)'),
+  pc_note: r('टिप्पणी (वैकल्पिक)', 'Note (optional)', 'ਟਿੱਪਣੀ (ਵਿਕਲਪਿਕ)', 'टीप (ऐच्छिक)'),
+  pc_notePh: r('जैसे: आढ़ती का नाम', 'e.g. arhtiya\'s name', 'ਜਿਵੇਂ: ਆੜ੍ਹਤੀ ਦਾ ਨਾਮ', 'उदा. अडत्याचे नाव'),
+  pc_match: r('✓ पर्ची का भाव तय भाव से मेल खाता है', '✓ Parchi rate matches the fixed rate', '✓ ਪਰਚੀ ਦਾ ਭਾਅ ਤੈਅ ਭਾਅ ਨਾਲ ਮੇਲ ਖਾਂਦਾ ਹੈ', '✓ पर्चीवरील भाव ठरलेल्या भावाशी जुळतो'),
+  pc_mismatch: r('⚠ पर्ची का भाव ₹{a} है, ऐप में तय भाव ₹{b}। यह अंतर रिकॉर्ड में दर्ज होगा।', '⚠ Parchi says ₹{a}, app has ₹{b}. This difference will be saved on the record.', '⚠ ਪਰਚੀ ਦਾ ਭਾਅ ₹{a} ਹੈ, ਐਪ ਵਿੱਚ ਤੈਅ ਭਾਅ ₹{b}। ਇਹ ਅੰਤਰ ਰਿਕਾਰਡ ਵਿੱਚ ਦਰਜ ਹੋਵੇਗਾ।', '⚠ पर्चीवर ₹{a} आहे, अ‍ॅपमध्ये ₹{b}. हा फरक नोंदीत जतन होईल.'),
+  pc_needPhoto: r('ऑफलाइन बोली के लिए मुनीम की पर्ची की फोटो ज़रूरी है।', 'A photo of the munim\'s parchi is required for an offline bid.', 'ਆਫਲਾਈਨ ਬੋਲੀ ਲਈ ਮੁਨੀਮ ਦੀ ਪਰਚੀ ਦੀ ਫੋਟੋ ਜ਼ਰੂਰੀ ਹੈ।', 'ऑफलाइन बोलीसाठी मुनीमच्या पर्चीचा फोटो आवश्यक आहे.'),
+  pc_needRate: r('पर्ची पर लिखा भाव दर्ज करें।', 'Enter the rate written on the parchi.', 'ਪਰਚੀ ਉੱਤੇ ਲਿਖਿਆ ਭਾਅ ਦਰਜ ਕਰੋ।', 'पर्चीवर लिहिलेला भाव नोंदवा.'),
+  pc_camPerm: r('कैमरा अनुमति नहीं मिली।', 'Camera permission was not granted.', 'ਕੈਮਰਾ ਇਜਾਜ਼ਤ ਨਹੀਂ ਮਿਲੀ।', 'कॅमेरा परवानगी मिळाली नाही.'),
+  pc_photoFail: r('फोटो नहीं ली जा सकी।', 'Could not capture the photo.', 'ਫੋਟੋ ਨਹੀਂ ਲਈ ਜਾ ਸਕੀ।', 'फोटो घेता आला नाही.'),
+  pc_attached: r('पर्ची संलग्न', 'Parchi attached', 'ਪਰਚੀ ਨੱਥੀ', 'पर्ची जोडली'),
+  pc_farmerTitle: r('आढ़ती की पर्ची (दूसरी पुष्टि)', 'Arhtiya\'s parchi (second confirmation)', 'ਆੜ੍ਹਤੀ ਦੀ ਪਰਚੀ (ਦੂਜੀ ਪੁਸ਼ਟੀ)', 'अडत्याची पर्ची (दुसरी खात्री)'),
+  pc_farmerHint: r('कैशियर ने भुगतान के समय आपकी पर्ची की फोटो ली। बोली का भाव और भुगतान का भाव मिलाकर देखें।', 'The cashier photographed your parchi at payment. Compare the bid rate with the paid rate.', 'ਕੈਸ਼ੀਅਰ ਨੇ ਭੁਗਤਾਨ ਵੇਲੇ ਤੁਹਾਡੀ ਪਰਚੀ ਦੀ ਫੋਟੋ ਲਈ। ਬੋਲੀ ਦਾ ਭਾਅ ਅਤੇ ਭੁਗਤਾਨ ਦਾ ਭਾਅ ਮਿਲਾ ਕੇ ਵੇਖੋ।', 'कॅशियरने देयकाच्या वेळी तुमच्या पर्चीचा फोटो घेतला. बोलीचा भाव आणि दिलेला भाव जुळवून पहा.'),
+  pc_parchiRate: r('पर्ची का भाव', 'Parchi rate', 'ਪਰਚੀ ਦਾ ਭਾਅ', 'पर्चीचा भाव'),
+  pc_paidRate: r('भुगतान का भाव', 'Paid rate', 'ਭੁਗਤਾਨ ਦਾ ਭਾਅ', 'दिलेला भाव'),
+  pc_tapToView: r('बड़ा देखने के लिए टैप करें', 'Tap to view full size', 'ਵੱਡਾ ਵੇਖਣ ਲਈ ਟੈਪ ਕਰੋ', 'मोठे पाहण्यासाठी टॅप करा'),
+  pc_capturedBy: r('{by} द्वारा {at} को ली गई', 'Captured by {by} on {at}', '{by} ਵੱਲੋਂ {at} ਨੂੰ ਲਈ ਗਈ', '{by} यांनी {at} रोजी घेतली'),
+  pc_pdfPage: r('पृष्ठ 2 — आढ़ती की पर्ची (मुनीम द्वारा जारी)', 'Page 2 — Arhtiya\'s parchi (issued by the munim)', 'ਪੰਨਾ 2 — ਆੜ੍ਹਤੀ ਦੀ ਪਰਚੀ (ਮੁਨੀਮ ਵੱਲੋਂ ਜਾਰੀ)', 'पान 2 — अडत्याची पर्ची (मुनीमने दिलेली)'),
+  pc_bothSlips: r('दो रसीदें', 'Two receipts', 'ਦੋ ਰਸੀਦਾਂ', 'दोन पावत्या'),
+  pc_bothSlipsSub: r('1. APMC कैशियर की आधिकारिक रसीद  2. आढ़ती के मुनीम की पर्ची', '1. Official receipt from the APMC cashier  2. Parchi from the arhtiya\'s munim', '1. APMC ਕੈਸ਼ੀਅਰ ਦੀ ਅਧਿਕਾਰਤ ਰਸੀਦ  2. ਆੜ੍ਹਤੀ ਦੇ ਮੁਨੀਮ ਦੀ ਪਰਚੀ', '1. APMC कॅशियरची अधिकृत पावती  2. अडत्याच्या मुनीमची पर्ची'),
+  pc_downloadBoth: r('⬇  रसीद + पर्ची PDF', '⬇  Receipt + parchi PDF', '⬇  ਰਸੀਦ + ਪਰਚੀ PDF', '⬇  पावती + पर्ची PDF'),
+  pc_officialTitle: r('APMC कैशियर की आधिकारिक रसीद', 'Official receipt (APMC cashier)', 'APMC ਕੈਸ਼ੀਅਰ ਦੀ ਅਧਿਕਾਰਤ ਰਸੀਦ', 'APMC कॅशियरची अधिकृत पावती'),
+
+  audio_welcome: r(
+    'एग्रोब्रिज किसान सेतु में आपका स्वागत है। यह ऐप किसानों को मंडी गेट स्लॉट बुक करने और घंटों के इंतजार से बचाने के लिए बनाया गया है। आगे बढ़ने के लिए नीचे दिए गए बटन पर टैप करें।',
+    'Welcome to Agrobridge KisanSetu. This app helps farmers book mandi gate slots and avoid long waits. Tap Get Started to continue.',
+    'ਐਗਰੋਬ੍ਰਿਜ ਕਿਸਾਨ ਸੇਤੁ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ। ਇਹ ਐਪ ਕਿਸਾਨਾਂ ਨੂੰ ਮੰਡੀ ਗੇਟ ਸਲਾਟ ਬੁੱਕ ਕਰਨ ਅਤੇ ਘੰਟਿਆਂ ਦੀ ਉਡੀਕ ਤੋਂ ਬਚਾਉਣ ਲਈ ਹੈ। ਅੱਗੇ ਵਧਣ ਲਈ ਹੇਠਾਂ ਬਟਨ ਦਬਾਓ।',
+    'अ‍ॅग्रोब्रिज किसान सेतु मध्ये स्वागत आहे. हे अ‍ॅप शेतकऱ्यांना मंडी गेट स्लॉट बुक करण्यास आणि तासन्‌तास प्रतीक्षा टाळण्यास मदत करते. पुढे जाण्यासाठी खालील बटण दाबा.'
+  ),
+  audio_role: r(
+    'अपनी भूमिका चुनें। यदि आप फसल बेचने वाले किसान हैं, तो किसान चुनें। यदि आप मंडी में गेट, जांच, तौल या खाता संभालते हैं, तो मंडी अधिकारी चुनें। यदि आप फसल खरीदने वाले व्यापारी हैं, तो व्यापारी चुनें।',
+    'Select your role. If you are a farmer selling crops, tap Farmer. If you work at the mandi gate, assay, weighbridge or accounts, tap Mandi Officer. If you buy crops, tap Trader.',
+    'ਆਪਣੀ ਭੂਮਿਕਾ ਚੁਣੋ। ਜੇ ਤੁਸੀਂ ਫਸਲ ਵੇਚਣ ਵਾਲੇ ਕਿਸਾਨ ਹੋ ਤਾਂ ਕਿਸਾਨ ਚੁਣੋ। ਜੇ ਤੁਸੀਂ ਮੰਡੀ ਵਿੱਚ ਕੰਮ ਕਰਦੇ ਹੋ ਤਾਂ ਮੰਡੀ ਅਧਿਕਾਰੀ ਚੁਣੋ। ਜੇ ਤੁਸੀਂ ਫਸਲ ਖਰੀਦਦੇ ਹੋ ਤਾਂ ਵਪਾਰੀ ਚੁਣੋ।',
+    'तुमची भूमिका निवडा. तुम्ही पीक विकणारे शेतकरी असाल तर शेतकरी निवडा. मंडीत काम करत असाल तर मंडी अधिकारी निवडा. पीक खरेदी करत असाल तर व्यापारी निवडा.'
+  ),
+  audio_farmer_dashboard: r(
+    'यह आपका मुख्य किसान पेज है। मंडी जाने के लिए स्लॉट बुक करें बटन पर टैप करें। अपनी टोकन स्थिति, कतार और संभावित समय आप ऊपर देख सकते हैं।',
+    'This is your farmer home page. Tap Book Slot to go to the mandi. Your token status, queue and expected time are shown at the top.',
+    'ਇਹ ਤੁਹਾਡਾ ਮੁੱਖ ਕਿਸਾਨ ਪੇਜ ਹੈ। ਮੰਡੀ ਜਾਣ ਲਈ ਸਲਾਟ ਬੁੱਕ ਕਰੋ ਦਬਾਓ। ਆਪਣਾ ਟੋਕਨ, ਕਤਾਰ ਅਤੇ ਸੰਭਾਵਿਤ ਸਮਾਂ ਉੱਪਰ ਵੇਖੋ।',
+    'हे तुमचे मुख्य शेतकरी पेज आहे. मंडीत जाण्यासाठी स्लॉट बुक करा दाबा. तुमचे टोकन, रांग व अपेक्षित वेळ वर दिसेल.'
+  ),
+  audio_crop: r(
+    'पहला चरण। वह फसल चुनें जिसे आप आज मंडी में बेचने जा रहे हैं। फसल चुनने के बाद नीचे आगे बढ़ें बटन पर टैप करें।',
+    'Step one. Select the crop you will sell at the mandi today, then tap Continue below.',
+    'ਪਹਿਲਾ ਪੜਾਅ। ਜੋ ਫਸਲ ਅੱਜ ਮੰਡੀ ਵਿੱਚ ਵੇਚਣੀ ਹੈ ਉਹ ਚੁਣੋ, ਫਿਰ ਹੇਠਾਂ ਅੱਗੇ ਵਧੋ ਦਬਾਓ।',
+    'पहिली पायरी. आज मंडीत विकायचे पीक निवडा आणि खालील पुढे जा बटण दाबा.'
+  ),
+  audio_centre: r(
+    'दूसरा चरण। अपनी निकटतम मंडी चुनें। सबसे पास की मंडी ऊपर दिखाई गई है। मंडी चुनकर आगे बढ़ें।',
+    'Step two. Select your nearest mandi. The closest one is shown at the top. Choose and continue.',
+    'ਦੂਜਾ ਪੜਾਅ। ਆਪਣੀ ਨਜ਼ਦੀਕੀ ਮੰਡੀ ਚੁਣੋ। ਸਭ ਤੋਂ ਨੇੜਲੀ ਮੰਡੀ ਉੱਪਰ ਹੈ। ਚੁਣ ਕੇ ਅੱਗੇ ਵਧੋ।',
+    'दुसरी पायरी. तुमची जवळची मंडी निवडा. सर्वात जवळची मंडी वर दाखवली आहे. निवडून पुढे जा.'
+  ),
+  audio_slot: r(
+    'तीसरा चरण। अपनी सुविधा अनुसार आगमन की तारीख और समय चुनें, फिर अनुमानित मात्रा भरें और टोकन लें।',
+    'Step three. Choose your arrival date and time, enter the approximate quantity, and get your token.',
+    'ਤੀਜਾ ਪੜਾਅ। ਆਮਦ ਦੀ ਤਾਰੀਖ ਅਤੇ ਸਮਾਂ ਚੁਣੋ, ਅਨੁਮਾਨਿਤ ਮਾਤਰਾ ਭਰੋ ਅਤੇ ਟੋਕਨ ਲਓ।',
+    'तिसरी पायरी. येण्याची तारीख व वेळ निवडा, अंदाजे प्रमाण भरा आणि टोकन घ्या.'
+  ),
+  audio_officer_queue: r(
+    'मंडी अधिकारी पोर्टल। आपके काम के कार्ड ऊपर हैं। गेट पर किसान का गेट पास स्कैन करके प्रवेश दें। जांच, तौल और भुगतान अपने-अपने कार्ड से करें।',
+    'Mandi officer portal. Your work cards are at the top. At the gate, scan the farmer\'s gate pass to admit them. Assay, weighing and payment each have their own card.',
+    'ਮੰਡੀ ਅਧਿਕਾਰੀ ਪੋਰਟਲ। ਤੁਹਾਡੇ ਕੰਮ ਦੇ ਕਾਰਡ ਉੱਪਰ ਹਨ। ਗੇਟ ਤੇ ਕਿਸਾਨ ਦਾ ਗੇਟ ਪਾਸ ਸਕੈਨ ਕਰਕੇ ਐਂਟਰੀ ਦਿਓ।',
+    'मंडी अधिकारी पोर्टल. तुमची कामाची कार्डे वर आहेत. गेटवर शेतकऱ्याचा गेट पास स्कॅन करून प्रवेश द्या.'
+  ),
 };
 
-export function translate(key, lang = 'hi') {
+/* ------------------------------------------------------------------ */
+/*  translate()                                                        */
+/* ------------------------------------------------------------------ */
+
+function fill(text, params, lang) {
+  if (!params) return text;
+  return String(text).replace(/\{(\w+)\}/g, (m, k) => {
+    const v = params[k];
+    if (v === undefined || v === null) return '';
+    // A param can itself be a translatable { key, params } object
+    // (e.g. buyer = { key: 'td_govBuyer' } coming from services).
+    if (typeof v === 'object' && v.key) return translate(v.key, lang, v.params);
+    return String(v);
+  });
+}
+
+/**
+ * translate('key', 'hi', { n: 3 })
+ * Unknown key -> the key itself (so it is visible during testing).
+ */
+export function translate(key, lang = DEFAULT_LANG, params) {
   const row = t[key];
-  if (!row) return '';
-  return row[lang] || row.hi || row.en || '';
+  if (!row) return fill(String(key || ''), params, lang);
+  const text = row[lang] || row.hi || row.en || '';
+  return fill(text, params, lang);
+}
+
+/** Crop display name in a language. */
+export function cropName(cropId, lang = DEFAULT_LANG) {
+  return translate(`crop_${cropId}`, lang);
+}
+
+/** Grade display name. */
+export function gradeName(gradeId, lang = DEFAULT_LANG) {
+  return translate(`grade_${gradeId}`, lang);
+}
+
+/**
+ * Mandi name: centres store `name` (Hindi + English in brackets) and
+ * optionally `name_en`. English users get the English form.
+ */
+export function centreName(centre, lang = DEFAULT_LANG) {
+  if (!centre) return '';
+  if (lang === 'en' && centre.name_en) return centre.name_en;
+  if (lang === 'en') {
+    const m = /\(([^)]+)\)/.exec(centre.name || '');
+    if (m) return m[1];
+  }
+  return centre.name || '';
 }

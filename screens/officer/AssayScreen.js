@@ -15,9 +15,10 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
-import { QUALITY_GRADES } from '../../services/centres';
+import { QUALITY_GRADES, cropLabel } from '../../services/centres';
 import { recordAssay } from '../../services/bookings';
 
+import { useLang } from '../../i18n/LanguageContext';
 /*
  * Assay = quality inspection at the mandi.
  * The inspector records moisture and foreign matter, assigns a
@@ -25,6 +26,7 @@ import { recordAssay } from '../../services/bookings';
  * rejects it outright.
  */
 export default function AssayScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const { token } = route.params || {};
 
   const [moisture, setMoisture] = useState('12');
@@ -38,12 +40,12 @@ export default function AssayScreen({ navigation, route }) {
     const f = parseFloat(foreign);
 
     if (Number.isNaN(m) || m < 0 || m > 100) {
-      Alert.alert('नमी', 'कृपया 0 से 100 के बीच सही मान दर्ज करें।');
+      Alert.alert(tr('moisture'), tr('as_range'));
       return;
     }
 
     if (Number.isNaN(f) || f < 0 || f > 100) {
-      Alert.alert('अन्य पदार्थ', 'कृपया 0 से 100 के बीच सही मान दर्ज करें।');
+      Alert.alert(tr('foreignMatter'), tr('as_range'));
       return;
     }
 
@@ -59,23 +61,21 @@ export default function AssayScreen({ navigation, route }) {
       });
 
       Alert.alert(
-        rejected ? 'अस्वीकृत' : 'दर्ज हो गया',
-        rejected
-          ? 'यह लॉट अस्वीकृत कर दिया गया।'
-          : 'अब वाहन को तौल के लिए भेजें।',
+        rejected ? tr('as_rejected') : tr('recorded'),
+        rejected ? tr('as_rejectedSub') : tr('as_recordedSub'),
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'दर्ज नहीं हुआ।');
+      Alert.alert(tr('error'), trError(error, 'notRecorded'));
     } finally {
       setBusy(false);
     }
   };
 
   const confirmReject = () => {
-    Alert.alert('लॉट अस्वीकार करें?', 'किसान को भुगतान नहीं होगा।', [
-      { text: 'रद्द', style: 'cancel' },
-      { text: 'हाँ, अस्वीकार', style: 'destructive', onPress: () => submit(true) },
+    Alert.alert(tr('as_rejectQ'), tr('as_rejectQSub'), [
+      { text: tr('cancel'), style: 'cancel' },
+      { text: tr('as_yesReject'), style: 'destructive', onPress: () => submit(true) },
     ]);
   };
 
@@ -85,20 +85,20 @@ export default function AssayScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
-          title="गुणवत्ता जांच"
-          subtitle={`टोकन ${token?.tokenNumber || ''} • ${token?.farmerName || ''}`}
+          title={tr('as_title')}
+          subtitle={tr('tokenAndName', { t: token?.tokenNumber || '', n: token?.farmerName || '' })}
         />
 
         <View style={styles.info}>
           <Text style={styles.infoText}>
-            फसल: {String(token?.cropName || token?.crop || '').toUpperCase()}
+            {tr('as_cropLine', { c: cropLabel(token, lang) })}
           </Text>
           <Text style={styles.infoText}>
-            वाहन: {token?.vehicleNumber || '—'}
+            {tr('as_vehicleLine', { v: token?.vehicleNumber || '—' })}
           </Text>
         </View>
 
-        <Text style={styles.label}>नमी % (Moisture)</Text>
+        <Text style={styles.label}>{tr('as_moisture')}</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
@@ -108,10 +108,10 @@ export default function AssayScreen({ navigation, route }) {
           placeholderTextColor="#999"
         />
         <Text style={styles.hint}>
-          गेहूँ के लिए सामान्य सीमा 12% तक
+          {tr('as_moistureHint')}
         </Text>
 
-        <Text style={styles.label}>अन्य पदार्थ % (Foreign Matter)</Text>
+        <Text style={styles.label}>{tr('as_foreign')}</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
@@ -121,7 +121,7 @@ export default function AssayScreen({ navigation, route }) {
           placeholderTextColor="#999"
         />
 
-        <Text style={styles.label}>ग्रेड</Text>
+        <Text style={styles.label}>{tr('grade')}</Text>
         <View style={styles.grades}>
           {QUALITY_GRADES.filter((g) => g.id !== 'REJECTED').map((g) => (
             <TouchableOpacity
@@ -135,26 +135,26 @@ export default function AssayScreen({ navigation, route }) {
                   grade === g.id && styles.gradeTextOn,
                 ]}
               >
-                {g.name}
+                {tr(g.nameKey || g.name)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.label}>टिप्पणी (वैकल्पिक)</Text>
+        <Text style={styles.label}>{tr('as_notes')}</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={notes}
           onChangeText={setNotes}
           multiline
-          placeholder="कोई विशेष बात"
+          placeholder={tr('as_notesPh')}
           placeholderTextColor="#999"
         />
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
-          title="अस्वीकार करें"
+          title={tr('as_rejectBtn')}
           variant="danger"
           onPress={confirmReject}
           disabled={busy}
@@ -162,7 +162,7 @@ export default function AssayScreen({ navigation, route }) {
         />
 
         <PrimaryButton
-          title="जांच पूरी - तौल पर भेजें"
+          title={tr('as_submit')}
           loading={busy}
           onPress={() => submit(false)}
         />

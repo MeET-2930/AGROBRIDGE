@@ -14,22 +14,24 @@ import PrimaryButton from '../../components/PrimaryButton';
 import GatePassCard from '../../components/GatePassCard';
 import Colors from '../../theme/colors';
 import { downloadGatePassPdf } from '../../services/receipt';
+import { useLang } from '../../i18n/LanguageContext';
 
 /*
  * Shown once, right after booking. The farmer gets the token
  * number AND the gate pass (QR + 6-digit number) together.
  */
 export default function TokenConfirmationScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const { booking } = route.params || {};
   const [downloading, setDownloading] = useState(false);
 
   const savePass = async () => {
     setDownloading(true);
     try {
-      await downloadGatePassPdf(booking);
+      await downloadGatePassPdf(booking, lang);
     } catch (error) {
       console.error('Gate pass PDF error:', error);
-      Alert.alert('PDF नहीं बना', error?.message || 'कृपया दोबारा प्रयास करें।');
+      Alert.alert(tr('pdfFailed'), trError(error, 'pleaseRetry'));
     } finally {
       setDownloading(false);
     }
@@ -51,7 +53,7 @@ export default function TokenConfirmationScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.container}>
         <AppHeader navigation={navigation} />
-        <Text style={styles.empty}>बुकिंग जानकारी नहीं मिली</Text>
+        <Text style={styles.empty}>{tr('tc_noBooking')}</Text>
       </SafeAreaView>
     );
   }
@@ -63,37 +65,37 @@ export default function TokenConfirmationScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.success}>
           <Ionicons name="checkmark-circle" size={64} color="#16A34A" />
-          <Text style={styles.successTitle}>टोकन बुक हो गया!</Text>
-          <Text style={styles.successSub}>आपका टोकन नंबर</Text>
+          <Text style={styles.successTitle}>{tr('tc_booked')}</Text>
+          <Text style={styles.successSub}>{tr('tc_yourToken')}</Text>
           <Text style={styles.tokenNumber}>{booking.tokenNumber}</Text>
           <Text style={styles.eta}>
-            अनुमानित बारी: {booking.estimatedTurnTime || booking.slotWindow}
+            {tr('tc_eta', { t: booking.estimatedTurnTime || booking.slotWindow })}
           </Text>
         </View>
 
         <GatePassCard token={booking} />
 
         <PrimaryButton
-          title="⬇  गेट पास PDF सेव करें"
+          title={tr('tc_savePass')}
           variant="outline"
           loading={downloading}
           onPress={savePass}
         />
 
         <View style={styles.tips}>
-          <Text style={styles.tipTitle}>गेट पर क्या करें?</Text>
-          <Text style={styles.tip}>1. यह QR या 6-अंकों का गेट पास नंबर दिखाएँ</Text>
-          <Text style={styles.tip}>2. अपना वाहन नंबर बताएँ</Text>
-          <Text style={styles.tip}>3. गेट अधिकारी आपको अंदर भेजेंगे</Text>
+          <Text style={styles.tipTitle}>{tr('tc_whatAtGate')}</Text>
+          <Text style={styles.tip}>{tr('tc_tip1')}</Text>
+          <Text style={styles.tip}>{tr('tc_tip2')}</Text>
+          <Text style={styles.tip}>{tr('tc_tip3')}</Text>
           <Text style={styles.tipNote}>
-            यह गेट पास आपके टोकन पेज पर भी हमेशा उपलब्ध रहेगा।
+            {tr('tc_tipNote')}
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
-          title="डैशबोर्ड पर जाएँ"
+          title={tr('goDashboard')}
           onPress={goHome}
         />
       </View>

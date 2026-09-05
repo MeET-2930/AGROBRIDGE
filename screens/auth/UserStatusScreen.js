@@ -13,10 +13,10 @@ export default function UserStatusScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack />
       <View style={styles.content}>
-        <ScreenTitle title="खाता विकल्प" subtitle="लॉग इन या नया पंजीकरण" />
-        <PrimaryCard title={tr('login') || 'लॉग इन'} subtitle="पंजीकृत मोबाइल से लॉग इन"
+        <ScreenTitle title={tr('status_title')} subtitle={tr('status_sub')} />
+        <PrimaryCard title={tr('login')} subtitle={tr('status_loginSub')}
           icon="log-in-outline" onPress={() => navigation.navigate('Login', { role })} />
-        <PrimaryCard title={tr('register') || 'नया खाता'} subtitle="नया पंजीकरण"
+        <PrimaryCard title={tr('register')} subtitle={tr('status_registerSub')}
           icon="person-add-outline" onPress={() => navigation.navigate('Register', { role })} />
       </View>
     </SafeAreaView>

@@ -6,10 +6,12 @@ import AppHeader from '../../components/AppHeader';
 import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
-import { fetchCentres } from '../../services/centres';
+import { fetchCentres, centreLabel } from '../../services/centres';
 import { getCurrentUserSession, updateTraderCentre } from '../../services/auth';
 
+import { useLang } from '../../i18n/LanguageContext';
 export default function TraderProfileScreen({ navigation }) {
+  const { tr, lang, trError } = useLang();
   const [session, setSession] = useState(null);
   const [centres, setCentres] = useState([]);
   const [centreId, setCentreId] = useState('');
@@ -37,9 +39,9 @@ export default function TraderProfileScreen({ navigation }) {
     setSaving(true);
     try {
       await updateTraderCentre({ centreId, centreName });
-      Alert.alert('सहेजा गया', 'आपकी मंडी अपडेट हो गई।', [{ text: 'ठीक', onPress: () => navigation.goBack() }]);
+      Alert.alert(tr('saved'), tr('tr_mandiSaved'), [{ text: tr('ok'), onPress: () => navigation.goBack() }]);
     } catch (e) {
-      Alert.alert('त्रुटि', e?.message || 'सहेज नहीं पाए।');
+      Alert.alert(tr('error'), trError(e, 'notSaved'));
     } finally {
       setSaving(false);
     }
@@ -49,15 +51,15 @@ export default function TraderProfileScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenTitle title="व्यापारी प्रोफ़ाइल" subtitle={session?.name || ''} />
+        <ScreenTitle title={tr('tr_profileTitle')} subtitle={session?.name || ''} />
 
         <View style={styles.card}>
-          <Row l="फर्म" v={session?.businessName} />
-          <Row l="लाइसेंस" v={session?.licenseNumber} />
-          <Row l="मोबाइल" v={session?.phone ? `+91 ${session.phone}` : ''} />
+          <Row l={tr('tr_firm')} v={session?.businessName} />
+          <Row l={tr('tr_license')} v={session?.licenseNumber} />
+          <Row l={tr('mobile')} v={session?.phone ? `+91 ${session.phone}` : ''} />
         </View>
 
-        <Text style={styles.label}>व्यापार की मंडी</Text>
+        <Text style={styles.label}>{tr('tr_tradeMandi')}</Text>
         {loading ? (
           <ActivityIndicator color={Colors.primary} />
         ) : (
@@ -73,7 +75,7 @@ export default function TraderProfileScreen({ navigation }) {
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.chipText, on && { color: Colors.primary }]}>{c.name}</Text>
+                  <Text style={[styles.chipText, on && { color: Colors.primary }]}>{centreLabel(c, lang)}</Text>
                   <Text style={styles.chipDesc}>{c.address}</Text>
                 </View>
                 {on ? <Ionicons name="checkmark-circle" size={22} color={Colors.primary} /> : null}
@@ -82,7 +84,7 @@ export default function TraderProfileScreen({ navigation }) {
           })
         )}
 
-        <PrimaryButton title="सहेजें" loading={saving} disabled={!centreId} onPress={save} style={{ marginTop: 16 }} />
+        <PrimaryButton title={tr('save')} loading={saving} disabled={!centreId} onPress={save} style={{ marginTop: 16 }} />
       </ScrollView>
     </SafeAreaView>
   );

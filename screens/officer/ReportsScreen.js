@@ -8,7 +8,10 @@ import Colors from '../../theme/colors';
 import { fetchOfficerSummary } from '../../services/bookings';
 import { getCurrentUserSession } from '../../services/auth';
 
+import { useLang } from '../../i18n/LanguageContext';
+import { centreLabel } from '../../services/centres';
 export default function ReportsScreen({ navigation }) {
+  const { tr, lang, trError } = useLang();
   const [data, setData] = useState(null);
   const [centreName, setCentreName] = useState('');
 
@@ -40,37 +43,37 @@ export default function ReportsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} showBack title="दैनिक रिपोर्ट" />
+      <AppHeader navigation={navigation} showBack title={tr('rp_title')} />
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.centre}>{centreName || 'मंडी नहीं चुनी'}</Text>
+        <Text style={styles.centre}>{centreName ? centreLabel(centreName, lang) : tr('od_noCentre')}</Text>
 
         {!data ? (
           <Text style={styles.empty}>
-            रिपोर्ट देखने के लिए पहले अपनी मंडी चुनें।
+            {tr('rp_pickFirst')}
           </Text>
         ) : (
           <>
             <View style={styles.card}>
-              <Text style={styles.title}>टोकन</Text>
-              <Row label="कुल टोकन" value={data.total} />
-              <Row label="प्रतीक्षित" value={data.pending} />
-              <Row label="अंदर" value={data.inside} />
-              <Row label="भुगतान हुआ" value={data.paid} />
-              <Row label="अनुपस्थित" value={data.noShows} />
+              <Text style={styles.title}>{tr('rp_tokens')}</Text>
+              <Row label={tr('od_totalTokens')} value={data.total} />
+              <Row label={tr('od_waiting')} value={data.pending} />
+              <Row label={tr('od_inside')} value={data.inside} />
+              <Row label={tr('rp_paidCount')} value={data.paid} />
+              <Row label={tr('od_absent')} value={data.noShows} />
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.title}>खरीद</Text>
+              <Text style={styles.title}>{tr('rp_procurement')}</Text>
               <Row
-                label="कुल खरीद"
-                value={`${data.totalProcuredQuintals} क्विंटल`}
+                label={tr('rp_totalProcured')}
+                value={`${data.totalProcuredQuintals} ${tr('quintal')}`}
               />
               <Row
-                label="वितरित राशि"
+                label={tr('rp_disbursed')}
                 value={`₹${(data.totalDisbursedRs || 0).toLocaleString('en-IN')}`}
               />
-              <Row label="अभी अंदर" value={data.nowServingToken || '—'} />
+              <Row label={tr('rp_nowInside')} value={data.nowServingToken || '—'} />
             </View>
           </>
         )}

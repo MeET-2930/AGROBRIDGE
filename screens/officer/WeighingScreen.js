@@ -16,12 +16,15 @@ import Colors from '../../theme/colors';
 
 import { recordWeighing } from '../../services/bookings';
 
+import { useLang } from '../../i18n/LanguageContext';
+import { gradeLabel } from '../../services/centres';
 /*
  * Weighbridge: gross weight (loaded vehicle) minus tare weight
  * (empty vehicle) gives the net crop quantity that the farmer
  * is actually paid for.
  */
 export default function WeighingScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const { token } = route.params || {};
 
   const [gross, setGross] = useState(
@@ -46,7 +49,7 @@ export default function WeighingScreen({ navigation, route }) {
 
   const submit = async () => {
     if (net <= 0) {
-      Alert.alert('वजन', 'शुद्ध वजन शून्य से अधिक होना चाहिए।');
+      Alert.alert(tr('weight'), tr('wg_netZero'));
       return;
     }
 
@@ -58,11 +61,11 @@ export default function WeighingScreen({ navigation, route }) {
         tareWeightQuintals: t,
       });
 
-      Alert.alert('दर्ज हो गया', 'अब भुगतान की प्रक्रिया करें।', [
+      Alert.alert(tr('recorded'), tr('wg_recordedSub'), [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'दर्ज नहीं हुआ।');
+      Alert.alert(tr('error'), trError(error, 'notRecorded'));
     } finally {
       setBusy(false);
     }
@@ -74,20 +77,20 @@ export default function WeighingScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
-          title="तौल (Weighbridge)"
-          subtitle={`टोकन ${token?.tokenNumber || ''} • ${token?.farmerName || ''}`}
+          title={tr('wg_title')}
+          subtitle={tr('tokenAndName', { t: token?.tokenNumber || '', n: token?.farmerName || '' })}
         />
 
         <View style={styles.info}>
           <Text style={styles.infoText}>
-            किसान द्वारा बताई मात्रा: {approx} क्विंटल
+            {tr('wg_declared', { q: approx })}
           </Text>
           <Text style={styles.infoText}>
-            ग्रेड: {token?.grade || '—'}
+            {tr('wg_gradeLine', { g: token?.grade ? gradeLabel(token.grade, lang) : '—' })}
           </Text>
         </View>
 
-        <Text style={styles.label}>कुल वजन / भरा वाहन (क्विंटल)</Text>
+        <Text style={styles.label}>{tr('wg_gross')}</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
@@ -97,7 +100,7 @@ export default function WeighingScreen({ navigation, route }) {
           placeholderTextColor="#999"
         />
 
-        <Text style={styles.label}>खाली वाहन का वजन (क्विंटल)</Text>
+        <Text style={styles.label}>{tr('wg_tare')}</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
@@ -107,33 +110,32 @@ export default function WeighingScreen({ navigation, route }) {
           placeholderTextColor="#999"
         />
         <Text style={styles.hint}>
-          यदि केवल फसल तौली गई है तो 0 रखें
+          {tr('wg_tareHint')}
         </Text>
 
         <View style={styles.netBox}>
-          <Text style={styles.netLabel}>शुद्ध वजन</Text>
-          <Text style={styles.netValue}>{net} क्विंटल</Text>
+          <Text style={styles.netLabel}>{tr('wg_net')}</Text>
+          <Text style={styles.netValue}>{net} {tr('quintal')}</Text>
 
           {approx > 0 ? (
             <Text
               style={[styles.variance, bigVariance && styles.varianceWarn]}
             >
-              बताई मात्रा से {variance > 0 ? '+' : ''}
-              {variance}%
+              {tr('wg_variance', { v: `${variance > 0 ? '+' : ''}${variance}` })}
             </Text>
           ) : null}
         </View>
 
         {bigVariance ? (
           <Text style={styles.warn}>
-            चेतावनी: बताई गई मात्रा से 20% से अधिक अंतर है। कृपया दोबारा जांचें।
+            {tr('wg_warn')}
           </Text>
         ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
-          title="तौल दर्ज करें"
+          title={tr('wg_submit')}
           loading={busy}
           disabled={net <= 0}
           onPress={submit}

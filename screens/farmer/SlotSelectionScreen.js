@@ -35,9 +35,10 @@ import {
 const TESTING_MODE = true;
 
 import { useLang } from '../../i18n/LanguageContext';
+import { centreLabel } from '../../services/centres';
 
 export default function SlotSelectionScreen({ navigation, route }) {
-  const { tr } = useLang();
+  const { tr, lang, trError } = useLang();
   const { crop, centre } = route.params || {};
 
   // Local date, never UTC. See services/dates.js for why.
@@ -79,10 +80,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
       setSlots([]);
       setSelected(null);
 
-      Alert.alert(
-        'स्लॉट लोड नहीं हुए',
-        error?.message || 'कृपया दोबारा प्रयास करें।'
-      );
+      Alert.alert(tr('ss_loadFail'), trError(error, 'pleaseRetry'));
     } finally {
       setLoading(false);
     }
@@ -94,27 +92,24 @@ export default function SlotSelectionScreen({ navigation, route }) {
 
   const confirm = async () => {
     if (!selected) {
-      Alert.alert('स्लॉट चुनें', 'कृपया एक स्लॉट चुनें।');
+      Alert.alert(tr('ss_pickSlot'), tr('ss_pickOne'));
       return;
     }
 
     if (selected.isFull) {
-      Alert.alert(
-        'स्लॉट पूरा है',
-        'यह स्लॉट उपलब्ध नहीं है। कृपया दूसरा स्लॉट चुनें।'
-      );
+      Alert.alert(tr('ss_isFull'), tr('ss_isFullSub'));
       return;
     }
 
     const session = await getCurrentUserSession();
 
     if (!session?.uid) {
-      Alert.alert('लॉग इन आवश्यक', 'कृपया दोबारा लॉग इन करें।');
+      Alert.alert(tr('loginRequired'), tr('loginAgain'));
       return;
     }
 
     if (!quantity || Number(quantity) <= 0) {
-      Alert.alert('मात्रा', 'कृपया अनुमानित मात्रा दर्ज करें।');
+      Alert.alert(tr('quantity'), tr('ss_enterQty'));
       return;
     }
 
@@ -140,10 +135,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
       });
     } catch (error) {
       console.error('Booking error:', error);
-      Alert.alert(
-        'बुकिंग असफल',
-        error?.message || 'बुकिंग करते समय समस्या हुई।'
-      );
+      Alert.alert(tr('ss_bookFail'), trError(error, 'ss_bookFailSub'));
 
       // The slot may have filled up while the farmer was deciding.
       loadSlots();
@@ -158,22 +150,22 @@ export default function SlotSelectionScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
-          title={tr('selectSlot') || 'आगमन समय'}
-          subtitle={centre?.name || 'मंडी'}
+          title={tr('selectSlot')}
+          subtitle={centreLabel(centre, lang) || tr('mandi')}
         />
 
         {TESTING_MODE ? (
           <View style={styles.testBanner}>
             <Text style={styles.testBannerText}>
-              🧪 टेस्टिंग मोड: आज के सभी स्लॉट पूरे दिन खुले हैं
+              {tr('ss_testBanner')}
             </Text>
           </View>
         ) : null}
 
         <Text style={styles.sectionTitle}>
-          तारीख चुनें{'  '}
+          {tr('ss_pickDate')}{'  '}
           <Text style={styles.sectionHint}>
-            (चुनी हुई: {friendlyDateLabel(date)} {date})
+            {tr('ss_selected', { label: friendlyDateLabel(date), date })}
           </Text>
         </Text>
 
@@ -204,7 +196,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>स्लॉट चुनें</Text>
+        <Text style={styles.sectionTitle}>{tr('ss_pickSlot')}</Text>
 
         {loading ? (
           <ActivityIndicator
@@ -216,8 +208,8 @@ export default function SlotSelectionScreen({ navigation, route }) {
           <View style={styles.empty}>
             <Text style={styles.emptyText}>
               {date === today
-                ? 'आज के बचे हुए स्लॉट खत्म हो गए। कल के लिए बुक करें।'
-                : 'इस दिन कोई स्लॉट उपलब्ध नहीं है।'}
+                ? tr('ss_noneToday')
+                : tr('ss_noneDay')}
             </Text>
           </View>
         ) : (
@@ -245,8 +237,8 @@ export default function SlotSelectionScreen({ navigation, route }) {
                     ]}
                   >
                     {slot.isFull
-                      ? 'क्षमता पूरी'
-                      : `${slot.availableCapacity} / ${slot.totalCapacity} स्थान उपलब्ध`}
+                      ? tr('ss_full')
+                      : tr('ss_available', { a: slot.availableCapacity, b: slot.totalCapacity })}
                   </Text>
                 </View>
 
@@ -258,10 +250,10 @@ export default function SlotSelectionScreen({ navigation, route }) {
           })
         )}
 
-        <Text style={styles.sectionTitle}>अनुमानित मात्रा</Text>
+        <Text style={styles.sectionTitle}>{tr('ss_qtyTitle')}</Text>
 
         <View style={styles.quantityBox}>
-          <Text style={styles.quantityLabel}>फसल की मात्रा</Text>
+          <Text style={styles.quantityLabel}>{tr('ss_qtyLabel')}</Text>
 
           <View style={styles.quantityInputRow}>
             <TouchableOpacity
@@ -285,14 +277,14 @@ export default function SlotSelectionScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.quantityUnit}>क्विंटल</Text>
+          <Text style={styles.quantityUnit}>{tr('quintal')}</Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
           loading={submitting}
-          title={tr('confirmToken') || 'टोकन लें'}
+          title={tr('confirmToken')}
           onPress={confirm}
           disabled={!selected || selected?.isFull || loading || submitting}
         />

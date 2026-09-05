@@ -27,11 +27,14 @@ import {
   AUCTION_STATUS,
 } from '../../services/auctions';
 
+import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel, gradeLabel } from '../../services/centres';
 /*
  * One lot, live. Big countdown, big highest bid, quick +5/+10/+25
  * buttons and a custom amount. Every tap is a Firestore transaction.
  */
 export default function AuctionBiddingScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const { tokenId } = route.params || {};
   const [session, setSession] = useState(null);
   const [lot, setLot] = useState(undefined);
@@ -67,7 +70,7 @@ export default function AuctionBiddingScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.container}>
         <AppHeader navigation={navigation} showBack />
-        <Text style={styles.empty}>लॉट नहीं मिला</Text>
+        <Text style={styles.empty}>{tr('bd_notFound')}</Text>
       </SafeAreaView>
     );
   }
@@ -81,7 +84,7 @@ export default function AuctionBiddingScreen({ navigation, route }) {
   const bid = async (value) => {
     const n = Math.round(Number(value));
     if (!n) {
-      Alert.alert('राशि', 'सही राशि दर्ज करें।');
+      Alert.alert(tr('bd_amount'), tr('bd_badAmount'));
       return;
     }
     setBusy(true);
@@ -93,7 +96,7 @@ export default function AuctionBiddingScreen({ navigation, route }) {
       });
       setAmount('');
     } catch (error) {
-      Alert.alert('बोली नहीं लगी', error?.message || 'दोबारा प्रयास करें।');
+      Alert.alert(tr('bd_bidFailed'), trError(error, 'pleaseRetry'));
     } finally {
       setBusy(false);
     }
@@ -101,50 +104,50 @@ export default function AuctionBiddingScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} showBack title={`लॉट ${lot.tokenNumber}`} />
+      <AppHeader navigation={navigation} showBack title={tr('bd_lotTitle', { t: lot.tokenNumber })} />
       <ScrollView contentContainerStyle={styles.content}>
         {/* Timer + status */}
         <View style={[styles.timerBox, urgent && styles.timerUrgent, !open && styles.timerClosed]}>
           <Text style={styles.timerLbl}>
-            {open ? 'बोली बंद होने में' : lot.status === AUCTION_STATUS.ACCEPTED ? 'बिक गया' : 'नीलामी बंद'}
+            {open ? tr('bd_closesIn') : lot.status === AUCTION_STATUS.ACCEPTED ? tr('bd_sold') : tr('bd_closed')}
           </Text>
           <Text style={styles.timer}>{open ? formatCountdown(sec) : '00:00'}</Text>
         </View>
 
         {/* Highest bid */}
         <View style={[styles.bidBox, mine && styles.bidBoxMine]}>
-          <Text style={styles.bidLbl}>सबसे ऊँची बोली</Text>
+          <Text style={styles.bidLbl}>{tr('ab_highest')}</Text>
           <Text style={styles.bidBig}>
             {lot.highestBid ? `₹${lot.highestBid}` : `₹${lot.reservePrice}`}
-            <Text style={styles.bidUnit}> / क्विंटल</Text>
+            <Text style={styles.bidUnit}> {tr('perQuintal')}</Text>
           </Text>
           <Text style={styles.bidWho}>
             {lot.highestBid
               ? mine
-                ? '● आपकी बोली सबसे ऊँची है'
-                : `${lot.highestBidderName} • आपको ₹${minNext} या अधिक लगानी होगी`
-              : `कोई बोली नहीं • शुरुआती भाव MSP ₹${lot.reservePrice}`}
+                ? tr('bd_yourHighest')
+                : tr('bd_needMore', { who: lot.highestBidderName, n: minNext })
+              : tr('bd_noBidsFloor', { n: lot.reservePrice })}
           </Text>
-          <Text style={styles.bidCount}>{lot.bidCount || 0} बोलियाँ</Text>
+          <Text style={styles.bidCount}>{tr('ab_bids', { n: lot.bidCount || 0 })}</Text>
         </View>
 
         {/* Lot details */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>लॉट विवरण</Text>
-          <Row l="फसल" v={lot.cropName} />
-          <Row l="अनुमानित मात्रा" v={`${lot.approxQuantityQuintals} क्विंटल`} />
-          <Row l="ग्रेड" v={lot.grade} />
-          <Row l="नमी" v={`${lot.moisturePercent ?? '—'}%`} />
-          <Row l="अन्य पदार्थ" v={`${lot.foreignMatterPercent ?? '—'}%`} />
-          {lot.assayNotes ? <Row l="जांच टिप्पणी" v={lot.assayNotes} /> : null}
-          <Row l="किसान" v={lot.farmerName} />
+          <Text style={styles.cardTitle}>{tr('bd_lotDetails')}</Text>
+          <Row l={tr('crop')} v={cropLabel(lot, lang)} />
+          <Row l={tr('approxQuantity')} v={`${lot.approxQuantityQuintals} ${tr('quintal')}`} />
+          <Row l={tr('grade')} v={gradeLabel(lot.grade, lang)} />
+          <Row l={tr('moisture')} v={`${lot.moisturePercent ?? '—'}%`} />
+          <Row l={tr('foreignMatter')} v={`${lot.foreignMatterPercent ?? '—'}%`} />
+          {lot.assayNotes ? <Row l={tr('bd_assayNotes')} v={lot.assayNotes} /> : null}
+          <Row l={tr('farmer')} v={lot.farmerName} />
           <Row l="MSP" v={`₹${lot.msp}`} />
         </View>
 
         {/* Bidding controls */}
         {open ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>बोली लगाएँ</Text>
+            <Text style={styles.cardTitle}>{tr('bd_placeBid')}</Text>
             <View style={styles.quick}>
               {[0, 10, 25].map((extra) => {
                 const v = minNext + extra;
@@ -156,7 +159,7 @@ export default function AuctionBiddingScreen({ navigation, route }) {
                     onPress={() => bid(v)}
                   >
                     <Text style={styles.quickTxt}>₹{v}</Text>
-                    <Text style={styles.quickSub}>{extra === 0 ? 'न्यूनतम' : `+${extra}`}</Text>
+                    <Text style={styles.quickSub}>{extra === 0 ? tr('bd_minimum') : `+${extra}`}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -167,12 +170,12 @@ export default function AuctionBiddingScreen({ navigation, route }) {
                 value={amount}
                 onChangeText={(t) => setAmount(t.replace(/\D/g, ''))}
                 keyboardType="number-pad"
-                placeholder={`₹${minNext} या अधिक`}
+                placeholder={tr('bd_orMore', { n: minNext })}
                 placeholderTextColor="#999"
                 editable={!mine}
               />
               <PrimaryButton
-                title="बोली"
+                title={tr('bd_bid')}
                 loading={busy}
                 disabled={mine || !amount}
                 onPress={() => bid(amount)}
@@ -180,9 +183,9 @@ export default function AuctionBiddingScreen({ navigation, route }) {
               />
             </View>
             {mine ? (
-              <Text style={styles.note}>आप पहले से आगे हैं। दूसरा व्यापारी ऊपर जाए तो आप फिर लगा सकते हैं।</Text>
+              <Text style={styles.note}>{tr('bd_leadNote')}</Text>
             ) : (
-              <Text style={styles.note}>न्यूनतम बढ़त ₹{BID_STEP}। बोली लगाने के बाद वापस नहीं ली जा सकती।</Text>
+              <Text style={styles.note}>{tr('bd_stepNote', { s: BID_STEP })}</Text>
             )}
           </View>
         ) : (
@@ -195,11 +198,11 @@ export default function AuctionBiddingScreen({ navigation, route }) {
             <Text style={styles.closedTxt}>
               {lot.status === AUCTION_STATUS.ACCEPTED
                 ? mine
-                  ? `बधाई! आपने ₹${lot.highestBid}/क्विं. पर जीता`
-                  : `${lot.highestBidderName} ने ₹${lot.highestBid} पर खरीदा`
+                  ? tr('bd_congrats', { n: lot.highestBid })
+                  : tr('bd_boughtBy', { who: lot.highestBidderName, n: lot.highestBid })
                 : lot.status === AUCTION_STATUS.REJECTED
-                ? 'किसान ने बोलियाँ अस्वीकार कीं'
-                : 'समय समाप्त — किसान के निर्णय की प्रतीक्षा'}
+                ? tr('bd_farmerRejected')
+                : tr('bd_awaitFarmer')}
             </Text>
           </View>
         )}
@@ -207,11 +210,11 @@ export default function AuctionBiddingScreen({ navigation, route }) {
         {/* Bid history */}
         {Array.isArray(lot.bids) && lot.bids.length > 0 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>बोली इतिहास</Text>
+            <Text style={styles.cardTitle}>{tr('bd_history')}</Text>
             {lot.bids.slice(0, 15).map((b, i) => (
               <View key={`${b.at}-${i}`} style={styles.hist}>
                 <Text style={[styles.histWho, b.traderId === session?.uid && { color: '#16A34A' }]}>
-                  {b.traderId === session?.uid ? 'आप' : b.traderName}
+                  {b.traderId === session?.uid ? tr('bd_you') : b.traderName}
                 </Text>
                 <Text style={styles.histAmt}>₹{b.amount}</Text>
                 <Text style={styles.histAt}>

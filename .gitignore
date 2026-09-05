@@ -21,3 +21,6 @@ AGROBRIDGE_files_backup/
 install*.sh
 seedCentres.js
 repomix-output.xml
+
+# local i18n scratch
+i18n-snapshot.md

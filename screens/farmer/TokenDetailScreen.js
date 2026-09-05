@@ -9,7 +9,11 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AppHeader from '../../components/AppHeader';
 import StatusBadge from '../../components/StatusBadge';
@@ -25,7 +29,8 @@ import {
   fixPrice,
   STATUS,
 } from '../../services/bookings';
-import { CROP_LIST } from '../../services/centres';
+import { CROP_LIST, cropLabel, gradeLabel } from '../../services/centres';
+import { useLang } from '../../i18n/LanguageContext';
 import {
   subscribeToAuction,
   openAuction,
@@ -49,18 +54,19 @@ const AMBER = '#F59E0B';
  * where they are in the process.
  */
 const STAGES = [
-  { key: STATUS.BOOKED, label: 'बुकिंग हुई' },
-  { key: STATUS.IN_GATE, label: 'गेट प्रवेश' },
-  { key: STATUS.ASSAY, label: 'गुणवत्ता जांच' },
-  { key: STATUS.PRICE_FIXED, label: 'भाव तय (MSP / नीलामी)' },
-  { key: STATUS.WEIGHING, label: 'तौल' },
-  { key: STATUS.PAYMENT_PENDING, label: 'भुगतान तैयार' },
-  { key: STATUS.PAID, label: 'भुगतान पूरा' },
+  { key: STATUS.BOOKED, label: 'stage_booked' },
+  { key: STATUS.IN_GATE, label: 'stage_gate' },
+  { key: STATUS.ASSAY, label: 'stage_assay' },
+  { key: STATUS.PRICE_FIXED, label: 'stage_price' },
+  { key: STATUS.WEIGHING, label: 'stage_weigh' },
+  { key: STATUS.PAYMENT_PENDING, label: 'stage_payReady' },
+  { key: STATUS.PAID, label: 'stage_paid' },
 ];
 
 const STAGE_ORDER = STAGES.map((s) => s.key);
 
 export default function TokenDetailScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const { tokenId } = route.params || {};
 
   const [token, setToken] = useState(null);
@@ -69,6 +75,7 @@ export default function TokenDetailScreen({ navigation, route }) {
   const [cancelling, setCancelling] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingPass, setDownloadingPass] = useState(false);
+  const [parchiOpen, setParchiOpen] = useState(false);
   const [fixing, setFixing] = useState(false);
   const [auction, setAuction] = useState(null);
   const [tick, setTick] = useState(0);
@@ -125,10 +132,10 @@ export default function TokenDetailScreen({ navigation, route }) {
   }, [tokenId]);
 
   const confirmCancel = () => {
-    Alert.alert('बुकिंग रद्द करें?', 'यह टोकन रद्द हो जाएगा।', [
-      { text: 'नहीं', style: 'cancel' },
+    Alert.alert(tr('td_cancelConfirm'), tr('td_cancelConfirmSub'), [
+      { text: tr('no'), style: 'cancel' },
       {
-        text: 'हाँ, रद्द करें',
+        text: tr('td_yesCancel'),
         style: 'destructive',
         onPress: async () => {
           setCancelling(true);
@@ -137,7 +144,7 @@ export default function TokenDetailScreen({ navigation, route }) {
             await cancelBooking(tokenId);
             navigation.goBack();
           } catch (error) {
-            Alert.alert('त्रुटि', error?.message || 'रद्द नहीं हो सका।');
+            Alert.alert(tr('error'), trError(error, 'td_cancelFail'));
           } finally {
             setCancelling(false);
           }
@@ -164,7 +171,7 @@ export default function TokenDetailScreen({ navigation, route }) {
       <SafeAreaView style={styles.container}>
         <AppHeader navigation={navigation} showBack />
         <View style={styles.content}>
-          <Text style={styles.notFound}>टोकन नहीं मिला</Text>
+          <Text style={styles.notFound}>{tr('td_notFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -177,18 +184,18 @@ export default function TokenDetailScreen({ navigation, route }) {
 
   const acceptMsp = () => {
     Alert.alert(
-      'MSP पर बेचें?',
-      `₹${msp} प्रति क्विंटल पर सरकारी एजेंसी को बेचने की पुष्टि करें। इसके बाद तौल होगा।`,
+      tr('td_sellMspConfirm'),
+      tr('td_sellMspConfirmSub', { msp }),
       [
-        { text: 'नहीं', style: 'cancel' },
+        { text: tr('no'), style: 'cancel' },
         {
-          text: 'हाँ, MSP पर बेचें',
+          text: tr('td_yesMsp'),
           onPress: async () => {
             setFixing(true);
             try {
               await fixPrice(tokenId, { mode: 'msp', ratePerQuintal: msp });
             } catch (error) {
-              Alert.alert('त्रुटि', error?.message || 'भाव तय नहीं हुआ।');
+              Alert.alert(tr('error'), trError(error, 'td_priceFail'));
             } finally {
               setFixing(false);
             }
@@ -200,18 +207,18 @@ export default function TokenDetailScreen({ navigation, route }) {
 
   const startAuction = () => {
     Alert.alert(
-      'नीलामी शुरू करें?',
-      `10 मिनट की लाइव बोली शुरू होगी। न्यूनतम भाव MSP ₹${msp} रहेगा। बाद में आप बोली स्वीकार या अस्वीकार कर सकते हैं।`,
+      tr('td_startConfirm'),
+      tr('td_startConfirmSub', { msp }),
       [
-        { text: 'नहीं', style: 'cancel' },
+        { text: tr('no'), style: 'cancel' },
         {
-          text: 'हाँ, शुरू करें',
+          text: tr('td_yesStart'),
           onPress: async () => {
             setAuctionBusy(true);
             try {
               await openAuction({ ...token, tokenId });
             } catch (error) {
-              Alert.alert('त्रुटि', error?.message || 'नीलामी शुरू नहीं हुई।');
+              Alert.alert(tr('error'), trError(error, 'td_startFail'));
             } finally {
               setAuctionBusy(false);
             }
@@ -224,12 +231,12 @@ export default function TokenDetailScreen({ navigation, route }) {
   const acceptBid = () => {
     if (!auction?.highestBid) return;
     Alert.alert(
-      'बोली स्वीकार करें?',
-      `${auction.highestBidderName} — ₹${auction.highestBid} / क्विंटल। इसके बाद तौल होगा।`,
+      tr('td_acceptConfirm'),
+      tr('td_acceptConfirmSub', { who: auction.highestBidderName, amt: auction.highestBid }),
       [
-        { text: 'नहीं', style: 'cancel' },
+        { text: tr('no'), style: 'cancel' },
         {
-          text: 'स्वीकार',
+          text: tr('td_accept'),
           onPress: async () => {
             setAuctionBusy(true);
             try {
@@ -241,7 +248,7 @@ export default function TokenDetailScreen({ navigation, route }) {
                 buyerName: lot.highestBidderName,
               });
             } catch (error) {
-              Alert.alert('त्रुटि', error?.message || 'स्वीकार नहीं हुआ।');
+              Alert.alert(tr('error'), trError(error, 'td_acceptFail'));
             } finally {
               setAuctionBusy(false);
             }
@@ -252,16 +259,16 @@ export default function TokenDetailScreen({ navigation, route }) {
   };
 
   const rejectBids = () => {
-    Alert.alert('बोली अस्वीकार?', 'आप फिर MSP पर बेच सकते हैं या दोबारा नीलामी कर सकते हैं।', [
-      { text: 'नहीं', style: 'cancel' },
+    Alert.alert(tr('td_rejectConfirm'), tr('td_rejectConfirmSub'), [
+      { text: tr('no'), style: 'cancel' },
       {
-        text: 'अस्वीकार',
+        text: tr('td_reject'),
         style: 'destructive',
         onPress: async () => {
           try {
             await rejectAuction(tokenId);
           } catch (error) {
-            Alert.alert('त्रुटि', error?.message || 'असफल।');
+            Alert.alert(tr('error'), trError(error, 'td_failed'));
           }
         },
       },
@@ -272,17 +279,17 @@ export default function TokenDetailScreen({ navigation, route }) {
     try {
       await extendAuction(tokenId, 5);
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'असफल।');
+      Alert.alert(tr('error'), trError(error, 'td_failed'));
     }
   };
 
   const handleGatePass = async () => {
     setDownloadingPass(true);
     try {
-      await downloadGatePassPdf({ ...token, id: token.id || tokenId });
+      await downloadGatePassPdf({ ...token, id: token.id || tokenId }, lang);
     } catch (error) {
       console.error('Gate pass PDF error:', error);
-      Alert.alert('PDF नहीं बना', error?.message || 'कृपया दोबारा प्रयास करें।');
+      Alert.alert(tr('pdfFailed'), trError(error, 'pleaseRetry'));
     } finally {
       setDownloadingPass(false);
     }
@@ -291,14 +298,10 @@ export default function TokenDetailScreen({ navigation, route }) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      await downloadReceiptPdf({ ...token, id: token.id || tokenId });
+      await downloadReceiptPdf({ ...token, id: token.id || tokenId }, lang);
     } catch (error) {
       console.error('Receipt PDF error:', error);
-      Alert.alert(
-        'PDF नहीं बना',
-        error?.message ||
-          'कृपया दोबारा प्रयास करें। (क्या expo-print इंस्टॉल है?)'
-      );
+      Alert.alert(tr('pdfFailed'), trError(error, 'pleaseRetry'));
     } finally {
       setDownloading(false);
     }
@@ -311,7 +314,7 @@ export default function TokenDetailScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.tokenHeader}>
           <View>
-            <Text style={styles.tokenLabel}>आपका टोकन</Text>
+            <Text style={styles.tokenLabel}>{tr('td_yourToken')}</Text>
             <Text style={styles.tokenNumber}>{token.tokenNumber}</Text>
           </View>
 
@@ -325,7 +328,7 @@ export default function TokenDetailScreen({ navigation, route }) {
           <View>
             <GatePassCard token={token} />
             <PrimaryButton
-              title="⬇  गेट पास PDF डाउनलोड करें"
+              title={tr('td_downloadPass')}
               variant="outline"
               loading={downloadingPass}
               onPress={handleGatePass}
@@ -336,7 +339,7 @@ export default function TokenDetailScreen({ navigation, route }) {
 
         {/* Stage progress */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>प्रगति</Text>
+          <Text style={styles.cardTitle}>{tr('td_progress')}</Text>
 
           {STAGES.map((stage, index) => {
             /*
@@ -381,11 +384,11 @@ export default function TokenDetailScreen({ navigation, route }) {
                       active && styles.stageLabelActive,
                     ]}
                   >
-                    {stage.label}
+                    {tr(stage.label)}
                   </Text>
 
                   <Text style={styles.stageSub}>
-                    {done ? 'पूरा हुआ' : active ? 'अभी चल रहा है' : 'बाकी'}
+                    {done ? tr('stage_done') : active ? tr('stage_now') : tr('stage_pending')}
                   </Text>
                 </View>
               </View>
@@ -395,36 +398,36 @@ export default function TokenDetailScreen({ navigation, route }) {
 
         {/* Booking details */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>बुकिंग विवरण</Text>
+          <Text style={styles.cardTitle}>{tr('td_bookingDetails')}</Text>
 
-          <Row label="मंडी" value={token.centreName} />
-          <Row label="पता" value={token.centreAddress} />
-          <Row label="तारीख" value={token.date} />
-          <Row label="समय" value={token.slotWindow} />
-          <Row label="फसल" value={token.cropName || token.crop} />
+          <Row label={tr('mandi')} value={token.centreName} />
+          <Row label={tr('address')} value={token.centreAddress} />
+          <Row label={tr('date')} value={token.date} />
+          <Row label={tr('time')} value={token.slotWindow} />
+          <Row label={tr('crop')} value={cropLabel(token, lang)} />
           <Row
-            label="अनुमानित मात्रा"
-            value={`${token.approxQuantityQuintals} क्विंटल`}
+            label={tr('approxQuantity')}
+            value={`${token.approxQuantityQuintals} ${tr('quintal')}`}
           />
-          <Row label="वाहन" value={token.vehicleNumber || 'गेट पर दर्ज होगा'} />
+          <Row label={tr('vehicle')} value={token.vehicleNumber || tr('td_atGate')} />
         </View>
 
         {/* Price decision: after assay, before weighing */}
         {token.status === STATUS.ASSAY ? (
           <View style={[styles.card, styles.priceCard]}>
-            <Text style={styles.cardTitle}>भाव तय करें</Text>
+            <Text style={styles.cardTitle}>{tr('td_fixPrice')}</Text>
             <Text style={styles.priceHint}>
-              जांच पूरी हो गई (ग्रेड {token.grade}). अब बताएं कि आप कैसे बेचना चाहते हैं। भाव तय होने के बाद ही तौल होगा।
+              {tr('td_fixPriceHint', { grade: gradeLabel(token.grade, lang) })}
             </Text>
 
             <View style={styles.priceOption}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.priceTitle}>सरकारी खरीद (MSP)</Text>
-                <Text style={styles.priceBig}>₹{msp} / क्विंटल</Text>
-                <Text style={styles.priceSub}>निश्चित भाव, तुरंत आगे बढ़ें</Text>
+                <Text style={styles.priceTitle}>{tr('td_mspTitle')}</Text>
+                <Text style={styles.priceBig}>₹{msp} {tr('perQuintal')}</Text>
+                <Text style={styles.priceSub}>{tr('td_mspSub')}</Text>
               </View>
               <PrimaryButton
-                title="MSP पर बेचें"
+                title={tr('td_sellMsp')}
                 loading={fixing}
                 onPress={acceptMsp}
                 style={{ height: 44, paddingHorizontal: 14 }}
@@ -435,18 +438,18 @@ export default function TokenDetailScreen({ navigation, route }) {
             {!auction || auction.status === AUCTION_STATUS.REJECTED ? (
               <View style={styles.priceOption}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.priceTitle}>व्यापारी नीलामी (e-Auction)</Text>
+                  <Text style={styles.priceTitle}>{tr('td_auctionTitle')}</Text>
                   <Text style={styles.priceSub}>
-                    10 मिनट लाइव बोली • न्यूनतम भाव MSP ₹{msp}
+                    {tr('td_auctionSub', { msp })}
                   </Text>
                   {auction?.status === AUCTION_STATUS.REJECTED ? (
                     <Text style={[styles.priceSub, { color: Colors.error }]}>
-                      पिछली नीलामी अस्वीकार की गई
+                      {tr('td_prevRejected')}
                     </Text>
                   ) : null}
                 </View>
                 <PrimaryButton
-                  title={auction ? 'दोबारा नीलामी' : 'नीलामी शुरू'}
+                  title={auction ? tr('td_reAuction') : tr('td_startAuction')}
                   variant="outline"
                   loading={auctionBusy}
                   onPress={startAuction}
@@ -458,7 +461,7 @@ export default function TokenDetailScreen({ navigation, route }) {
                 <View style={{ flex: 1 }}>
                   <View style={styles.auctionHead}>
                     <Text style={styles.priceTitle}>
-                      {isBiddingOpen(auction) ? '🔴 नीलामी चालू' : '⏹ नीलामी समाप्त'}
+                      {isBiddingOpen(auction) ? tr('td_live') : tr('td_ended')}
                     </Text>
                     <Text style={styles.countdown}>
                       {formatCountdown(secondsLeft(auction))}
@@ -467,24 +470,24 @@ export default function TokenDetailScreen({ navigation, route }) {
 
                   {auction.highestBid ? (
                     <>
-                      <Text style={styles.priceBig}>₹{auction.highestBid} / क्विंटल</Text>
+                      <Text style={styles.priceBig}>₹{auction.highestBid} {tr('perQuintal')}</Text>
                       <Text style={styles.priceSub}>
-                        सबसे ऊँची बोली: {auction.highestBidderName} • कुल {auction.bidCount} बोलियाँ
+                        {tr('td_highest', { who: auction.highestBidderName, n: auction.bidCount })}
                       </Text>
                       {auction.highestBid > msp ? (
                         <Text style={[styles.priceSub, { color: '#16A34A', fontWeight: '800' }]}>
-                          MSP से ₹{auction.highestBid - msp} अधिक
+                          {tr('td_aboveMsp', { d: auction.highestBid - msp })}
                         </Text>
                       ) : null}
                     </>
                   ) : (
-                    <Text style={styles.priceSub}>अभी तक कोई बोली नहीं आई</Text>
+                    <Text style={styles.priceSub}>{tr('td_noBids')}</Text>
                   )}
 
                   <View style={styles.auctionActions}>
                     {auction.highestBid ? (
                       <PrimaryButton
-                        title="बोली स्वीकार करें"
+                        title={tr('td_acceptBid')}
                         loading={auctionBusy}
                         onPress={acceptBid}
                         style={{ flex: 1, height: 42 }}
@@ -492,14 +495,14 @@ export default function TokenDetailScreen({ navigation, route }) {
                     ) : null}
                     {!isBiddingOpen(auction) && !auction.highestBid ? (
                       <PrimaryButton
-                        title="5 मिनट और"
+                        title={tr('td_more5')}
                         variant="outline"
                         onPress={extend}
                         style={{ height: 42, paddingHorizontal: 12 }}
                       />
                     ) : null}
                     <PrimaryButton
-                      title="अस्वीकार"
+                      title={tr('td_reject')}
                       variant="outline"
                       onPress={rejectBids}
                       style={{ height: 42, paddingHorizontal: 12 }}
@@ -513,32 +516,32 @@ export default function TokenDetailScreen({ navigation, route }) {
 
         {token.ratePerQuintal && token.status !== STATUS.ASSAY ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>तय भाव</Text>
+            <Text style={styles.cardTitle}>{tr('td_fixedPrice')}</Text>
             <Row
-              label="भाव"
-              value={`₹${token.ratePerQuintal} / क्विंटल`}
+              label={tr('price')}
+              value={`₹${token.ratePerQuintal} ${tr('perQuintal')}`}
               bold
             />
             <Row
-              label="माध्यम"
-              value={token.priceMode === 'auction' ? 'नीलामी' : 'MSP'}
+              label={tr('td_mode')}
+              value={token.priceMode === 'auction' ? tr('td_auction') : 'MSP'}
             />
-            <Row label="खरीदार" value={token.buyerName} />
+            <Row label={tr('td_buyer')} value={token.buyerName || tr('td_govBuyer')} />
           </View>
         ) : null}
 
         {/* Assay results, once recorded */}
         {token.assayAt ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>गुणवत्ता जांच</Text>
-            <Row label="ग्रेड" value={token.grade} />
-            <Row label="नमी" value={`${token.moisturePercent}%`} />
+            <Text style={styles.cardTitle}>{tr('as_title')}</Text>
+            <Row label={tr('grade')} value={gradeLabel(token.grade, lang)} />
+            <Row label={tr('moisture')} value={`${token.moisturePercent}%`} />
             <Row
-              label="अन्य पदार्थ"
+              label={tr('foreignMatter')}
               value={`${token.foreignMatterPercent}%`}
             />
             {token.assayNotes ? (
-              <Row label="टिप्पणी" value={token.assayNotes} />
+              <Row label={tr('notes')} value={token.assayNotes} />
             ) : null}
           </View>
         ) : null}
@@ -546,18 +549,18 @@ export default function TokenDetailScreen({ navigation, route }) {
         {/* Weighing, once recorded */}
         {token.weighedAt ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>तौल</Text>
+            <Text style={styles.cardTitle}>{tr('td_weighing')}</Text>
             <Row
-              label="कुल वजन"
-              value={`${token.grossWeightQuintals} क्विंटल`}
+              label={tr('td_gross')}
+              value={`${token.grossWeightQuintals} ${tr('quintal')}`}
             />
             <Row
-              label="खाली वाहन"
-              value={`${token.tareWeightQuintals} क्विंटल`}
+              label={tr('td_tare')}
+              value={`${token.tareWeightQuintals} ${tr('quintal')}`}
             />
             <Row
-              label="शुद्ध वजन"
-              value={`${token.actualQuantity} क्विंटल`}
+              label={tr('td_net')}
+              value={`${token.actualQuantity} ${tr('quintal')}`}
               bold
             />
           </View>
@@ -566,18 +569,28 @@ export default function TokenDetailScreen({ navigation, route }) {
         {/* Payment receipt */}
         {token.status === STATUS.PAID ? (
           <View style={[styles.card, styles.receiptCard]}>
-            <Text style={styles.cardTitle}>भुगतान रसीद</Text>
+            <Text style={styles.cardTitle}>{tr('td_receipt')}</Text>
+            {token.parchi?.imageBase64 ? (
+              <View style={styles.twoSlips}>
+                <Ionicons name="documents-outline" size={18} color={Colors.secondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.twoSlipsTitle}>{tr('pc_bothSlips')}</Text>
+                  <Text style={styles.twoSlipsSub}>{tr('pc_bothSlipsSub')}</Text>
+                </View>
+              </View>
+            ) : null}
+            <Text style={styles.slipLabel}>{tr('pc_officialTitle')}</Text>
 
-            <Row label="रसीद क्रमांक" value={token.receiptId} />
-            <Row label="मात्रा" value={`${token.actualQuantity} क्विंटल`} />
-            <Row label="दर" value={`₹${token.ratePerQuintal} / क्विंटल`} />
-            <Row label="कुल राशि" value={`₹${token.grossAmount}`} />
-            <Row label="मंडी शुल्क" value={`− ₹${token.mandiFee}`} />
-            <Row label="आढ़त" value={`− ₹${token.commission}`} />
-            <Row label="हमाली" value={`− ₹${token.hamali}`} />
+            <Row label={tr('td_receiptNo')} value={token.receiptId} />
+            <Row label={tr('quantity')} value={`${token.actualQuantity} ${tr('quintal')}`} />
+            <Row label={tr('rate')} value={`₹${token.ratePerQuintal} ${tr('perQuintal')}`} />
+            <Row label={tr('td_total')} value={`₹${token.grossAmount}`} />
+            <Row label={tr('td_mandiFee')} value={`− ₹${token.mandiFee}`} />
+            <Row label={tr('td_commission')} value={`− ₹${token.commission}`} />
+            <Row label={tr('td_hamali')} value={`− ₹${token.hamali}`} />
 
             <View style={styles.netRow}>
-              <Text style={styles.netLabel}>नेट भुगतान</Text>
+              <Text style={styles.netLabel}>{tr('td_netPay')}</Text>
               <Text style={styles.netValue}>
                 ₹{Number(token.netPayable).toLocaleString('en-IN')}
               </Text>
@@ -585,12 +598,50 @@ export default function TokenDetailScreen({ navigation, route }) {
 
             {token.paymentReference ? (
               <Text style={styles.utr}>
-                संदर्भ संख्या: {token.paymentReference}
+                {tr('td_ref', { ref: token.paymentReference })}
               </Text>
             ) : null}
 
+            {token.parchi?.imageBase64 ? (
+              <View style={styles.parchiCard}>
+                <Text style={styles.slipLabel}>{tr('pc_farmerTitle')}</Text>
+                <Text style={styles.parchiHint}>{tr('pc_farmerHint')}</Text>
+                <TouchableOpacity onPress={() => setParchiOpen(true)} activeOpacity={0.9}>
+                  <Image
+                    source={{ uri: token.parchi.imageBase64 }}
+                    style={styles.parchiThumb}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.parchiTap}>{tr('pc_tapToView')}</Text>
+                </TouchableOpacity>
+                <View style={styles.compareRow}>
+                  <View style={styles.compareBox}>
+                    <Text style={styles.compareLbl}>{tr('pc_parchiRate')}</Text>
+                    <Text style={styles.compareVal}>₹{token.parchi.rate}</Text>
+                  </View>
+                  <Ionicons
+                    name={token.parchi.matchesFixedRate ? 'checkmark-circle' : 'alert-circle'}
+                    size={28}
+                    color={token.parchi.matchesFixedRate ? '#16A34A' : '#DC2626'}
+                  />
+                  <View style={styles.compareBox}>
+                    <Text style={styles.compareLbl}>{tr('pc_paidRate')}</Text>
+                    <Text style={styles.compareVal}>₹{token.ratePerQuintal}</Text>
+                  </View>
+                </View>
+                {token.parchi.capturedBy || token.parchi.capturedAt ? (
+                  <Text style={styles.utr}>
+                    {tr('pc_capturedBy', {
+                      by: token.parchi.capturedBy || 'APMC',
+                      at: new Date(token.parchi.capturedAt).toLocaleString('en-IN'),
+                    })}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
             <PrimaryButton
-              title="⬇  रसीद PDF डाउनलोड करें"
+              title={token.parchi?.imageBase64 ? tr('pc_downloadBoth') : tr('td_downloadReceipt')}
               loading={downloading}
               onPress={handleDownload}
               style={{ marginTop: 14 }}
@@ -598,9 +649,20 @@ export default function TokenDetailScreen({ navigation, route }) {
           </View>
         ) : null}
 
+        <Modal visible={parchiOpen} transparent animationType="fade" onRequestClose={() => setParchiOpen(false)}>
+          <View style={styles.viewer}>
+            <TouchableOpacity style={styles.viewerClose} onPress={() => setParchiOpen(false)}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            {token.parchi?.imageBase64 ? (
+              <Image source={{ uri: token.parchi.imageBase64 }} style={styles.viewerImg} resizeMode="contain" />
+            ) : null}
+          </View>
+        </Modal>
+
         {token.status === STATUS.BOOKED ? (
           <PrimaryButton
-            title="बुकिंग रद्द करें"
+            title={tr('td_cancelBooking')}
             variant="outline"
             loading={cancelling}
             onPress={confirmCancel}
@@ -775,4 +837,25 @@ const styles = StyleSheet.create({
   netLabel: { fontSize: 14, fontWeight: '800', color: Colors.navy },
   netValue: { fontSize: 20, fontWeight: '900', color: Colors.secondary },
   utr: { fontSize: 10, color: Colors.subText, marginTop: 8 },
+  twoSlips: {
+    flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: Colors.accent,
+    borderRadius: 10, padding: 10, marginBottom: 10,
+  },
+  twoSlipsTitle: { fontWeight: '900', color: Colors.secondary, fontSize: 13 },
+  twoSlipsSub: { fontSize: 11, color: Colors.navy, marginTop: 2 },
+  slipLabel: { fontSize: 11, fontWeight: '800', color: Colors.subText, textTransform: 'uppercase', marginBottom: 6 },
+  parchiCard: {
+    marginTop: 14, backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B',
+    borderRadius: 12, padding: 12,
+  },
+  parchiHint: { fontSize: 12, color: '#92400E', lineHeight: 17, marginBottom: 8 },
+  parchiThumb: { width: '100%', height: 180, borderRadius: 10, backgroundColor: '#111' },
+  parchiTap: { textAlign: 'center', fontSize: 11, color: Colors.subText, marginTop: 4 },
+  compareRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, gap: 8 },
+  compareBox: { flex: 1, backgroundColor: Colors.white, borderRadius: 10, padding: 10, alignItems: 'center' },
+  compareLbl: { fontSize: 10, color: Colors.subText, fontWeight: '700' },
+  compareVal: { fontSize: 18, fontWeight: '900', color: Colors.navy, marginTop: 2 },
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
+  viewerImg: { width: '100%', height: '85%' },
+  viewerClose: { position: 'absolute', top: 44, right: 16, zIndex: 2, padding: 8 },
 });

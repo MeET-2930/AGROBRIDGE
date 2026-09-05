@@ -23,18 +23,13 @@ import {
   AUCTION_STATUS,
 } from '../../services/auctions';
 
-const STATUS_LABEL = {
-  open: 'बोली चालू',
-  closed: 'समय समाप्त',
-  accepted: 'बिक गया',
-  rejected: 'अस्वीकृत',
-  cancelled: 'रद्द',
-};
-
+import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel, gradeLabel, centreLabel } from '../../services/centres';
 /*
  * e-NAM style display board: every lot at the trader's mandi today.
  */
 export default function AuctionBoardScreen({ navigation }) {
+  const { tr, lang, trError } = useLang();
   const [session, setSession] = useState(null);
   const [lots, setLots] = useState([]);
   const [, setTick] = useState(0);
@@ -77,32 +72,32 @@ export default function AuctionBoardScreen({ navigation }) {
         onPress={() => navigation.navigate('AuctionBidding', { tokenId: lot.tokenId })}
       >
         <View style={styles.top}>
-          <Text style={styles.lot}>लॉट {lot.tokenNumber}</Text>
+          <Text style={styles.lot}>{tr('bd_lotTitle', { t: lot.tokenNumber })}</Text>
           {open ? (
             <Text style={styles.timer}>⏱ {formatCountdown(secondsLeft(lot))}</Text>
           ) : (
-            <Text style={styles.status}>{STATUS_LABEL[lot.status] || lot.status}</Text>
+            <Text style={styles.status}>{tr(`ast_${lot.status}`)}</Text>
           )}
         </View>
         <Text style={styles.crop}>
-          {lot.cropName} • ग्रेड {lot.grade} • ~{lot.approxQuantityQuintals} क्विं.
+          {tr('ab_lotLine', { crop: cropLabel(lot, lang), g: gradeLabel(lot.grade, lang), q: lot.approxQuantityQuintals })}
         </Text>
         <Text style={styles.meta}>
-          नमी {lot.moisturePercent ?? '—'}% • अन्य पदार्थ {lot.foreignMatterPercent ?? '—'}% • MSP ₹{lot.msp}
+          {tr('ab_metaLine', { m: lot.moisturePercent ?? '—', f: lot.foreignMatterPercent ?? '—', msp: lot.msp })}
         </Text>
         <View style={styles.bidRow}>
           <View>
-            <Text style={styles.bidLbl}>सबसे ऊँची बोली</Text>
+            <Text style={styles.bidLbl}>{tr('ab_highest')}</Text>
             <Text style={styles.bid}>
               {lot.highestBid ? `₹${lot.highestBid}` : '—'}
-              <Text style={styles.bidUnit}> /क्विं.</Text>
+              <Text style={styles.bidUnit}> /{tr('quintalShort')}</Text>
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.bidLbl}>{lot.bidCount || 0} बोलियाँ</Text>
+            <Text style={styles.bidLbl}>{tr('ab_bids', { n: lot.bidCount || 0 })}</Text>
             {mine ? (
               <Text style={styles.mine}>
-                {lot.status === AUCTION_STATUS.ACCEPTED ? '🏆 आपने जीता' : '● आप आगे हैं'}
+                {lot.status === AUCTION_STATUS.ACCEPTED ? tr('ab_youWon') : tr('ab_youLead')}
               </Text>
             ) : lot.highestBidderName ? (
               <Text style={styles.other}>{lot.highestBidderName}</Text>
@@ -118,25 +113,25 @@ export default function AuctionBoardScreen({ navigation }) {
       <AppHeader navigation={navigation} showBack />
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
-          title="नीलामी बोर्ड"
-          subtitle={`${session?.centreName || ''} • ${live.length} लॉट चालू`}
+          title={tr('ab_title')}
+          subtitle={tr('ab_sub', { c: centreLabel(session?.centreName || '', lang), n: live.length })}
         />
 
         {!session?.centreId ? (
-          <Text style={styles.empty}>पहले प्रोफ़ाइल में मंडी चुनें।</Text>
+          <Text style={styles.empty}>{tr('ab_pickFirst')}</Text>
         ) : lots.length === 0 ? (
           <View style={styles.emptyBox}>
             <Ionicons name="hourglass-outline" size={40} color={Colors.subText} />
-            <Text style={styles.empty}>आज अभी कोई लॉट नीलामी में नहीं आया</Text>
+            <Text style={styles.empty}>{tr('ab_empty')}</Text>
             <Text style={styles.emptySub}>
-              गुणवत्ता जांच के बाद किसान लॉट खोलेगा, वह यहाँ तुरंत दिखेगा।
+              {tr('ab_emptySub')}
             </Text>
           </View>
         ) : (
           <>
-            {live.length > 0 ? <Text style={styles.section}>🔴 चालू</Text> : null}
+            {live.length > 0 ? <Text style={styles.section}>{tr('ab_live')}</Text> : null}
             {live.map((l) => <Card key={l.tokenId} lot={l} />)}
-            {rest.length > 0 ? <Text style={styles.section}>पुराने / बंद</Text> : null}
+            {rest.length > 0 ? <Text style={styles.section}>{tr('ab_past')}</Text> : null}
             {rest.map((l) => <Card key={l.tokenId} lot={l} />)}
           </>
         )}

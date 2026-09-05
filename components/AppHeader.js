@@ -5,6 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '../theme/colors';
 import { useLang } from '../i18n/LanguageContext';
 
+/*
+ * Original AGROBRIDGE header: centred brand + subtitle, round
+ * green-tinted icon buttons. Padded by the phone's notch height so
+ * back / language / speaker are always tappable.
+ */
 export default function AppHeader({
   navigation,
   showBack = false,
@@ -33,13 +38,23 @@ export default function AppHeader({
     }
   };
 
-  const canGoBack = !!(showBack && navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack());
+  const canGoBack = !!(
+    showBack &&
+    navigation &&
+    typeof navigation.canGoBack === 'function' &&
+    navigation.canGoBack()
+  );
 
   return (
     <View style={[styles.header, { paddingTop: Math.max(insets.top, 0) + 10 }]}>
       <View style={styles.sideSlot}>
         {canGoBack ? (
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()} accessibilityLabel="Go back">
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Go back"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Ionicons name="arrow-back" size={22} color={Colors.navy} />
           </TouchableOpacity>
         ) : (
@@ -48,20 +63,30 @@ export default function AppHeader({
       </View>
 
       <View style={styles.centerBlock}>
-        <Text style={[styles.title, { color: isBrand ? Colors.secondary : Colors.navy }]}>
+        <Text style={[styles.title, { color: isBrand ? Colors.secondary : Colors.navy }]} numberOfLines={1}>
           {displayTitle}
         </Text>
-        <Text style={styles.sub}>{displaySub}</Text>
+        <Text style={styles.sub} numberOfLines={1}>{displaySub}</Text>
       </View>
 
       <View style={styles.sideSlotRight}>
         {showLang ? (
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setPickerOpen(true)} accessibilityLabel="Change language">
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => setPickerOpen(true)}
+            accessibilityLabel="Change language"
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
             <Ionicons name="language" size={18} color={Colors.navy} />
           </TouchableOpacity>
         ) : null}
         {showSpeaker ? (
-          <TouchableOpacity style={styles.iconBtn} onPress={handleSpeakerPress} accessibilityLabel="Voice assistance">
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleSpeakerPress}
+            accessibilityLabel="Voice assistance"
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+          >
             <Ionicons name="volume-medium" size={18} color={Colors.navy} />
           </TouchableOpacity>
         ) : null}

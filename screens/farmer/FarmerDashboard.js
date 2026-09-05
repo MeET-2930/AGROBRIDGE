@@ -22,6 +22,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel } from '../../services/centres';
 
 import {
   fetchActiveFarmerBooking,
@@ -36,7 +37,7 @@ import {
 } from '../../services/auth';
 
 export default function FarmerDashboard({ navigation }) {
-  const { tr } = useLang();
+  const { tr, lang } = useLang();
 
   const [session, setSession] = useState(null);
   const [booking, setBooking] = useState(null);
@@ -159,8 +160,8 @@ export default function FarmerDashboard({ navigation }) {
           </TouchableOpacity>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.greet}>{tr('namaste') || 'नमस्ते'} 🙏</Text>
-            <Text style={styles.name}>{session?.name || 'किसान'}</Text>
+            <Text style={styles.greet}>{tr('namaste')} 🙏</Text>
+            <Text style={styles.name}>{session?.name || tr('farmer')}</Text>
             <Text style={styles.phone}>+91 {session?.phone || ''}</Text>
           </View>
         </View>
@@ -180,7 +181,7 @@ export default function FarmerDashboard({ navigation }) {
 
             <View style={styles.bookingCard}>
               <Text style={styles.bookingLabel}>
-                {tr('activeBooking') || 'सक्रिय बुकिंग'}
+                {tr('activeBooking')}
               </Text>
 
               <Text style={styles.bookingCentre}>{booking.centreName}</Text>
@@ -190,12 +191,11 @@ export default function FarmerDashboard({ navigation }) {
               </Text>
 
               <Text style={styles.bookingMeta}>
-                फसल: {booking.cropName || booking.crop} •{' '}
-                {booking.approxQuantityQuintals} क्विंटल
+                {tr('fd_cropLine', { crop: cropLabel(booking, lang), qty: booking.approxQuantityQuintals })}
               </Text>
 
               <PrimaryButton
-                title={tr('trackStatus') || 'पूरा विवरण देखें'}
+                title={tr('trackStatus')}
                 style={{ marginTop: 12, height: 44 }}
                 onPress={() =>
                   navigation.navigate('TokenDetail', {
@@ -208,19 +208,18 @@ export default function FarmerDashboard({ navigation }) {
         ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>
-              {tr('noActiveBooking') || 'कोई सक्रिय बुकिंग नहीं'}
+              {tr('noActiveBooking')}
             </Text>
 
             <Text style={styles.emptySub}>
-              {tr('noActiveBookingSub') ||
-                'मंडी में बिना इंतजार एंट्री के लिए अभी स्लॉट बुक करें'}
+              {tr('noActiveBookingSub')}
             </Text>
 
             <TouchableOpacity
               onPress={() => navigation.navigate('CropSelection')}
             >
               <Text style={styles.link}>
-                {tr('bookASlot') || 'स्लॉट बुक करें →'}
+                {tr('bookASlot')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -228,13 +227,13 @@ export default function FarmerDashboard({ navigation }) {
 
         <View style={styles.grid}>
           <DashboardCard
-            title={tr('bookSlot') || 'स्लॉट बुक'}
+            title={tr('bookSlot')}
             icon="calendar-outline"
             onPress={() => navigation.navigate('CropSelection')}
           />
 
           <DashboardCard
-            title={tr('myToken') || 'मेरा टोकन'}
+            title={tr('myToken')}
             icon="ticket-outline"
             onPress={() =>
               booking
@@ -246,25 +245,25 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('payments') || 'भुगतान'}
+            title={tr('payments')}
             icon="receipt-outline"
             onPress={() => navigation.navigate('Payments')}
           />
 
           <DashboardCard
-            title={tr('history') || 'इतिहास'}
+            title={tr('history')}
             icon="time-outline"
             onPress={() => navigation.navigate('History')}
           />
 
           <DashboardCard
-            title={tr('myCrops') || 'फसलें'}
+            title={tr('myCrops')}
             icon="leaf-outline"
             onPress={() => navigation.navigate('CropSelection')}
           />
 
           <DashboardCard
-            title={tr('help') || 'सहायता'}
+            title={tr('help')}
             icon="help-circle-outline"
             onPress={() => {}}
           />
@@ -278,7 +277,7 @@ export default function FarmerDashboard({ navigation }) {
         >
           <View style={styles.modal}>
             <Text style={styles.profileName}>
-              {session?.name || 'किसान'}
+              {session?.name || tr('farmer')}
             </Text>
 
             <Text style={styles.profilePhone}>
@@ -292,7 +291,7 @@ export default function FarmerDashboard({ navigation }) {
                 color={Colors.error}
               />
               <Text style={styles.logoutText}>
-                {tr('logout') || 'लॉग आउट'}
+                {tr('logout')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -1,30 +1,28 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AppHeader from '../../components/AppHeader';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
 
 export default function WelcomeScreen({ navigation }) {
-  const { tr, speak, setPickerOpen } = useLang();
-  const startLabel = tr('getStarted') || 'शुरू करें';
+  const { tr, setPickerOpen } = useLang();
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.topActions}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => setPickerOpen(true)}>
-          <Ionicons name="language" size={20} color={Colors.navy} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => speak('audio_welcome')}>
-          <Ionicons name="volume-medium" size={20} color={Colors.navy} />
-        </TouchableOpacity>
-      </View>
+      <AppHeader navigation={navigation} showBack={false} audioKey="audio_welcome" />
 
       <View style={styles.content}>
         <Text style={styles.logo}>🌾</Text>
         <Text style={styles.brand}>AGROBRIDGE</Text>
-        <Text style={styles.brandSub}>{tr('brandSub') || 'किसानसेतु - डिजिटल मंडी खरीद'}</Text>
-        <Text style={styles.headline}>स्मार्ट मंडी खरीद</Text>
-        <Text style={styles.headlineSub}>बिना लाइन, बिना इंतजार</Text>
+        <Text style={styles.brandSub}>{tr('brandSub')}</Text>
+        <Text style={styles.headline}>{tr('welcome_headline')}</Text>
+        <Text style={styles.headlineSub}>{tr('welcome_sub')}</Text>
+
+        <TouchableOpacity style={styles.langPill} onPress={() => setPickerOpen(true)}>
+          <Ionicons name="language" size={16} color={Colors.secondary} />
+          <Text style={styles.langPillText}>{tr('selectLanguage')}</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
@@ -33,9 +31,9 @@ export default function WelcomeScreen({ navigation }) {
           activeOpacity={0.85}
           onPress={() => navigation.navigate('RoleSelection')}
         >
-          <Text style={styles.ctaText}>{startLabel}</Text>
+          <Text style={styles.ctaText}>{tr('getStarted')}</Text>
         </TouchableOpacity>
-        <Text style={styles.footerTag}>कृषि मंत्रालय आधारित डिजिटल मंडी पहल</Text>
+        <Text style={styles.footerTag}>{tr('welcome_footer')}</Text>
       </View>
     </SafeAreaView>
   );
@@ -54,6 +52,11 @@ const styles = StyleSheet.create({
   brandSub: { fontSize: 13, fontWeight: '700', color: Colors.navy, marginTop: 6, textAlign: 'center' },
   headline: { fontSize: 22, fontWeight: '800', color: Colors.navy, marginTop: 28, textAlign: 'center' },
   headlineSub: { fontSize: 16, fontWeight: '700', color: Colors.primary, marginTop: 6, textAlign: 'center' },
+  langPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 26,
+    backgroundColor: Colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+  },
+  langPillText: { color: Colors.secondary, fontWeight: '800', fontSize: 13 },
   footer: { padding: 20, paddingBottom: 28 },
   cta: {
     backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 16,

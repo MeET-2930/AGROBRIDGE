@@ -7,6 +7,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
+import { tErr } from './i18nError';
 
 const SESSION_KEY = '@agrobridge_user_session';
 
@@ -17,26 +18,36 @@ export const OFFICER_DUTIES = [
     id: 'gate',
     name: 'गेट अधिकारी (Gate Entry)',
     desc: 'गेट आगमन और वाहन प्रविष्टि',
+    nameKey: 'duty_gate',
+    descKey: 'duty_gate_desc',
   },
   {
     id: 'assay',
     name: 'गुणवत्ता निरीक्षक (Assay / QC)',
     desc: 'नमूना, नमी, ग्रेड तय करना',
+    nameKey: 'duty_assay',
+    descKey: 'duty_assay_desc',
   },
   {
     id: 'weighbridge',
     name: 'तौल अधिकारी (Weighbridge)',
     desc: 'भाव तय होने के बाद वजन माप',
+    nameKey: 'duty_weighbridge',
+    descKey: 'duty_weighbridge_desc',
   },
   {
     id: 'accounts',
     name: 'लेखा व भुगतान (Cashier)',
     desc: 'भुगतान और बैंक रसीद',
+    nameKey: 'duty_accounts',
+    descKey: 'duty_accounts_desc',
   },
   {
     id: 'admin',
     name: 'मंडी प्रशासक (Admin)',
     desc: 'समस्त नियंत्रण व विलंब प्रबंधन',
+    nameKey: 'duty_admin',
+    descKey: 'duty_admin_desc',
   },
 ];
 
@@ -86,24 +97,20 @@ export async function loginWithPhone(phone, role = 'farmer') {
     const normalizedPhone = normalizePhone(phone);
 
     if (normalizedPhone.length !== 10) {
-      throw new Error('कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें।');
+      throw tErr('err.badPhone');
     }
 
     const userDocRef = doc(db, 'users', normalizedPhone);
     const userSnap = await getDoc(userDocRef);
 
     if (!userSnap.exists()) {
-      throw new Error(
-        'इस मोबाइल नंबर से कोई खाता नहीं मिला। पहले पंजीकरण करें।'
-      );
+      throw tErr('err.notRegistered');
     }
 
     const userData = userSnap.data();
 
     if (userData.role !== role) {
-      throw new Error(
-        `यह मोबाइल नंबर ${userData.role} खाते के लिए पंजीकृत है।`
-      );
+      throw tErr('err.wrongRole', { role: userData.role });
     }
 
     return saveSession(buildSession(userSnap.id, userData));
@@ -131,38 +138,36 @@ export async function registerUser({
     const normalizedPhone = normalizePhone(phone);
 
     if (!name?.trim()) {
-      throw new Error('नाम दर्ज करें।');
+      throw tErr('err.enterName');
     }
 
     if (normalizedPhone.length !== 10) {
-      throw new Error('कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें।');
+      throw tErr('err.badPhone');
     }
 
     const userDocRef = doc(db, 'users', normalizedPhone);
     const userSnap = await getDoc(userDocRef);
 
     if (userSnap.exists()) {
-      throw new Error(
-        'इस मोबाइल नंबर से खाता पहले से मौजूद है। कृपया लॉग इन करें।'
-      );
+      throw tErr('err.exists');
     }
 
     if (role === 'officer') {
       if (!employeeId?.trim()) {
-        throw new Error('कर्मचारी आईडी दर्ज करें।');
+        throw tErr('err.enterEmpId');
       }
 
       if (!centreId?.trim()) {
-        throw new Error('कृपया अपनी मंडी चुनें।');
+        throw tErr('err.pickMandi');
       }
     }
 
     if (role === 'trader' && (!licenseNumber?.trim() || !businessName?.trim())) {
-      throw new Error('लाइसेंस नंबर और फर्म नाम दर्ज करें।');
+      throw tErr('err.traderFields');
     }
 
     if (role === 'trader' && !centreId?.trim()) {
-      throw new Error('कृपया वह मंडी चुनें जहाँ आप व्यापार करते हैं।');
+      throw tErr('err.traderMandi');
     }
 
     const newUser = {
@@ -202,8 +207,8 @@ export async function registerUser({
  * Trader: change the mandi they trade at (also used by profile screen).
  */
 export async function updateTraderCentre({ centreId, centreName }) {
-  if (!currentUserSession?.uid) throw new Error('कृपया दोबारा लॉग इन करें।');
-  if (!centreId) throw new Error('कृपया मंडी चुनें।');
+  if (!currentUserSession?.uid) throw tErr('loginAgain');
+  if (!centreId) throw tErr('err.pickMandi');
   const patch = { centreId, centreName: centreName || '' };
   await updateDoc(doc(db, 'users', currentUserSession.uid), patch);
   return saveSession({ ...currentUserSession, ...patch });
@@ -219,11 +224,11 @@ export async function updateOfficerPosting({
   officerDuty,
 }) {
   if (!currentUserSession?.uid) {
-    throw new Error('कृपया दोबारा लॉग इन करें।');
+    throw tErr('loginAgain');
   }
 
   if (!centreId) {
-    throw new Error('कृपया मंडी चुनें।');
+    throw tErr('err.pickMandi');
   }
 
   const patch = { centreId, centreName: centreName || '' };
@@ -241,17 +246,17 @@ export async function updateOfficerPosting({
  */
 export async function updateGovId({ govIdType, govIdNumber }) {
   if (!currentUserSession?.uid) {
-    throw new Error('कृपया दोबारा लॉग इन करें।');
+    throw tErr('loginAgain');
   }
 
   const cleaned = String(govIdNumber || '').replace(/\s/g, '');
 
   if (govIdType === 'aadhaar' && cleaned.length !== 12) {
-    throw new Error('आधार संख्या 12 अंकों की होनी चाहिए।');
+    throw tErr('err.aadhaar12');
   }
 
   if (!cleaned) {
-    throw new Error('कृपया पहचान संख्या दर्ज करें।');
+    throw tErr('err.enterId');
   }
 
   const patch = {

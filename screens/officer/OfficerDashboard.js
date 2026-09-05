@@ -27,17 +27,11 @@ import {
 
 import { getCurrentUserSession, logoutUserSession } from '../../services/auth';
 import { useLang } from '../../i18n/LanguageContext';
-
-const DUTY_LABEL = {
-  gate: 'गेट अधिकारी',
-  assay: 'गुणवत्ता निरीक्षक',
-  weighbridge: 'तौल अधिकारी',
-  accounts: 'लेखा व भुगतान',
-  admin: 'मंडी प्रशासक',
-};
+import { centreLabel } from '../../services/centres';
 
 export default function OfficerDashboard({ navigation }) {
-  const { tr } = useLang();
+  const { tr, lang } = useLang();
+  const dutyLabel = (d) => (d ? tr(`duty_${d}`) : '');
 
   const [session, setSession] = useState(null);
   const [rows, setRows] = useState([]);
@@ -116,23 +110,23 @@ export default function OfficerDashboard({ navigation }) {
       <AppHeader
         navigation={navigation}
         showBack={false}
-        tag="मंडी अधिकारी पोर्टल"
+        tag={tr('od_portal')}
         audioKey="audio_officer_queue"
       />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.greet}>{tr('namaste') || 'नमस्ते'}</Text>
-            <Text style={styles.name}>{session?.name || 'अधिकारी'}</Text>
+            <Text style={styles.greet}>{tr('namaste')}</Text>
+            <Text style={styles.name}>{session?.name || tr('od_officer')}</Text>
             <View style={styles.dutyPill}>
               <Text style={styles.dutyPillText}>
-                {DUTY_LABEL[duty] || duty}
+                {dutyLabel(duty)}
               </Text>
             </View>
 
             <Text style={styles.centreLine} numberOfLines={1}>
-              {session?.centreName || 'मंडी नहीं चुनी'}
+              {session?.centreName ? centreLabel(session.centreName, lang) : tr('od_noCentre')}
             </Text>
           </View>
 
@@ -154,10 +148,9 @@ export default function OfficerDashboard({ navigation }) {
           >
             <Ionicons name="business-outline" size={28} color="#E65100" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.setupTitle}>अपनी मंडी चुनें</Text>
+              <Text style={styles.setupTitle}>{tr('od_setupTitle')}</Text>
               <Text style={styles.setupSub}>
-                मंडी चुने बिना आपको कोई टोकन नहीं दिखेगा। सेट करने के लिए
-                टैप करें।
+                {tr('od_setupSub')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#E65100" />
@@ -185,17 +178,17 @@ export default function OfficerDashboard({ navigation }) {
               ]}
             >
               {myWork === 0
-                ? 'कोई काम बाकी नहीं'
-                : `${myWork} वाहन आपके पास लंबित`}
+                ? tr('od_noWork')
+                : tr('od_pending', { n: myWork })}
             </Text>
             <Text style={styles.bannerSub}>
-              आज कुल {totals.total} टोकन • अंदर {totals.inside}
+              {tr('od_todayLine', { total: totals.total, inside: totals.inside })}
             </Text>
           </View>
         </View>
 
         {/* Work cards, one per stage this officer owns */}
-        <Text style={styles.sectionTitle}>आपका काम</Text>
+        <Text style={styles.sectionTitle}>{tr('od_yourWork')}</Text>
 
         {stages.map((stage) => {
           const count = countFor(stage.statuses);
@@ -223,8 +216,8 @@ export default function OfficerDashboard({ navigation }) {
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={styles.workTitle}>{stage.title}</Text>
-                <Text style={styles.workSub}>{stage.subtitle}</Text>
+                <Text style={styles.workTitle}>{tr(stage.titleKey || stage.title)}</Text>
+                <Text style={styles.workSub}>{tr(stage.subtitleKey || stage.subtitle)}</Text>
               </View>
 
               <View
@@ -253,52 +246,52 @@ export default function OfficerDashboard({ navigation }) {
         })}
 
         {/* Day summary */}
-        <Text style={styles.sectionTitle}>आज का सारांश</Text>
+        <Text style={styles.sectionTitle}>{tr('od_summary')}</Text>
 
         <View style={styles.stats}>
           <View style={styles.stat}>
             <Text style={styles.num}>{totals.total}</Text>
-            <Text style={styles.lbl}>कुल टोकन</Text>
+            <Text style={styles.lbl}>{tr('od_totalTokens')}</Text>
           </View>
 
           <View style={styles.stat}>
             <Text style={[styles.num, { color: '#FFD54F' }]}>
               {totals.waiting}
             </Text>
-            <Text style={styles.lbl}>प्रतीक्षित</Text>
+            <Text style={styles.lbl}>{tr('od_waiting')}</Text>
           </View>
 
           <View style={styles.stat}>
             <Text style={[styles.num, { color: '#90CAF9' }]}>
               {totals.inside}
             </Text>
-            <Text style={styles.lbl}>अंदर</Text>
+            <Text style={styles.lbl}>{tr('od_inside')}</Text>
           </View>
 
           <View style={styles.stat}>
             <Text style={[styles.num, { color: '#A5D6A7' }]}>
               {totals.paid}
             </Text>
-            <Text style={styles.lbl}>भुगतान</Text>
+            <Text style={styles.lbl}>{tr('od_paid')}</Text>
           </View>
 
           <View style={styles.stat}>
             <Text style={[styles.num, { color: '#EF9A9A' }]}>
               {totals.absent}
             </Text>
-            <Text style={styles.lbl}>अनुपस्थित</Text>
+            <Text style={styles.lbl}>{tr('od_absent')}</Text>
           </View>
         </View>
 
         {/* Extra tools */}
-        <Text style={styles.sectionTitle}>अन्य</Text>
+        <Text style={styles.sectionTitle}>{tr('od_other')}</Text>
 
         <TouchableOpacity
           style={styles.toolRow}
           onPress={() => navigation.navigate('TodaysQueue')}
         >
           <Ionicons name="list-outline" size={20} color={Colors.secondary} />
-          <Text style={styles.toolText}>पूरी कतार देखें</Text>
+          <Text style={styles.toolText}>{tr('od_fullQueue')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
         </TouchableOpacity>
 
@@ -311,7 +304,7 @@ export default function OfficerDashboard({ navigation }) {
             size={20}
             color={Colors.secondary}
           />
-          <Text style={styles.toolText}>दैनिक रिपोर्ट</Text>
+          <Text style={styles.toolText}>{tr('od_dailyReport')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
         </TouchableOpacity>
 
@@ -325,7 +318,7 @@ export default function OfficerDashboard({ navigation }) {
               size={20}
               color={Colors.error}
             />
-            <Text style={styles.toolText}>विलंब रिपोर्ट</Text>
+            <Text style={styles.toolText}>{tr('od_delayReport')}</Text>
             <Ionicons
               name="chevron-forward"
               size={18}
@@ -338,9 +331,9 @@ export default function OfficerDashboard({ navigation }) {
       <Modal visible={open} transparent animationType="fade">
         <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
           <View style={styles.modal}>
-            <Text style={styles.modalName}>{session?.name || 'अधिकारी'}</Text>
+            <Text style={styles.modalName}>{session?.name || tr('od_officer')}</Text>
             <Text style={styles.modalSub}>
-              {DUTY_LABEL[duty] || duty} • {session?.employeeId || ''}
+              {dutyLabel(duty)} • {session?.employeeId || ''}
             </Text>
 
             <TouchableOpacity
@@ -356,7 +349,7 @@ export default function OfficerDashboard({ navigation }) {
                 color={Colors.secondary}
               />
               <Text style={styles.profileLinkText}>
-                मंडी / ड्यूटी / पहचान बदलें
+                {tr('od_changePosting')}
               </Text>
             </TouchableOpacity>
 
@@ -367,7 +360,7 @@ export default function OfficerDashboard({ navigation }) {
                 color={Colors.error}
               />
               <Text style={styles.logoutText}>
-                {tr('logout') || 'लॉग आउट'}
+                {tr('logout')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -26,6 +26,8 @@ import {
 
 import { getCurrentUserSession } from '../../services/auth';
 
+import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel, gradeLabel } from '../../services/centres';
 /*
  * A focused work list for ONE stage of the pipeline.
  *
@@ -34,6 +36,7 @@ import { getCurrentUserSession } from '../../services/auth';
  * far less error-prone at a busy gate than one long mixed list.
  */
 export default function StageQueueScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const { stageId } = route.params || {};
   const stage = getStageById(stageId);
 
@@ -74,7 +77,7 @@ export default function StageQueueScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.container}>
         <AppHeader navigation={navigation} showBack />
-        <Text style={styles.empty}>चरण नहीं मिला</Text>
+        <Text style={styles.empty}>{tr('sq_notFound')}</Text>
       </SafeAreaView>
     );
   }
@@ -82,16 +85,16 @@ export default function StageQueueScreen({ navigation, route }) {
   const list = rows.filter((r) => stage.statuses.includes(r.status));
 
   const noShow = (tokenId) => {
-    Alert.alert('अनुपस्थित?', 'क्या किसान नहीं आया?', [
-      { text: 'रद्द', style: 'cancel' },
+    Alert.alert(tr('noShowQ'), tr('noShowSub'), [
+      { text: tr('cancel'), style: 'cancel' },
       {
-        text: 'हाँ',
+        text: tr('yes'),
         style: 'destructive',
         onPress: async () => {
           try {
             await markNoShow(tokenId);
           } catch (error) {
-            Alert.alert('त्रुटि', error?.message || 'दर्ज नहीं हुआ।');
+            Alert.alert(tr('error'), trError(error, 'notRecorded'));
           }
         },
       },
@@ -114,12 +117,12 @@ export default function StageQueueScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} showBack title={stage.title} />
+      <AppHeader navigation={navigation} showBack title={tr(stage.titleKey || stage.title)} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
-          title={stage.title}
-          subtitle={`${list.length} वाहन लंबित • ${stage.subtitle}`}
+          title={tr(stage.titleKey || stage.title)}
+          subtitle={tr('sq_pendingLine', { n: list.length, sub: tr(stage.subtitleKey || stage.subtitle) })}
         />
 
         {stage.action === 'gate' ? (
@@ -129,7 +132,7 @@ export default function StageQueueScreen({ navigation, route }) {
           >
             <Ionicons name="qr-code-outline" size={22} color={Colors.white} />
             <Text style={styles.scanBtnText}>
-              गेट पास स्कैन करें / नंबर डालें
+              {tr('sq_scanBtn')}
             </Text>
             <Ionicons name="arrow-forward" size={18} color={Colors.white} />
           </TouchableOpacity>
@@ -138,7 +141,7 @@ export default function StageQueueScreen({ navigation, route }) {
         {list.length === 0 ? (
           <View style={styles.clearBox}>
             <Ionicons name="checkmark-circle" size={40} color="#2E7D32" />
-            <Text style={styles.clearText}>इस चरण में कोई काम बाकी नहीं</Text>
+            <Text style={styles.clearText}>{tr('sq_clear')}</Text>
           </View>
         ) : (
           list.map((token, index) => (
@@ -148,7 +151,7 @@ export default function StageQueueScreen({ navigation, route }) {
             >
               {index === 0 ? (
                 <View style={styles.nextTag}>
-                  <Text style={styles.nextTagText}>अगला</Text>
+                  <Text style={styles.nextTagText}>{tr('sq_next')}</Text>
                 </View>
               ) : null}
 
@@ -161,32 +164,31 @@ export default function StageQueueScreen({ navigation, route }) {
               <Text style={styles.sub}>+91 {token.farmerPhone}</Text>
               {stage.action === 'gate' ? (
                 <Text style={styles.passCode}>
-                  गेट पास: {gatePassCodeOf(token)}
+                  {tr('sq_gatePass', { code: gatePassCodeOf(token) })}
                 </Text>
               ) : null}
 
               <View style={styles.metaRow}>
                 <Text style={styles.meta}>
-                  {String(token.cropName || token.crop || '').toUpperCase()}
+                  {cropLabel(token, lang)}
                 </Text>
                 <Text style={styles.meta}>
-                  {token.vehicleNumber || 'वाहन लंबित'}
+                  {token.vehicleNumber || tr('vehiclePending')}
                 </Text>
                 <Text style={styles.meta}>
-                  {token.actualQuantity || token.approxQuantityQuintals} क्विं.
+                  {token.actualQuantity || token.approxQuantityQuintals} {tr('quintalShort')}
                 </Text>
               </View>
 
               {token.grade ? (
                 <Text style={styles.meta}>
-                  ग्रेड: {token.grade} • नमी {token.moisturePercent}%
+                  {tr('sq_gradeLine', { g: gradeLabel(token.grade, lang), m: token.moisturePercent })}
                 </Text>
               ) : null}
 
               {token.ratePerQuintal ? (
                 <Text style={[styles.meta, { color: '#16A34A' }]}>
-                  भाव ₹{token.ratePerQuintal}/क्विं. •{' '}
-                  {token.priceMode === 'auction' ? `नीलामी • ${token.buyerName}` : 'MSP'}
+                  {tr('sq_priceLine', { rate: token.ratePerQuintal, mode: token.priceMode === 'auction' ? tr('sq_auctionBy', { who: token.buyerName }) : 'MSP' })}
                 </Text>
               ) : null}
 
@@ -196,7 +198,7 @@ export default function StageQueueScreen({ navigation, route }) {
                     style={styles.outline}
                     onPress={() => noShow(token.tokenId)}
                   >
-                    <Text style={styles.outlineText}>अनुपस्थित</Text>
+                    <Text style={styles.outlineText}>{tr('markNoShow')}</Text>
                   </TouchableOpacity>
                 ) : null}
 
@@ -205,7 +207,7 @@ export default function StageQueueScreen({ navigation, route }) {
                   onPress={() => runAction(token)}
                 >
                   <Text style={styles.primaryText}>
-                    {stage.action === 'gate' ? 'गेट पास स्कैन' : stage.actionLabel}
+                    {stage.action === 'gate' ? tr('sq_scanShort') : tr(stage.actionKey || stage.actionLabel)}
                   </Text>
                   <Ionicons
                     name="arrow-forward"

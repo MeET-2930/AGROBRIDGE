@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import AppHeader from '../../components/AppHeader';
 import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryCard from '../../components/PrimaryCard';
@@ -12,12 +12,12 @@ export default function RoleSelectionScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack audioKey="audio_role" />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenTitle title={tr('selectRole') || 'अपनी भूमिका चुनें'} />
-        <PrimaryCard title={tr('roleFarmer') || 'किसान'} subtitle={tr('roleFarmerSub')} icon="leaf-outline"
+        <ScreenTitle title={tr('selectRole')} />
+        <PrimaryCard title={tr('roleFarmer')} subtitle={tr('roleFarmerSub')} icon="leaf-outline"
           onPress={() => navigation.navigate('UserStatus', { role: 'farmer' })} />
-        <PrimaryCard title={tr('roleOfficer') || 'मंडी अधिकारी'} subtitle={tr('roleOfficerSub')} icon="shield-checkmark-outline"
+        <PrimaryCard title={tr('roleOfficer')} subtitle={tr('roleOfficerSub')} icon="shield-checkmark-outline"
           onPress={() => navigation.navigate('UserStatus', { role: 'officer' })} />
-        <PrimaryCard title={tr('roleTrader') || 'व्यापारी'} subtitle={tr('roleTraderSub')} icon="cart-outline"
+        <PrimaryCard title={tr('roleTrader')} subtitle={tr('roleTraderSub')} icon="cart-outline"
           onPress={() => navigation.navigate('UserStatus', { role: 'trader' })} />
       </ScrollView>
     </SafeAreaView>

@@ -17,6 +17,8 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 import { findByGatePass, markGateEntry, STATUS } from '../../services/bookings';
 
+import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel } from '../../services/centres';
 /*
  * Gate officer: scan the farmer's gate pass QR (or type the
  * 6-digit number), confirm vehicle number, let them in.
@@ -24,6 +26,7 @@ import { findByGatePass, markGateEntry, STATUS } from '../../services/bookings';
  * route.params.rows = today's live list from StageQueueScreen.
  */
 export default function GateScanScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const rows = route.params?.rows || [];
   const expectTokenId = route.params?.expectTokenId || null;
   const expected = rows.find((r) => r.tokenId === expectTokenId) || null;
@@ -44,27 +47,24 @@ export default function GateScanScreen({ navigation, route }) {
     const hit = findByGatePass(rows, input);
 
     if (!hit) {
-      Alert.alert(
-        'गेट पास नहीं मिला',
-        'आज की कतार में यह पास नहीं है। नंबर जाँचें या मंडी/तारीख देखें।'
-      );
+      Alert.alert(tr('gs_notFound'), tr('gs_notFoundSub'));
       locked.current = false;
       return;
     }
 
     if (hit.status !== STATUS.BOOKED) {
-      Alert.alert('पहले से प्रवेश', `टोकन ${hit.tokenNumber} पहले ही अंदर है।`);
+      Alert.alert(tr('gs_already'), tr('gs_alreadySub', { t: hit.tokenNumber }));
       locked.current = false;
       return;
     }
 
     if (expected && hit.tokenId !== expected.tokenId) {
       Alert.alert(
-        'दूसरा टोकन',
-        `यह पास ${hit.tokenNumber} का है, आपने ${expected.tokenNumber} चुना था। फिर भी ${hit.tokenNumber} को प्रवेश दें?`,
+        tr('gs_otherToken'),
+        tr('gs_otherTokenSub', { a: hit.tokenNumber, b: expected.tokenNumber }),
         [
-          { text: 'नहीं', style: 'cancel', onPress: () => { locked.current = false; } },
-          { text: 'हाँ', onPress: () => { setMatch(hit); setVehicle(hit.vehicleNumber || ''); setHow(source); } },
+          { text: tr('no'), style: 'cancel', onPress: () => { locked.current = false; } },
+          { text: tr('yes'), onPress: () => { setMatch(hit); setVehicle(hit.vehicleNumber || ''); setHow(source); } },
         ]
       );
       return;
@@ -84,18 +84,18 @@ export default function GateScanScreen({ navigation, route }) {
   const confirm = async () => {
     if (!match) return;
     if (!String(vehicle).trim()) {
-      Alert.alert('वाहन नंबर', 'कृपया वाहन नंबर दर्ज करें।');
+      Alert.alert(tr('vehicleNumber'), tr('gs_enterVehicle'));
       return;
     }
     setBusy(true);
     try {
       await markGateEntry(match.tokenId, vehicle, how);
-      Alert.alert('प्रवेश दर्ज ✓', `${match.tokenNumber} • ${match.farmerName}`, [
-        { text: 'अगला स्कैन', onPress: reset },
-        { text: 'वापस', onPress: () => navigation.goBack() },
+      Alert.alert(tr('gs_admitted'), `${match.tokenNumber} • ${match.farmerName}`, [
+        { text: tr('gs_nextScan'), onPress: reset },
+        { text: tr('back'), onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'गेट प्रवेश दर्ज नहीं हुआ।');
+      Alert.alert(tr('error'), trError(error, 'gs_entryFail'));
     } finally {
       setBusy(false);
     }
@@ -110,23 +110,23 @@ export default function GateScanScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} showBack title="गेट पास स्कैन" />
+      <AppHeader navigation={navigation} showBack title={tr('gs_title')} />
 
       {!match ? (
         <View style={{ flex: 1 }}>
           {expected ? (
             <View style={styles.expectBar}>
-              <Text style={styles.expectLabel}>प्रतीक्षित टोकन</Text>
+              <Text style={styles.expectLabel}>{tr('gs_expected')}</Text>
               <Text style={styles.expectToken}>{expected.tokenNumber}</Text>
               <Text style={styles.expectName}>{expected.farmerName}</Text>
               <Text style={styles.expectHint}>
-                किसान का गेट पास स्कैन करें या नंबर टाइप करें — बिना पास प्रवेश नहीं
+                {tr('gs_expectHint')}
               </Text>
             </View>
           ) : (
             <View style={styles.expectBarPlain}>
               <Text style={styles.expectHint}>
-                बिना गेट पास (QR / 6-अंक) के प्रवेश नहीं दिया जा सकता
+                {tr('gs_noPassHint')}
               </Text>
             </View>
           )}
@@ -142,9 +142,9 @@ export default function GateScanScreen({ navigation, route }) {
             ) : (
               <View style={styles.noCam}>
                 <ActivityIndicator color={Colors.white} />
-                <Text style={styles.noCamText}>कैमरा अनुमति चाहिए</Text>
+                <Text style={styles.noCamText}>{tr('gs_camPerm')}</Text>
                 <TouchableOpacity onPress={requestPermission}>
-                  <Text style={styles.noCamLink}>अनुमति दें</Text>
+                  <Text style={styles.noCamLink}>{tr('gs_allow')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -152,13 +152,13 @@ export default function GateScanScreen({ navigation, route }) {
           </View>
 
           <View style={styles.manual}>
-            <Text style={styles.manualTitle}>या गेट पास नंबर टाइप करें</Text>
+            <Text style={styles.manualTitle}>{tr('gs_typeNumber')}</Text>
             <View style={styles.row}>
               <TextInput
                 style={styles.input}
                 value={typed}
                 onChangeText={setTyped}
-                placeholder="6 अंक  (या A-03)"
+                placeholder={tr('gs_placeholder')}
                 placeholderTextColor="#999"
                 keyboardType="default"
                 autoCapitalize="characters"
@@ -171,31 +171,31 @@ export default function GateScanScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
             <Text style={styles.hint}>
-              आज की कतार में {rows.filter((r) => r.status === STATUS.BOOKED).length} वाहन प्रतीक्षा में
+              {tr('gs_waitingCount', { n: rows.filter((r) => r.status === STATUS.BOOKED).length })}
             </Text>
           </View>
         </View>
       ) : (
         <View style={styles.result}>
           <View style={styles.verifiedTop}>
-            <Text style={styles.verifiedLabel}>✓ सत्यापित टोकन</Text>
+            <Text style={styles.verifiedLabel}>{tr('gs_verified')}</Text>
             <Text style={styles.verifiedToken}>{match.tokenNumber}</Text>
           </View>
 
           <View style={styles.okBadge}>
             <Ionicons name="checkmark-circle" size={22} color="#16A34A" />
             <Text style={styles.okText}>
-              गेट पास सही है ({how === 'qr' ? 'QR' : 'नंबर'})
+              {tr('gs_passOk', { how: how === 'qr' ? tr('gs_byQr') : tr('gs_byNumber') })}
             </Text>
           </View>
 
           <Text style={styles.name}>{match.farmerName}</Text>
           <Text style={styles.sub}>+91 {match.farmerPhone}</Text>
           <Text style={styles.sub}>
-            {match.cropName || match.crop} • {match.approxQuantityQuintals} क्विं. • {match.slotWindow}
+            {cropLabel(match, lang)} • {match.approxQuantityQuintals} {tr('quintalShort')} • {match.slotWindow}
           </Text>
 
-          <Text style={styles.label}>वाहन नंबर</Text>
+          <Text style={styles.label}>{tr('vehicleNumber')}</Text>
           <TextInput
             style={styles.inputBig}
             value={vehicle}
@@ -206,13 +206,13 @@ export default function GateScanScreen({ navigation, route }) {
           />
 
           <PrimaryButton
-            title="प्रवेश दें  →"
+            title={tr('gs_admit')}
             loading={busy}
             onPress={confirm}
             style={{ marginTop: 16 }}
           />
           <TouchableOpacity onPress={reset} style={{ marginTop: 14 }}>
-            <Text style={styles.cancel}>रद्द / दोबारा स्कैन</Text>
+            <Text style={styles.cancel}>{tr('gs_rescan')}</Text>
           </TouchableOpacity>
         </View>
       )}

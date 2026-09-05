@@ -38,6 +38,7 @@ import {
 import { db } from './firebase';
 import { fetchCentreById } from './centres';
 import { todayLocal, parseLocalDate } from './dates';
+import { tErr } from './i18nError';
 
 /* ===============================================================
  * STATUS STATE MACHINE
@@ -150,7 +151,7 @@ export async function fetchCentreSlots(centreId, dateStr) {
   const centre = await fetchCentreById(centreId);
 
   if (!centre) {
-    throw new Error('Mandi centre not found');
+    throw tErr('err.mandiNotFound');
   }
 
   const capacity = capacityPerWindow(centre);
@@ -276,7 +277,7 @@ export async function createBooking({
   const centre = await fetchCentreById(centreId);
 
   if (!centre) {
-    throw new Error('Mandi centre not found');
+    throw tErr('err.mandiNotFound');
   }
 
   const capacity = capacityPerWindow(centre);
@@ -316,9 +317,7 @@ export async function createBooking({
     const usedInSlot = Number(slotCounts[slotTime]) || 0;
 
     if (usedInSlot >= capacity) {
-      throw new Error(
-        'यह स्लॉट अभी-अभी भर गया। कृपया दूसरा समय चुनें।'
-      );
+      throw tErr('err.slotFull');
     }
 
     const position = (Number(queue.lastIssuedPosition) || 0) + 1;
@@ -487,8 +486,15 @@ export function subscribeToBooking(tokenId, callback) {
  * count - never another farmer's identity.
  */
 export function buildQueueView(booking, queue) {
+  /*
+   * NOTE ON LANGUAGE
+   * headline / detail are NOT sentences. They are { key, params }
+   * objects, resolved on screen with tr(view.headline) so the
+   * farmer sees them in the language he picked.
+   */
   const myPosition = Number(booking?.positionAssigned) || 0;
   const status = booking?.status;
+  const msg = (key, params) => ({ key, params: params || {} });
 
   // Assay done: the FARMER must now choose MSP or auction.
   if (status === STATUS.ASSAY) {
@@ -497,8 +503,8 @@ export function buildQueueView(booking, queue) {
       tokensAhead: 0,
       nowServingToken: booking?.tokenNumber,
       etaMinutes: 0,
-      headline: 'जांच पूरी — भाव तय करें',
-      detail: `ग्रेड ${booking?.grade || 'FAQ'} • MSP पर बेचें या नीलामी शुरू करें। टैप करें →`,
+      headline: msg('qv_action_h'),
+      detail: msg('qv_action_d', { grade: booking?.grade || 'FAQ' }),
     };
   }
 
@@ -507,30 +513,33 @@ export function buildQueueView(booking, queue) {
     const rate = booking?.ratePerQuintal;
     const buyer =
       booking?.priceMode === 'auction'
-        ? booking?.buyerName || 'व्यापारी'
-        : 'सरकारी खरीद (MSP)';
+        ? booking?.buyerName || { key: 'tr_trader' }
+        : { key: 'td_govBuyer' };
+
+    let headline;
+    let detail;
+
+    if (status === STATUS.IN_GATE) {
+      headline = msg('qv_inside_h');
+      detail = msg('qv_inside_d');
+    } else if (status === STATUS.PRICE_FIXED) {
+      headline = msg('qv_priceFixed_h', { rate });
+      detail = msg('qv_priceFixed_d', { buyer });
+    } else if (status === STATUS.WEIGHING) {
+      headline = msg('qv_weighed_h');
+      detail = msg('qv_weighed_d', { qty: booking?.actualQuantity || '', rate });
+    } else {
+      headline = msg('qv_payPending_h');
+      detail = msg('qv_payPending_d');
+    }
 
     return {
       level: 'inside',
       tokensAhead: 0,
       nowServingToken: queue?.nowServingToken || booking?.tokenNumber,
       etaMinutes: 0,
-      headline:
-        status === STATUS.IN_GATE
-          ? 'आप मंडी के अंदर हैं'
-          : status === STATUS.PRICE_FIXED
-          ? `भाव तय: ₹${rate} / क्विंटल`
-          : status === STATUS.WEIGHING
-          ? 'तौल पूरा — भुगतान की प्रतीक्षा'
-          : 'भुगतान तैयार हो रहा है',
-      detail:
-        status === STATUS.IN_GATE
-          ? 'गुणवत्ता जांच की प्रतीक्षा करें'
-          : status === STATUS.PRICE_FIXED
-          ? `खरीदार: ${buyer} • अब तौल के लिए जाएँ`
-          : status === STATUS.WEIGHING
-          ? `${booking?.actualQuantity || ''} क्विंटल × ₹${rate}`
-          : 'कैशियर रसीद बना रहा है',
+      headline,
+      detail,
     };
   }
 
@@ -542,10 +551,10 @@ export function buildQueueView(booking, queue) {
       etaMinutes: 0,
       headline:
         status === STATUS.PAID
-          ? 'भुगतान पूरा हुआ'
+          ? msg('qv_paid_h')
           : status === STATUS.NO_SHOW
-          ? 'आप उपस्थित नहीं हुए'
-          : 'यह टोकन बंद है',
+          ? msg('qv_noShow_h')
+          : msg('qv_closed_h'),
       detail: '',
     };
   }
@@ -566,8 +575,6 @@ export function buildQueueView(booking, queue) {
   /*
    * How many farmers are genuinely ahead of me: those still open,
    * positioned before me, and not already inside the mandi.
-   * Counting this way is correct with any number of lanes and
-   * whatever order the officers actually work in.
    */
   const waitingAhead = openPositions.filter(
     (p) => p < myPosition && !insidePositions.includes(p)
@@ -578,9 +585,6 @@ export function buildQueueView(booking, queue) {
   // Each lane clears roughly one vehicle per avgMinutesPerEntry.
   const etaMinutes = Math.round((waitingAhead * perEntry) / lanes);
 
-  const insideNote =
-    insideCount > 0 ? `अंदर ${insideCount} वाहन` : '';
-
   // Nothing has started at this centre today.
   if (openPositions.length === 0 && !nowServingToken) {
     return {
@@ -590,8 +594,8 @@ export function buildQueueView(booking, queue) {
       etaMinutes: Math.round(
         (Math.max(0, myPosition - 1) * perEntry) / lanes
       ),
-      headline: 'कतार अभी शुरू नहीं हुई',
-      detail: `आपका टोकन ${booking?.tokenNumber || ''}`,
+      headline: msg('qv_notStarted_h'),
+      detail: msg('qv_notStarted_d', { token: booking?.tokenNumber || '' }),
     };
   }
 
@@ -602,12 +606,14 @@ export function buildQueueView(booking, queue) {
       tokensAhead: waitingAhead,
       nowServingToken,
       etaMinutes: 0,
-      headline: 'गेट पर पहुंचें - आपकी बारी है',
+      headline: msg('qv_go_h'),
       detail: nowServingToken
-        ? `अभी टोकन ${nowServingToken} चल रहा है • ${insideNote}`
-        : 'गेट खाली है',
+        ? msg('qv_go_d', { token: nowServingToken, n: insideCount })
+        : msg('qv_go_empty'),
     };
   }
+
+  const aheadLine = msg('qv_aheadLine', { n: waitingAhead, inside: insideCount });
 
   if (waitingAhead <= 2) {
     return {
@@ -615,10 +621,8 @@ export function buildQueueView(booking, queue) {
       tokensAhead: waitingAhead,
       nowServingToken,
       etaMinutes,
-      headline: 'तैयार हो जाइए',
-      detail: `आपसे पहले ${waitingAhead} किसान${
-        insideNote ? ' • ' + insideNote : ''
-      }`,
+      headline: msg('qv_ready_h'),
+      detail: aheadLine,
     };
   }
 
@@ -627,10 +631,8 @@ export function buildQueueView(booking, queue) {
     tokensAhead: waitingAhead,
     nowServingToken,
     etaMinutes,
-    headline: 'अभी समय है',
-    detail: `आपसे पहले ${waitingAhead} किसान${
-      insideNote ? ' • ' + insideNote : ''
-    }`,
+    headline: msg('qv_wait_h'),
+    detail: aheadLine,
   };
 }
 
@@ -661,7 +663,7 @@ async function advanceStage(tokenId, patch, { entering = false } = {}) {
     const bSnap = await tx.get(bookingRef);
 
     if (!bSnap.exists()) {
-      throw new Error('Token not found');
+      throw tErr('err.tokenNotFound');
     }
 
     const booking = bSnap.data();
@@ -777,15 +779,15 @@ export async function fixPrice(
   { mode = 'msp', ratePerQuintal, buyerId = null, buyerName = null }
 ) {
   const rate = parseFloat(ratePerQuintal) || 0;
-  if (rate <= 0) throw new Error('Valid rate per quintal is required');
+  if (rate <= 0) throw tErr('err.badRate');
 
   const bookingRef = doc(db, 'bookings', tokenId);
   const snap = await getDoc(bookingRef);
-  if (!snap.exists()) throw new Error('Token not found');
+  if (!snap.exists()) throw tErr('err.tokenNotFound');
 
   const booking = snap.data();
   if (booking.status !== STATUS.ASSAY) {
-    throw new Error('भाव तभी तय हो सकता है जब गुणवत्ता जांच पूरी हो चुकी हो।');
+    throw tErr('err.priceAfterAssay');
   }
 
   const patch = {
@@ -815,11 +817,11 @@ export async function recordWeighing(
 
   const preSnap = await getDoc(doc(db, 'bookings', tokenId));
   if (preSnap.exists() && preSnap.data().status !== STATUS.PRICE_FIXED) {
-    throw new Error('भाव तय होने से पहले तौल नहीं हो सकता।');
+    throw tErr('err.weighBeforePrice');
   }
 
   if (net <= 0) {
-    throw new Error('शुद्ध वजन शून्य से अधिक होना चाहिए।');
+    throw tErr('wg_netZero');
   }
 
   const patch = {
@@ -836,9 +838,17 @@ export async function recordWeighing(
 /**
  * Cashier: compute deductions, generate receipt, close the token.
  */
+/*
+ * paymentBasis: 'msp' | 'ebid' | 'offline'
+ *   msp     - government agency at MSP
+ *   ebid    - winning bid placed inside the app
+ *   offline - bid held physically by the arhtiya; the munim's hand
+ *             written PARCHI is the farmer's only proof of the rate,
+ *             so the cashier MUST attach a photo of it (parchi.imageBase64).
+ */
 export async function markPaid(
   tokenId,
-  { actualQuantity, ratePerQuintal, grade }
+  { actualQuantity, ratePerQuintal, grade, paymentBasis, parchi, cashierName }
 ) {
   if (!tokenId) throw new Error('Token ID is required');
 
@@ -846,14 +856,14 @@ export async function markPaid(
   const snapshot = await getDoc(bookingRef);
 
   if (!snapshot.exists()) {
-    throw new Error('Token not found');
+    throw tErr('err.tokenNotFound');
   }
 
   const booking = snapshot.data();
   const centre = await fetchCentreById(booking.centreId);
 
   if (!centre) {
-    throw new Error('Mandi centre not found');
+    throw tErr('err.mandiNotFound');
   }
 
   const quantity =
@@ -863,8 +873,28 @@ export async function markPaid(
   const rate =
     parseFloat(booking.ratePerQuintal) || parseFloat(ratePerQuintal) || 0;
 
-  if (quantity <= 0) throw new Error('Valid quantity is required');
-  if (rate <= 0) throw new Error('Valid rate is required');
+  if (quantity <= 0) throw tErr('mp_badQty');
+  if (rate <= 0) throw tErr('err.badRate');
+
+  // Default the basis from what the app already knows.
+  const basis =
+    paymentBasis ||
+    (booking.priceMode === 'auction' ? 'ebid' : 'msp');
+
+  let parchiRecord = null;
+  if (basis === 'offline') {
+    if (!parchi?.imageBase64) throw tErr('pc_needPhoto');
+    const parchiRate = parseFloat(parchi.rate) || 0;
+    if (parchiRate <= 0) throw tErr('pc_needRate');
+    parchiRecord = {
+      imageBase64: parchi.imageBase64, // data URI, ~150 KB (compressed on device)
+      rate: parchiRate,
+      note: parchi.note || '',
+      matchesFixedRate: Math.abs(parchiRate - rate) < 0.5,
+      capturedAt: new Date().toISOString(),
+      capturedBy: cashierName || null,
+    };
+  }
 
   const gross = quantity * rate;
   const mandiFee = gross * ((Number(centre.mandiFeePercent) || 0) / 100);
@@ -894,6 +924,10 @@ export async function markPaid(
 
     paymentReference: `SIM${Date.now().toString().slice(-10)}`,
     receiptGeneratedAt: new Date().toISOString(),
+
+    paymentBasis: basis,
+    cashierName: cashierName || null,
+    parchi: parchiRecord,
   };
 
   return advanceStage(tokenId, patch);
@@ -920,12 +954,12 @@ export async function cancelBooking(tokenId) {
   return runTransaction(db, async (tx) => {
     const bSnap = await tx.get(bookingRef);
 
-    if (!bSnap.exists()) throw new Error('Token not found');
+    if (!bSnap.exists()) throw tErr('err.tokenNotFound');
 
     const booking = bSnap.data();
 
     if (booking.status !== STATUS.BOOKED) {
-      throw new Error('यह बुकिंग अब रद्द नहीं की जा सकती।');
+      throw tErr('err.cannotCancel');
     }
 
     const qRef = queueRef(booking.centreId, booking.date);
@@ -1170,6 +1204,9 @@ export const DUTY_STAGES = {
       id: 'gate',
       title: 'गेट प्रवेश',
       subtitle: 'वाहन को अंदर भेजें',
+      titleKey: 'stg_gate_t',
+      subtitleKey: 'stg_gate_s',
+      actionKey: 'stg_gate_a',
       icon: 'enter-outline',
       statuses: [STATUS.BOOKED],
       action: 'gate',
@@ -1182,6 +1219,9 @@ export const DUTY_STAGES = {
       id: 'assay',
       title: 'गुणवत्ता जांच',
       subtitle: 'नमूना, नमी, ग्रेड और अन्य पदार्थ',
+      titleKey: 'stg_assay_t',
+      subtitleKey: 'stg_assay_s',
+      actionKey: 'stg_assay_a',
       icon: 'flask-outline',
       statuses: [STATUS.IN_GATE],
       action: 'Assay',
@@ -1194,6 +1234,9 @@ export const DUTY_STAGES = {
       id: 'weighing',
       title: 'तौल',
       subtitle: 'केवल भाव तय हो चुके वाहन',
+      titleKey: 'stg_weighing_t',
+      subtitleKey: 'stg_weighing_s',
+      actionKey: 'stg_weighing_a',
       icon: 'scale-outline',
       statuses: [STATUS.PRICE_FIXED],
       action: 'Weighing',
@@ -1206,6 +1249,9 @@ export const DUTY_STAGES = {
       id: 'payment',
       title: 'भुगतान',
       subtitle: 'कटौती और रसीद',
+      titleKey: 'stg_payment_t',
+      subtitleKey: 'stg_payment_s',
+      actionKey: 'stg_payment_a',
       icon: 'cash-outline',
       statuses: [STATUS.WEIGHING, STATUS.PAYMENT_PENDING],
       action: 'MarkPaid',

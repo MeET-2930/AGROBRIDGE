@@ -25,8 +25,9 @@ import {
   updateGovId,
 } from '../../services/auth';
 
-import { fetchCentres } from '../../services/centres';
+import { fetchCentres, centreLabel } from '../../services/centres';
 
+import { useLang } from '../../i18n/LanguageContext';
 /*
  * Officer profile and posting.
  *
@@ -40,6 +41,7 @@ import { fetchCentres } from '../../services/centres';
  * ready for it.
  */
 export default function OfficerProfileScreen({ navigation, route }) {
+  const { tr, lang, trError } = useLang();
   const mustPickCentre = route?.params?.mustPickCentre;
 
   const [session, setSession] = useState(null);
@@ -87,7 +89,7 @@ export default function OfficerProfileScreen({ navigation, route }) {
 
   const savePosting = async () => {
     if (!centreId) {
-      Alert.alert('मंडी चुनें', 'कृपया अपनी मंडी चुनें।');
+      Alert.alert(tr('op_pickMandi'), tr('op_pickMandiSub'));
       return;
     }
 
@@ -96,11 +98,11 @@ export default function OfficerProfileScreen({ navigation, route }) {
     try {
       await updateOfficerPosting({ centreId, centreName, officerDuty: duty });
 
-      Alert.alert('सहेजा गया', 'आपकी मंडी और ड्यूटी अपडेट हो गई।', [
+      Alert.alert(tr('saved'), tr('op_savedSub'), [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'सहेजा नहीं जा सका।');
+      Alert.alert(tr('error'), trError(error, 'notSaved'));
     } finally {
       setSavingPosting(false);
     }
@@ -111,9 +113,9 @@ export default function OfficerProfileScreen({ navigation, route }) {
 
     try {
       await updateGovId({ govIdType: 'aadhaar', govIdNumber });
-      Alert.alert('सहेजा गया', 'पहचान संख्या दर्ज हो गई।');
+      Alert.alert(tr('saved'), tr('op_idSaved'));
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'सहेजा नहीं जा सका।');
+      Alert.alert(tr('error'), trError(error, 'notSaved'));
     } finally {
       setSavingId(false);
     }
@@ -134,42 +136,42 @@ export default function OfficerProfileScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} showBack title="प्रोफ़ाइल" />
+      <AppHeader navigation={navigation} showBack title={tr('profile')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
-          title="अधिकारी प्रोफ़ाइल"
-          subtitle="मंडी, ड्यूटी और पहचान"
+          title={tr('op_title')}
+          subtitle={tr('op_sub')}
         />
 
         {mustPickCentre ? (
           <View style={styles.alert}>
             <Ionicons name="alert-circle" size={22} color="#E65100" />
             <Text style={styles.alertText}>
-              काम शुरू करने से पहले अपनी मंडी चुनें।
+              {tr('op_mustPick')}
             </Text>
           </View>
         ) : null}
 
         {/* Identity */}
         <View style={styles.card}>
-          <Row label="नाम" value={session?.name} />
-          <Row label="मोबाइल" value={`+91 ${session?.phone || ''}`} />
-          <Row label="कर्मचारी आईडी" value={session?.employeeId || '—'} />
+          <Row label={tr('name')} value={session?.name} />
+          <Row label={tr('mobile')} value={`+91 ${session?.phone || ''}`} />
+          <Row label={tr('op_empId')} value={session?.employeeId || '—'} />
           <Row
-            label="सत्यापन"
-            value={session?.isVerified ? 'सत्यापित' : 'लंबित'}
+            label={tr('op_verification')}
+            value={session?.isVerified ? tr('op_verified') : tr('op_pending')}
           />
         </View>
 
         {/* Posting */}
-        <Text style={styles.sectionTitle}>आपकी मंडी</Text>
+        <Text style={styles.sectionTitle}>{tr('op_yourMandi')}</Text>
         <Text style={styles.help}>
-          आपको केवल इसी मंडी के टोकन और काम दिखाई देंगे।
+          {tr('op_yourMandiHelp')}
         </Text>
 
         {centres.length === 0 ? (
-          <Text style={styles.warn}>कोई मंडी नहीं मिली।</Text>
+          <Text style={styles.warn}>{tr('noneFound')}</Text>
         ) : (
           centres.map((centre) => {
             const on = centreId === centre.id;
@@ -187,7 +189,7 @@ export default function OfficerProfileScreen({ navigation, route }) {
                   <Text
                     style={[styles.pickTitle, on && { color: Colors.primary }]}
                   >
-                    {centre.name}
+                    {centreLabel(centre, lang)}
                   </Text>
                   <Text style={styles.pickSub} numberOfLines={1}>
                     {centre.address}
@@ -206,7 +208,7 @@ export default function OfficerProfileScreen({ navigation, route }) {
           })
         )}
 
-        <Text style={styles.sectionTitle}>ड्यूटी पद</Text>
+        <Text style={styles.sectionTitle}>{tr('op_duty')}</Text>
 
         {OFFICER_DUTIES.map((d) => {
           const on = duty === d.id;
@@ -221,9 +223,9 @@ export default function OfficerProfileScreen({ navigation, route }) {
                 <Text
                   style={[styles.pickTitle, on && { color: Colors.primary }]}
                 >
-                  {d.name}
+                  {tr(d.nameKey || d.name)}
                 </Text>
-                <Text style={styles.pickSub}>{d.desc}</Text>
+                <Text style={styles.pickSub}>{tr(d.descKey || d.desc)}</Text>
               </View>
 
               {on ? (
@@ -238,16 +240,16 @@ export default function OfficerProfileScreen({ navigation, route }) {
         })}
 
         <PrimaryButton
-          title="मंडी और ड्यूटी सहेजें"
+          title={tr('op_savePosting')}
           loading={savingPosting}
           onPress={savePosting}
           style={{ marginTop: 8 }}
         />
 
         {/* Government ID */}
-        <Text style={styles.sectionTitle}>पहचान सत्यापन</Text>
+        <Text style={styles.sectionTitle}>{tr('op_idTitle')}</Text>
         <Text style={styles.help}>
-          आधार संख्या दर्ज करें। सरकारी सत्यापन बाद में जोड़ा जाएगा।
+          {tr('op_idHelp')}
         </Text>
 
         <TextInput
@@ -256,12 +258,12 @@ export default function OfficerProfileScreen({ navigation, route }) {
           onChangeText={(t) => setGovIdNumber(t.replace(/\D/g, ''))}
           keyboardType="number-pad"
           maxLength={12}
-          placeholder="12 अंकों की आधार संख्या"
+          placeholder={tr('op_idPh')}
           placeholderTextColor="#999"
         />
 
         <PrimaryButton
-          title="पहचान सहेजें"
+          title={tr('op_saveId')}
           variant="outline"
           loading={savingId}
           onPress={saveGovId}

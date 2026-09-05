@@ -9,9 +9,11 @@ import Colors from '../../theme/colors';
 import { reportCentreDelay } from '../../services/bookings';
 import { getCurrentUserSession } from '../../services/auth';
 
+import { useLang } from '../../i18n/LanguageContext';
 export default function DelayReportScreen({ navigation }) {
+  const { tr, lang, trError } = useLang();
   const [minutes, setMinutes] = useState('20');
-  const [reason, setReason] = useState('वर्षा / तौल मशीन');
+  const [reason, setReason] = useState(tr('dl_reasonDefault'));
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -21,16 +23,18 @@ export default function DelayReportScreen({ navigation }) {
       const user = await getCurrentUserSession();
 
       if (!user?.centreId) {
-        throw new Error('पहले अपनी मंडी चुनें।');
+        Alert.alert(tr('error'), tr('dl_pickFirst'));
+        setBusy(false);
+        return;
       }
 
       await reportCentreDelay(user.centreId, minutes, reason);
 
-      Alert.alert('हो गया', `+${minutes} मिनट विलंब दर्ज`, [
+      Alert.alert(tr('done'), tr('dl_doneSub', { m: minutes }), [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'दर्ज नहीं हुआ।');
+      Alert.alert(tr('error'), trError(error, 'notRecorded'));
     } finally {
       setBusy(false);
     }
@@ -42,11 +46,11 @@ export default function DelayReportScreen({ navigation }) {
 
       <View style={styles.content}>
         <ScreenTitle
-          title="विलंब रिपोर्ट (एडमिन)"
-          subtitle="सभी शेष ETA अपने आप शिफ्ट होंगे"
+          title={tr('dl_title')}
+          subtitle={tr('dl_sub')}
         />
 
-        <Text style={styles.label}>अतिरिक्त मिनट</Text>
+        <Text style={styles.label}>{tr('dl_minutes')}</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
@@ -54,11 +58,11 @@ export default function DelayReportScreen({ navigation }) {
           onChangeText={setMinutes}
         />
 
-        <Text style={styles.label}>कारण</Text>
+        <Text style={styles.label}>{tr('dl_reason')}</Text>
         <TextInput style={styles.input} value={reason} onChangeText={setReason} />
 
         <PrimaryButton
-          title="विलंब प्रसारित करें"
+          title={tr('dl_submit')}
           variant="danger"
           loading={busy}
           style={{ marginTop: 20 }}

@@ -16,14 +16,14 @@ export default function CropSelectionScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack audioKey="audio_crop" />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenTitle title={tr('selectCrop') || 'फसल चुनें'} subtitle={tr('selectCropSub')} />
+        <ScreenTitle title={tr('selectCrop')} subtitle={tr('selectCropSub')} />
         {CROP_LIST.map((crop) => {
           const on = selected.id === crop.id;
           return (
             <TouchableOpacity key={crop.id} style={[styles.card, on && styles.cardOn]} onPress={() => setSelected(crop)}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.name, on && { color: Colors.primary }]}>{crop.name}</Text>
-                <Text style={styles.msp}>MSP ₹{crop.msp} / {crop.unit}</Text>
+                <Text style={[styles.name, on && { color: Colors.primary }]}>{tr(crop.nameKey)}</Text>
+                <Text style={styles.msp}>MSP ₹{crop.msp} {tr('perQuintal')}</Text>
               </View>
               {on ? <Ionicons name="checkmark-circle" size={22} color={Colors.primary} /> : null}
             </TouchableOpacity>
@@ -31,7 +31,7 @@ export default function CropSelectionScreen({ navigation }) {
         })}
       </ScrollView>
       <View style={styles.footer}>
-        <PrimaryButton title={tr('continue') || 'आगे बढ़ें'} onPress={() => navigation.navigate('CentreSelection', { crop: selected })} />
+        <PrimaryButton title={tr('continue')} onPress={() => navigation.navigate('CentreSelection', { crop: selected })} />
       </View>
     </SafeAreaView>
   );

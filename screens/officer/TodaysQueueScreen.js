@@ -29,20 +29,21 @@ import {
 
 import { getCurrentUserSession } from '../../services/auth';
 import { useLang } from '../../i18n/LanguageContext';
+import { cropLabel } from '../../services/centres';
 
 /*
  * Which screen the officer goes to next, based on where the
  * booking currently is in the pipeline.
  */
 const NEXT_STAGE = {
-  [STATUS.IN_GATE]: { route: 'Assay', label: 'गुणवत्ता जांच' },
-  [STATUS.ASSAY]: { route: 'Weighing', label: 'तौल करें' },
-  [STATUS.WEIGHING]: { route: 'MarkPaid', label: 'भुगतान' },
-  [STATUS.PAYMENT_PENDING]: { route: 'MarkPaid', label: 'भुगतान' },
+  [STATUS.IN_GATE]: { route: 'Assay', label: 'stg_assay_a' },
+  [STATUS.ASSAY]: { route: 'Weighing', label: 'stg_weighing_a' },
+  [STATUS.WEIGHING]: { route: 'MarkPaid', label: 'stg_payment_a' },
+  [STATUS.PAYMENT_PENDING]: { route: 'MarkPaid', label: 'stg_payment_a' },
 };
 
 export default function TodaysQueueScreen({ navigation }) {
-  const { tr } = useLang();
+  const { tr, lang, trError } = useLang();
 
   const [queue, setQueue] = useState([]);
   const [modal, setModal] = useState(false);
@@ -97,23 +98,23 @@ export default function TodaysQueueScreen({ navigation }) {
       await markGateEntry(selected.tokenId, vehicle);
       setModal(false);
     } catch (error) {
-      Alert.alert('त्रुटि', error?.message || 'गेट प्रवेश दर्ज नहीं हुआ।');
+      Alert.alert(tr('error'), trError(error, 'gs_entryFail'));
     } finally {
       setBusy(false);
     }
   };
 
   const noShow = (tokenId) => {
-    Alert.alert('अनुपस्थित?', 'क्या किसान नहीं आया?', [
-      { text: 'रद्द', style: 'cancel' },
+    Alert.alert(tr('noShowQ'), tr('noShowSub'), [
+      { text: tr('cancel'), style: 'cancel' },
       {
-        text: 'हाँ',
+        text: tr('yes'),
         style: 'destructive',
         onPress: async () => {
           try {
             await markNoShow(tokenId);
           } catch (error) {
-            Alert.alert('त्रुटि', error?.message || 'दर्ज नहीं हुआ।');
+            Alert.alert(tr('error'), trError(error, 'notRecorded'));
           }
         },
       },
@@ -132,22 +133,22 @@ export default function TodaysQueueScreen({ navigation }) {
         navigation={navigation}
         showBack
         audioKey="audio_officer_queue"
-        title={tr('gateQueue') || 'गेट कतार'}
+        title={tr('gateQueue')}
       />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.nowBar}>
-          <Text style={styles.nowLabel}>अभी अंदर</Text>
+          <Text style={styles.nowLabel}>{tr('tq_nowInside')}</Text>
           <Text style={styles.nowToken}>
             {nowServing ? nowServing.tokenNumber : '—'}
           </Text>
           <Text style={styles.nowCount}>
-            कतार में {active.length}
+            {tr('tq_inQueue', { n: active.length })}
           </Text>
         </View>
 
         {active.length === 0 ? (
-          <Text style={styles.empty}>कतार खाली है</Text>
+          <Text style={styles.empty}>{tr('tq_empty')}</Text>
         ) : (
           active.map((token) => (
             <View key={token.tokenId} style={styles.card}>
@@ -159,16 +160,16 @@ export default function TodaysQueueScreen({ navigation }) {
               <Text style={styles.name}>{token.farmerName}</Text>
 
               <Text style={styles.sub}>
-                {String(token.cropName || token.crop || '').toUpperCase()} •{' '}
-                {token.vehicleNumber || 'वाहन लंबित'}
+                {cropLabel(token, lang)} •{' '}
+                {token.vehicleNumber || tr('vehiclePending')}
               </Text>
 
               <Text style={styles.sub}>
-                समय: {token.slotWindow} • अनुमानित {token.estimatedTurnTime}
+                {tr('tq_timeLine', { slot: token.slotWindow, eta: token.estimatedTurnTime })}
               </Text>
 
               <Text style={styles.sub}>
-                अनुमानित मात्रा: {token.approxQuantityQuintals} क्विंटल
+                {tr('tq_qtyLine', { q: token.approxQuantityQuintals })}
               </Text>
 
               <View style={styles.actions}>
@@ -179,7 +180,7 @@ export default function TodaysQueueScreen({ navigation }) {
                       onPress={() => noShow(token.tokenId)}
                     >
                       <Text style={styles.outlineText}>
-                        {tr('markNoShow') || 'अनुपस्थित'}
+                        {tr('markNoShow')}
                       </Text>
                     </TouchableOpacity>
 
@@ -192,7 +193,7 @@ export default function TodaysQueueScreen({ navigation }) {
                         size={16}
                         color={Colors.white}
                       />
-                      <Text style={styles.primaryText}>गेट प्रवेश</Text>
+                      <Text style={styles.primaryText}>{tr('tq_gateEntry')}</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
@@ -204,7 +205,7 @@ export default function TodaysQueueScreen({ navigation }) {
                     }}
                   >
                     <Text style={styles.primaryText}>
-                      {NEXT_STAGE[token.status]?.label || 'आगे बढ़ें'}
+                      {NEXT_STAGE[token.status] ? tr(NEXT_STAGE[token.status].label) : tr('tq_proceed')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -218,11 +219,11 @@ export default function TodaysQueueScreen({ navigation }) {
         <View style={styles.overlay}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>
-              {tr('enterVehicle') || 'वाहन नंबर'}
+              {tr('vehicleNumber')}
             </Text>
 
             <Text style={styles.sheetSub}>
-              टोकन {selected?.tokenNumber} • {selected?.farmerName}
+              {tr('tokenAndName', { t: selected?.tokenNumber || '', n: selected?.farmerName || '' })}
             </Text>
 
             <TextInput
@@ -235,16 +236,16 @@ export default function TodaysQueueScreen({ navigation }) {
             />
 
             <Text style={styles.note}>
-              पुष्टि करते ही अगले किसान को हरा संकेत मिल जाएगा।
+              {tr('tq_useScan')}
             </Text>
 
             <View style={styles.sheetRow}>
               <TouchableOpacity onPress={() => setModal(false)}>
-                <Text style={styles.cancel}>{tr('cancel') || 'रद्द'}</Text>
+                <Text style={styles.cancel}>{tr('cancel')}</Text>
               </TouchableOpacity>
 
               <PrimaryButton
-                title={tr('confirmArrival') || 'पुष्टि'}
+                title={tr('confirm')}
                 loading={busy}
                 onPress={confirmGateEntry}
                 style={{ flex: 1, height: 44 }}
