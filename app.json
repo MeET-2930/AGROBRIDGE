@@ -23,11 +23,25 @@
       "versionCode": 2,
       "permissions": [
         "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "CAMERA",
         "READ_MEDIA_IMAGES"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2eb67fd5-2848-4522-b319-5fbb94f929b5"
+      }
+    },
+    "owner": "meetbindal_team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2eb67fd5-2848-4522-b319-5fbb94f929b5"
     }
   }
 }
