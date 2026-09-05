@@ -37,7 +37,7 @@ export default function RegisterScreen({ navigation, route }) {
   const [centresLoading, setCentresLoading] = useState(false);
 
   useEffect(() => {
-    if (role !== 'officer') return;
+    if (role !== 'officer' && role !== 'trader') return;
 
     let alive = true;
     setCentresLoading(true);
@@ -68,7 +68,9 @@ export default function RegisterScreen({ navigation, route }) {
     (role !== 'officer' ||
       (employeeId.trim().length > 0 && centreId.length > 0)) &&
     (role !== 'trader' ||
-      (licenseNumber.trim().length > 0 && businessName.trim().length > 0));
+      (licenseNumber.trim().length > 0 &&
+        businessName.trim().length > 0 &&
+        centreId.length > 0));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -215,6 +217,58 @@ export default function RegisterScreen({ navigation, route }) {
               placeholder="फर्म का नाम"
               placeholderTextColor="#999"
             />
+
+            <Text style={styles.label}>व्यापार की मंडी *</Text>
+            <Text style={styles.help}>
+              जिस मंडी में आपका लाइसेंस है वही चुनें। आपको उसी मंडी की
+              नीलामी दिखेंगी।
+            </Text>
+
+            {centresLoading ? (
+              <ActivityIndicator
+                color={Colors.primary}
+                style={{ marginVertical: 14 }}
+              />
+            ) : centres.length === 0 ? (
+              <Text style={styles.warn}>
+                कोई मंडी नहीं मिली। कृपया व्यवस्थापक से संपर्क करें।
+              </Text>
+            ) : (
+              centres.map((centre) => {
+                const on = centreId === centre.id;
+
+                return (
+                  <TouchableOpacity
+                    key={centre.id}
+                    style={[styles.centreCard, on && styles.centreCardOn]}
+                    onPress={() => pickCentre(centre)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.centreName,
+                          on && { color: Colors.primary },
+                        ]}
+                      >
+                        {centre.name}
+                      </Text>
+                      <Text style={styles.centreAddr} numberOfLines={1}>
+                        {centre.address}
+                      </Text>
+                    </View>
+
+                    {on ? (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={Colors.primary}
+                      />
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
           </>
         )}
 

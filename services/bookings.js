@@ -490,24 +490,47 @@ export function buildQueueView(booking, queue) {
   const myPosition = Number(booking?.positionAssigned) || 0;
   const status = booking?.status;
 
+  // Assay done: the FARMER must now choose MSP or auction.
+  if (status === STATUS.ASSAY) {
+    return {
+      level: 'action',
+      tokensAhead: 0,
+      nowServingToken: booking?.tokenNumber,
+      etaMinutes: 0,
+      headline: 'जांच पूरी — भाव तय करें',
+      detail: `ग्रेड ${booking?.grade || 'FAQ'} • MSP पर बेचें या नीलामी शुरू करें। टैप करें →`,
+    };
+  }
+
   // Farmer is already inside the mandi.
   if (INSIDE_STATUSES.includes(status)) {
+    const rate = booking?.ratePerQuintal;
+    const buyer =
+      booking?.priceMode === 'auction'
+        ? booking?.buyerName || 'व्यापारी'
+        : 'सरकारी खरीद (MSP)';
+
     return {
       level: 'inside',
       tokensAhead: 0,
       nowServingToken: queue?.nowServingToken || booking?.tokenNumber,
       etaMinutes: 0,
-      headline: 'आप मंडी के अंदर हैं',
+      headline:
+        status === STATUS.IN_GATE
+          ? 'आप मंडी के अंदर हैं'
+          : status === STATUS.PRICE_FIXED
+          ? `भाव तय: ₹${rate} / क्विंटल`
+          : status === STATUS.WEIGHING
+          ? 'तौल पूरा — भुगतान की प्रतीक्षा'
+          : 'भुगतान तैयार हो रहा है',
       detail:
         status === STATUS.IN_GATE
-          ? 'गेट प्रवेश हो गया है'
-          : status === STATUS.ASSAY
-          ? 'जांच पूरी — भाव तय करें (MSP / नीलामी)'
+          ? 'गुणवत्ता जांच की प्रतीक्षा करें'
           : status === STATUS.PRICE_FIXED
-          ? 'भाव तय — तौल की प्रतीक्षा'
+          ? `खरीदार: ${buyer} • अब तौल के लिए जाएँ`
           : status === STATUS.WEIGHING
-          ? 'तौल हो रहा है'
-          : 'भुगतान तैयार हो रहा है',
+          ? `${booking?.actualQuantity || ''} क्विंटल × ₹${rate}`
+          : 'कैशियर रसीद बना रहा है',
     };
   }
 
