@@ -44,6 +44,13 @@ const LEVELS = {
     text: '#1B5E20',
     icon: 'checkmark-circle-outline',
   },
+  action: {
+    bg: '#FFF7ED',
+    border: '#F59E0B',
+    dot: '#F59E0B',
+    text: '#9A3412',
+    icon: 'hand-right-outline',
+  },
   inside: {
     bg: '#E3F2FD',
     border: '#1565C0',
@@ -79,7 +86,8 @@ export default function QueueStatusCard({ view, token, onPress }) {
 
   const theme = LEVELS[view.level] || LEVELS.waiting;
   const eta = formatEta(view.etaMinutes);
-  const showNumbers = view.level !== 'inside' && view.level !== 'closed';
+  const showNumbers =
+    view.level !== 'inside' && view.level !== 'closed' && view.level !== 'action';
 
   const Wrapper = onPress ? TouchableOpacity : View;
 

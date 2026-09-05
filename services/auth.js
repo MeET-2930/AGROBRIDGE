@@ -161,6 +161,10 @@ export async function registerUser({
       throw new Error('लाइसेंस नंबर और फर्म नाम दर्ज करें।');
     }
 
+    if (role === 'trader' && !centreId?.trim()) {
+      throw new Error('कृपया वह मंडी चुनें जहाँ आप व्यापार करते हैं।');
+    }
+
     const newUser = {
       phone: normalizedPhone,
       role,
@@ -168,8 +172,10 @@ export async function registerUser({
 
       employeeId: role === 'officer' ? employeeId.trim() : null,
       officerDuty: role === 'officer' ? officerDuty : null,
-      centreId: role === 'officer' ? centreId : null,
-      centreName: role === 'officer' ? centreName : null,
+      // Officers are posted at a mandi; traders hold a licence for one.
+      centreId: role === 'officer' || role === 'trader' ? centreId || null : null,
+      centreName:
+        role === 'officer' || role === 'trader' ? centreName || null : null,
 
       govIdNumber: null,
       govIdType: null,
@@ -190,6 +196,17 @@ export async function registerUser({
     console.error('Registration Error:', error);
     throw error;
   }
+}
+
+/**
+ * Trader: change the mandi they trade at (also used by profile screen).
+ */
+export async function updateTraderCentre({ centreId, centreName }) {
+  if (!currentUserSession?.uid) throw new Error('कृपया दोबारा लॉग इन करें।');
+  if (!centreId) throw new Error('कृपया मंडी चुनें।');
+  const patch = { centreId, centreName: centreName || '' };
+  await updateDoc(doc(db, 'users', currentUserSession.uid), patch);
+  return saveSession({ ...currentUserSession, ...patch });
 }
 
 /**

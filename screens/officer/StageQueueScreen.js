@@ -183,6 +183,13 @@ export default function StageQueueScreen({ navigation, route }) {
                 </Text>
               ) : null}
 
+              {token.ratePerQuintal ? (
+                <Text style={[styles.meta, { color: '#16A34A' }]}>
+                  भाव ₹{token.ratePerQuintal}/क्विं. •{' '}
+                  {token.priceMode === 'auction' ? `नीलामी • ${token.buyerName}` : 'MSP'}
+                </Text>
+              ) : null}
+
               <View style={styles.actions}>
                 {stage.action === 'gate' ? (
                   <TouchableOpacity

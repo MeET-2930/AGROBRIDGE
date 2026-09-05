@@ -26,6 +26,18 @@ import {
   STATUS,
 } from '../../services/bookings';
 import { CROP_LIST } from '../../services/centres';
+import {
+  subscribeToAuction,
+  openAuction,
+  acceptHighestBid,
+  rejectAuction,
+  extendAuction,
+  closeAuctionIfDue,
+  isBiddingOpen,
+  secondsLeft,
+  formatCountdown,
+  AUCTION_STATUS,
+} from '../../services/auctions';
 import { downloadReceiptPdf, downloadGatePassPdf } from '../../services/receipt';
 import GatePassCard from '../../components/GatePassCard';
 
@@ -58,6 +70,27 @@ export default function TokenDetailScreen({ navigation, route }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadingPass, setDownloadingPass] = useState(false);
   const [fixing, setFixing] = useState(false);
+  const [auction, setAuction] = useState(null);
+  const [tick, setTick] = useState(0);
+  const [auctionBusy, setAuctionBusy] = useState(false);
+
+  // Live auction doc for this token + 1s ticker for the countdown.
+  useEffect(() => {
+    if (!tokenId) return undefined;
+    const unsub = subscribeToAuction(tokenId, setAuction);
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => {
+      unsub();
+      clearInterval(timer);
+    };
+  }, [tokenId]);
+
+  // When the timer hits zero, flip the lot to 'closed' once.
+  useEffect(() => {
+    if (auction?.status === AUCTION_STATUS.OPEN && secondsLeft(auction) === 0) {
+      closeAuctionIfDue(tokenId).catch(() => {});
+    }
+  }, [tick, auction?.status]);
 
   const unsubQueue = useRef(null);
 
@@ -163,6 +196,84 @@ export default function TokenDetailScreen({ navigation, route }) {
         },
       ]
     );
+  };
+
+  const startAuction = () => {
+    Alert.alert(
+      'नीलामी शुरू करें?',
+      `10 मिनट की लाइव बोली शुरू होगी। न्यूनतम भाव MSP ₹${msp} रहेगा। बाद में आप बोली स्वीकार या अस्वीकार कर सकते हैं।`,
+      [
+        { text: 'नहीं', style: 'cancel' },
+        {
+          text: 'हाँ, शुरू करें',
+          onPress: async () => {
+            setAuctionBusy(true);
+            try {
+              await openAuction({ ...token, tokenId });
+            } catch (error) {
+              Alert.alert('त्रुटि', error?.message || 'नीलामी शुरू नहीं हुई।');
+            } finally {
+              setAuctionBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const acceptBid = () => {
+    if (!auction?.highestBid) return;
+    Alert.alert(
+      'बोली स्वीकार करें?',
+      `${auction.highestBidderName} — ₹${auction.highestBid} / क्विंटल। इसके बाद तौल होगा।`,
+      [
+        { text: 'नहीं', style: 'cancel' },
+        {
+          text: 'स्वीकार',
+          onPress: async () => {
+            setAuctionBusy(true);
+            try {
+              const lot = await acceptHighestBid(tokenId, token.farmerId);
+              await fixPrice(tokenId, {
+                mode: 'auction',
+                ratePerQuintal: lot.highestBid,
+                buyerId: lot.highestBidderId,
+                buyerName: lot.highestBidderName,
+              });
+            } catch (error) {
+              Alert.alert('त्रुटि', error?.message || 'स्वीकार नहीं हुआ।');
+            } finally {
+              setAuctionBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const rejectBids = () => {
+    Alert.alert('बोली अस्वीकार?', 'आप फिर MSP पर बेच सकते हैं या दोबारा नीलामी कर सकते हैं।', [
+      { text: 'नहीं', style: 'cancel' },
+      {
+        text: 'अस्वीकार',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await rejectAuction(tokenId);
+          } catch (error) {
+            Alert.alert('त्रुटि', error?.message || 'असफल।');
+          }
+        },
+      },
+    ]);
+  };
+
+  const extend = async () => {
+    try {
+      await extendAuction(tokenId, 5);
+    } catch (error) {
+      Alert.alert('त्रुटि', error?.message || 'असफल।');
+    }
   };
 
   const handleGatePass = async () => {
@@ -320,14 +431,83 @@ export default function TokenDetailScreen({ navigation, route }) {
               />
             </View>
 
-            <View style={[styles.priceOption, { opacity: 0.55 }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.priceTitle}>व्यापारी नीलामी (e-Auction)</Text>
-                <Text style={styles.priceSub}>
-                  जल्द आ रहा है — व्यापारियों की लाइव बोली
-                </Text>
+            {/* ---- e-Auction ---- */}
+            {!auction || auction.status === AUCTION_STATUS.REJECTED ? (
+              <View style={styles.priceOption}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.priceTitle}>व्यापारी नीलामी (e-Auction)</Text>
+                  <Text style={styles.priceSub}>
+                    10 मिनट लाइव बोली • न्यूनतम भाव MSP ₹{msp}
+                  </Text>
+                  {auction?.status === AUCTION_STATUS.REJECTED ? (
+                    <Text style={[styles.priceSub, { color: Colors.error }]}>
+                      पिछली नीलामी अस्वीकार की गई
+                    </Text>
+                  ) : null}
+                </View>
+                <PrimaryButton
+                  title={auction ? 'दोबारा नीलामी' : 'नीलामी शुरू'}
+                  variant="outline"
+                  loading={auctionBusy}
+                  onPress={startAuction}
+                  style={{ height: 44, paddingHorizontal: 14 }}
+                />
               </View>
-            </View>
+            ) : (
+              <View style={[styles.priceOption, styles.auctionLive]}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.auctionHead}>
+                    <Text style={styles.priceTitle}>
+                      {isBiddingOpen(auction) ? '🔴 नीलामी चालू' : '⏹ नीलामी समाप्त'}
+                    </Text>
+                    <Text style={styles.countdown}>
+                      {formatCountdown(secondsLeft(auction))}
+                    </Text>
+                  </View>
+
+                  {auction.highestBid ? (
+                    <>
+                      <Text style={styles.priceBig}>₹{auction.highestBid} / क्विंटल</Text>
+                      <Text style={styles.priceSub}>
+                        सबसे ऊँची बोली: {auction.highestBidderName} • कुल {auction.bidCount} बोलियाँ
+                      </Text>
+                      {auction.highestBid > msp ? (
+                        <Text style={[styles.priceSub, { color: '#16A34A', fontWeight: '800' }]}>
+                          MSP से ₹{auction.highestBid - msp} अधिक
+                        </Text>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Text style={styles.priceSub}>अभी तक कोई बोली नहीं आई</Text>
+                  )}
+
+                  <View style={styles.auctionActions}>
+                    {auction.highestBid ? (
+                      <PrimaryButton
+                        title="बोली स्वीकार करें"
+                        loading={auctionBusy}
+                        onPress={acceptBid}
+                        style={{ flex: 1, height: 42 }}
+                      />
+                    ) : null}
+                    {!isBiddingOpen(auction) && !auction.highestBid ? (
+                      <PrimaryButton
+                        title="5 मिनट और"
+                        variant="outline"
+                        onPress={extend}
+                        style={{ height: 42, paddingHorizontal: 12 }}
+                      />
+                    ) : null}
+                    <PrimaryButton
+                      title="अस्वीकार"
+                      variant="outline"
+                      onPress={rejectBids}
+                      style={{ height: 42, paddingHorizontal: 12 }}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         ) : null}
 
@@ -514,6 +694,10 @@ const styles = StyleSheet.create({
   priceTitle: { fontWeight: '800', color: Colors.navy, fontSize: 13 },
   priceBig: { fontWeight: '900', color: '#16A34A', fontSize: 20 },
   priceSub: { color: Colors.subText, fontSize: 11 },
+  auctionLive: { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' },
+  auctionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  countdown: { fontSize: 18, fontWeight: '900', color: '#B45309', fontVariant: ['tabular-nums'] },
+  auctionActions: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   cardTitle: {
     fontSize: 14,
     fontWeight: '800',
