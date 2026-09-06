@@ -40,6 +40,7 @@ export default function OtpScreen({ navigation, route }) {
           centreName: p.centreName,
           licenseNumber: p.licenseNumber,
           businessName: p.businessName,
+          adminCode: p.adminCode,
         });
       } else {
         session = await loginWithPhone(p.phone, p.role);

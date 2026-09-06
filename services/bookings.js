@@ -39,6 +39,8 @@ import { db } from './firebase';
 import { fetchCentreById } from './centres';
 import { todayLocal, parseLocalDate } from './dates';
 import { tErr } from './i18nError';
+import { requireOfficerDuty, DUTY_FOR_STAGE } from './auth';
+import { notifyNextFarmer } from './ivr';
 
 /* ===============================================================
  * STATUS STATE MACHINE
@@ -654,6 +656,19 @@ export function buildQueueView(booking, queue) {
  * Counting these is correct no matter how many lanes the mandi runs
  * in parallel, and no matter what order the officers work in.
  */
+/**
+ * Role guard used by every officer action: the caller must be an
+ * officer posted at the token's mandi, holding one of `duties`
+ * (or admin). Throws a translated error otherwise.
+ */
+async function assertOfficerFor(tokenId, duties) {
+  if (!tokenId) throw new Error('Token ID is required');
+  const snap = await getDoc(doc(db, 'bookings', tokenId));
+  if (!snap.exists()) throw tErr('err.tokenNotFound');
+  await requireOfficerDuty(snap.data().centreId, duties);
+  return snap.data();
+}
+
 async function advanceStage(tokenId, patch, { entering = false } = {}) {
   if (!tokenId) throw new Error('Token ID is required');
 
@@ -730,6 +745,7 @@ export async function markGateEntry(
   vehicleNumber = '',
   verifiedBy = 'manual' // 'qr' | 'code' | 'manual'
 ) {
+  await assertOfficerFor(tokenId, DUTY_FOR_STAGE.gate);
   const patch = {
     status: STATUS.IN_GATE,
     gateEntryAt: new Date().toISOString(),
@@ -741,7 +757,10 @@ export async function markGateEntry(
     patch.vehicleNumber = String(vehicleNumber).toUpperCase().trim();
   }
 
-  return advanceStage(tokenId, patch, { entering: true });
+  const result = await advanceStage(tokenId, patch, { entering: true });
+  // A vehicle just went in -> phone the next farmer in the queue.
+  notifyNextFarmer(result.centreId, result.date);
+  return result;
 }
 
 /** Backward-compatible alias for the old screen code. */
@@ -754,6 +773,7 @@ export async function recordAssay(
   tokenId,
   { moisturePercent, foreignMatterPercent, grade, notes = '', rejected = false }
 ) {
+  await assertOfficerFor(tokenId, DUTY_FOR_STAGE.assay);
   const patch = {
     status: rejected ? STATUS.REJECTED : STATUS.ASSAY,
     assayAt: new Date().toISOString(),
@@ -811,6 +831,7 @@ export async function recordWeighing(
   tokenId,
   { grossWeightQuintals, tareWeightQuintals }
 ) {
+  await assertOfficerFor(tokenId, DUTY_FOR_STAGE.weighing);
   const gross = parseFloat(grossWeightQuintals) || 0;
   const tare = parseFloat(tareWeightQuintals) || 0;
   const net = Math.round((gross - tare) * 100) / 100;
@@ -851,6 +872,7 @@ export async function markPaid(
   { actualQuantity, ratePerQuintal, grade, paymentBasis, parchi, cashierName }
 ) {
   if (!tokenId) throw new Error('Token ID is required');
+  await assertOfficerFor(tokenId, DUTY_FOR_STAGE.payment);
 
   const bookingRef = doc(db, 'bookings', tokenId);
   const snapshot = await getDoc(bookingRef);
@@ -937,6 +959,7 @@ export async function markPaid(
  * Officer: farmer never turned up.
  */
 export async function markNoShow(tokenId) {
+  await assertOfficerFor(tokenId, DUTY_FOR_STAGE.gate);
   return advanceStage(tokenId, {
     status: STATUS.NO_SHOW,
     noShowAt: new Date().toISOString(),
@@ -1116,6 +1139,7 @@ export function subscribeToTodaysQueue(centreId, dateStr, callback) {
 
 export async function reportCentreDelay(centreId, delayMinutes, reason) {
   if (!centreId) throw new Error('Centre ID is required');
+  await requireOfficerDuty(centreId, DUTY_FOR_STAGE.delay); // admin only
 
   await setDoc(
     doc(db, 'delays', centreId),
@@ -1269,7 +1293,14 @@ DUTY_STAGES.admin = [
 ];
 
 export function getStagesForDuty(duty) {
-  return DUTY_STAGES[duty] || DUTY_STAGES.admin;
+  // Unknown / missing duty falls back to the LEAST powerful role.
+  return DUTY_STAGES[duty] || DUTY_STAGES.gate;
+}
+
+/** Duty that owns a given stage id (admin owns all). */
+export function dutyOwnsStage(duty, stageId) {
+  if (duty === 'admin') return true;
+  return (DUTY_STAGES[duty] || []).some((s) => s.id === stageId);
 }
 
 export function getStageById(stageId) {

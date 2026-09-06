@@ -13,3 +13,21 @@
  */
 
 export const ACTIVE_CENTRE_ID = 'centre_gurugram_01';
+
+/*
+ * MANDI_ADMIN_CODE
+ * Needed to register as "Mandi Admin" or to change an officer's duty
+ * after registration. A centre document may override it with its own
+ * `adminCode` field; otherwise this project-wide code is used.
+ * Change it before the final demo and tell only the mandi secretary.
+ */
+export const MANDI_ADMIN_CODE = 'AGB-ADMIN-2026';
+
+/*
+ * Phone service (IVR) - ivr/server.js hosted on Render.com.
+ * Leave IVR_BASE_URL empty to hide the "Call me" card and skip
+ * reminder calls. No trailing slash.
+ * After moving to Firebase Blaze this becomes the Cloud Function URL.
+ */
+export const IVR_BASE_URL = 'https://agrobridge-ivr.onrender.com';
+export const IVR_APP_KEY = 'agb-demo-2026';   // must equal APP_SHARED_KEY on the server

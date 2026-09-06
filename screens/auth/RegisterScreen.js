@@ -21,6 +21,7 @@ export default function RegisterScreen({ navigation, route }) {
   const [phone, setPhone] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [officerDuty, setOfficerDuty] = useState('gate');
+  const [adminCode, setAdminCode] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [businessName, setBusinessName] = useState('');
 
@@ -48,7 +49,9 @@ export default function RegisterScreen({ navigation, route }) {
   const canContinue =
     name.trim().length > 0 &&
     phone.length === 10 &&
-    (role !== 'officer' || (employeeId.trim().length > 0 && centreId.length > 0)) &&
+    (role !== 'officer' ||
+      (employeeId.trim().length > 0 && centreId.length > 0 &&
+        (officerDuty !== 'admin' || adminCode.trim().length > 0))) &&
     (role !== 'trader' ||
       (licenseNumber.trim().length > 0 && businessName.trim().length > 0 && centreId.length > 0));
 
@@ -124,6 +127,15 @@ export default function RegisterScreen({ navigation, route }) {
                 </TouchableOpacity>
               );
             })}
+
+            {officerDuty === 'admin' ? (
+              <>
+                <Text style={styles.label}>{tr('reg_adminCode')}</Text>
+                <Text style={styles.help}>{tr('reg_adminCodeHelp')}</Text>
+                <TextInput style={styles.input} value={adminCode} onChangeText={setAdminCode}
+                  placeholder="AGB-ADMIN-XXXX" placeholderTextColor="#999" autoCapitalize="characters" />
+              </>
+            ) : null}
           </>
         )}
 
@@ -149,7 +161,7 @@ export default function RegisterScreen({ navigation, route }) {
           onPress={() =>
             navigation.navigate('Otp', {
               role, phone, name, employeeId, officerDuty, centreId, centreName,
-              licenseNumber, businessName, isNewRegistration: true,
+              licenseNumber, businessName, adminCode, isNewRegistration: true,
             })
           }
         />

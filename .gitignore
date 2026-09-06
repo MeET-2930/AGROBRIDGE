@@ -26,3 +26,8 @@ repomix-output.xml
 i18n-snapshot.md
 firebase-debug.log
 firebase-debug.log
+functions-repomix.md
+ivr/.env
+ivr/node_modules/
+serviceAccount*.json
+*.b64

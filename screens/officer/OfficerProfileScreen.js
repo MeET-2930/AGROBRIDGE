@@ -51,6 +51,7 @@ export default function OfficerProfileScreen({ navigation, route }) {
   const [centreId, setCentreId] = useState('');
   const [centreName, setCentreName] = useState('');
   const [duty, setDuty] = useState('gate');
+  const [adminCode, setAdminCode] = useState('');
   const [savingPosting, setSavingPosting] = useState(false);
 
   const [govIdNumber, setGovIdNumber] = useState('');
@@ -96,7 +97,7 @@ export default function OfficerProfileScreen({ navigation, route }) {
     setSavingPosting(true);
 
     try {
-      await updateOfficerPosting({ centreId, centreName, officerDuty: duty });
+      await updateOfficerPosting({ centreId, centreName, officerDuty: duty, adminCode });
 
       Alert.alert(tr('saved'), tr('op_savedSub'), [
         { text: 'OK', onPress: () => navigation.goBack() },
@@ -238,6 +239,22 @@ export default function OfficerProfileScreen({ navigation, route }) {
             </TouchableOpacity>
           );
         })}
+
+        {(duty !== (session?.officerDuty || 'gate') ||
+          (session?.centreId && centreId !== session.centreId)) ? (
+          <>
+            <Text style={styles.sectionTitle}>{tr('op_adminCode')}</Text>
+            <Text style={styles.help}>{tr('op_adminCodeHelp')}</Text>
+            <TextInput
+              style={styles.input}
+              value={adminCode}
+              onChangeText={setAdminCode}
+              autoCapitalize="characters"
+              placeholder="AGB-ADMIN-XXXX"
+              placeholderTextColor="#999"
+            />
+          </>
+        ) : null}
 
         <PrimaryButton
           title={tr('op_savePosting')}

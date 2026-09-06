@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -23,6 +24,8 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
 import { cropLabel } from '../../services/centres';
+import { requestCallback, warmUpIvr } from '../../services/ivr';
+import { IVR_BASE_URL } from '../../services/config';
 
 import {
   fetchActiveFarmerBooking,
@@ -129,6 +132,25 @@ export default function FarmerDashboard({ navigation }) {
       index: 0,
       routes: [{ name: 'Auth' }],
     });
+  };
+
+  const callMe = () => {
+    if (!session?.phone) return;
+    warmUpIvr();
+    Alert.alert(tr('ivr_callMe'), tr('ivr_callMeSub', { phone: session.phone }), [
+      { text: tr('cancel'), style: 'cancel' },
+      {
+        text: tr('ivr_callNow'),
+        onPress: async () => {
+          try {
+            await requestCallback(session.phone, lang);
+            Alert.alert(tr('ivr_calling'), tr('ivr_callingSub'));
+          } catch (e) {
+            Alert.alert(tr('error'), tr('ivr_callFail'));
+          }
+        },
+      },
+    ]);
   };
 
   const queueView = booking ? buildQueueView(booking, queue) : null;
@@ -267,6 +289,14 @@ export default function FarmerDashboard({ navigation }) {
             icon="help-circle-outline"
             onPress={() => navigation.navigate('Help', { role: 'farmer' })}
           />
+
+          {IVR_BASE_URL ? (
+            <DashboardCard
+              title={tr('ivr_callMe')}
+              icon="call-outline"
+              onPress={callMe}
+            />
+          ) : null}
         </View>
       </ScrollView>
 

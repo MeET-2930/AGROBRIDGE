@@ -8,6 +8,47 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { tErr } from './i18nError';
+import { MANDI_ADMIN_CODE } from './config';
+
+/* Which duties may act on which pipeline stage. Admin may do all. */
+export const DUTY_FOR_STAGE = {
+  gate: ['gate'],
+  assay: ['assay'],
+  weighing: ['weighbridge'],
+  payment: ['accounts'],
+  delay: [],            // admin only
+};
+
+/** Check a mandi-admin code against the centre's own code or the project code. */
+export async function verifyAdminCode(centreId, code) {
+  const typed = String(code || '').trim().toUpperCase();
+  if (!typed) return false;
+  let expected = MANDI_ADMIN_CODE;
+  try {
+    if (centreId) {
+      const snap = await getDoc(doc(db, 'centres', centreId));
+      if (snap.exists() && snap.data().adminCode) expected = snap.data().adminCode;
+    }
+  } catch (e) {
+    // fall back to project-wide code
+  }
+  return typed === String(expected).trim().toUpperCase();
+}
+
+/**
+ * Throw unless the logged-in user is an officer of `centreId` whose duty
+ * is one of `duties` (or admin). Called by every stage action in
+ * bookings.js so the rule cannot be bypassed from a screen.
+ */
+export async function requireOfficerDuty(centreId, duties = []) {
+  const s = currentUserSession;
+  if (!s?.uid || s.role !== 'officer') throw tErr('loginAgain');
+  if (centreId && s.centreId && s.centreId !== centreId) throw tErr('err.notYourMandi');
+  const duty = s.officerDuty || 'gate';
+  if (duty === 'admin') return s;
+  if (!duties.includes(duty)) throw tErr('err.notYourDuty');
+  return s;
+}
 
 const SESSION_KEY = '@agrobridge_user_session';
 
@@ -128,11 +169,12 @@ export async function registerUser({
   name,
   phone,
   employeeId = '',
-  officerDuty = 'admin',
+  officerDuty = 'gate',
   centreId = '',
   centreName = '',
   licenseNumber = '',
   businessName = '',
+  adminCode = '',
 }) {
   try {
     const normalizedPhone = normalizePhone(phone);
@@ -159,6 +201,11 @@ export async function registerUser({
 
       if (!centreId?.trim()) {
         throw tErr('err.pickMandi');
+      }
+
+      // Admin is a protected duty: needs the mandi admin code.
+      if (officerDuty === 'admin' && !(await verifyAdminCode(centreId, adminCode))) {
+        throw tErr('err.badAdminCode');
       }
     }
 
@@ -222,6 +269,7 @@ export async function updateOfficerPosting({
   centreId,
   centreName,
   officerDuty,
+  adminCode = '',
 }) {
   if (!currentUserSession?.uid) {
     throw tErr('loginAgain');
@@ -232,6 +280,19 @@ export async function updateOfficerPosting({
   }
 
   const patch = { centreId, centreName: centreName || '' };
+
+  // Duty is locked after registration. Changing it (or moving to
+  // another mandi) needs the mandi admin code - otherwise any officer
+  // could promote themselves to admin.
+  const currentDuty = currentUserSession.officerDuty || 'gate';
+  const dutyChanged = officerDuty && officerDuty !== currentDuty;
+  const mandiChanged = !!currentUserSession.centreId && currentUserSession.centreId !== centreId;
+
+  if (dutyChanged || mandiChanged) {
+    if (!(await verifyAdminCode(centreId, adminCode))) {
+      throw tErr('err.badAdminCode');
+    }
+  }
 
   if (officerDuty) patch.officerDuty = officerDuty;
 

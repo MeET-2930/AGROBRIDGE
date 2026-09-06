@@ -23,6 +23,7 @@ import {
   subscribeToTodaysQueue,
   markGateEntry,
   markNoShow,
+  dutyOwnsStage,
   STATUS,
   CLOSED_STATUSES,
 } from '../../services/bookings';
@@ -36,16 +37,18 @@ import { cropLabel } from '../../services/centres';
  * booking currently is in the pipeline.
  */
 const NEXT_STAGE = {
-  [STATUS.IN_GATE]: { route: 'Assay', label: 'stg_assay_a' },
-  [STATUS.ASSAY]: { route: 'Weighing', label: 'stg_weighing_a' },
-  [STATUS.WEIGHING]: { route: 'MarkPaid', label: 'stg_payment_a' },
-  [STATUS.PAYMENT_PENDING]: { route: 'MarkPaid', label: 'stg_payment_a' },
+  [STATUS.IN_GATE]: { route: 'Assay', label: 'stg_assay_a', stage: 'assay', duty: 'duty_assay' },
+  [STATUS.ASSAY]: { route: 'Weighing', label: 'stg_weighing_a', stage: 'weighing', duty: 'duty_weighbridge' },
+  [STATUS.PRICE_FIXED]: { route: 'Weighing', label: 'stg_weighing_a', stage: 'weighing', duty: 'duty_weighbridge' },
+  [STATUS.WEIGHING]: { route: 'MarkPaid', label: 'stg_payment_a', stage: 'payment', duty: 'duty_accounts' },
+  [STATUS.PAYMENT_PENDING]: { route: 'MarkPaid', label: 'stg_payment_a', stage: 'payment', duty: 'duty_accounts' },
 };
 
 export default function TodaysQueueScreen({ navigation }) {
   const { tr, lang, trError } = useLang();
 
   const [queue, setQueue] = useState([]);
+  const [duty, setDuty] = useState('gate');
   const [modal, setModal] = useState(false);
   const [selected, setSelected] = useState(null);
   const [vehicle, setVehicle] = useState('');
@@ -63,6 +66,7 @@ export default function TodaysQueueScreen({ navigation }) {
 
       const start = async () => {
         const user = await getCurrentUserSession();
+        if (alive) setDuty(user?.officerDuty || 'gate');
 
         if (!user?.centreId) {
           if (alive) setQueue([]);
@@ -174,41 +178,51 @@ export default function TodaysQueueScreen({ navigation }) {
 
               <View style={styles.actions}>
                 {token.status === STATUS.BOOKED ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.outline}
-                      onPress={() => noShow(token.tokenId)}
-                    >
-                      <Text style={styles.outlineText}>
-                        {tr('markNoShow')}
-                      </Text>
-                    </TouchableOpacity>
+                  dutyOwnsStage(duty, 'gate') ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.outline}
+                        onPress={() => noShow(token.tokenId)}
+                      >
+                        <Text style={styles.outlineText}>
+                          {tr('markNoShow')}
+                        </Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.primary}
-                      onPress={() => openGateEntry(token)}
-                    >
-                      <Ionicons
-                        name="enter-outline"
-                        size={16}
-                        color={Colors.white}
-                      />
-                      <Text style={styles.primaryText}>{tr('tq_gateEntry')}</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
+                      <TouchableOpacity
+                        style={styles.primary}
+                        onPress={() => openGateEntry(token)}
+                      >
+                        <Ionicons
+                          name="enter-outline"
+                          size={16}
+                          color={Colors.white}
+                        />
+                        <Text style={styles.primaryText}>{tr('tq_gateEntry')}</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <Text style={styles.viewOnly}>
+                      {tr('tq_handledBy', { who: tr('duty_gate') })}
+                    </Text>
+                  )
+                ) : NEXT_STAGE[token.status] &&
+                  dutyOwnsStage(duty, NEXT_STAGE[token.status].stage) ? (
                   <TouchableOpacity
                     style={styles.secondary}
-                    onPress={() => {
-                      const next = NEXT_STAGE[token.status];
-                      if (next) navigation.navigate(next.route, { token });
-                    }}
+                    onPress={() =>
+                      navigation.navigate(NEXT_STAGE[token.status].route, { token })
+                    }
                   >
                     <Text style={styles.primaryText}>
-                      {NEXT_STAGE[token.status] ? tr(NEXT_STAGE[token.status].label) : tr('tq_proceed')}
+                      {tr(NEXT_STAGE[token.status].label)}
                     </Text>
                   </TouchableOpacity>
-                )}
+                ) : NEXT_STAGE[token.status] ? (
+                  <Text style={styles.viewOnly}>
+                    {tr('tq_handledBy', { who: tr(NEXT_STAGE[token.status].duty) })}
+                  </Text>
+                ) : null}
               </View>
             </View>
           ))
@@ -259,6 +273,7 @@ export default function TodaysQueueScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  viewOnly: { color: Colors.subText, fontSize: 12, fontStyle: 'italic', paddingVertical: 8 },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, paddingBottom: 30 },
 

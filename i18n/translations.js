@@ -715,6 +715,22 @@ export const t = {
   pdf_slot: r('स्लॉट', 'Slot', 'ਸਲਾਟ', 'स्लॉट'),
   centreLabel_gate: r('गेट पर', 'At the gate', 'ਗੇਟ ਤੇ', 'गेटवर'),
 
+  // ---- install16: phone service (IVR)
+  ivr_callMe: r('फ़ोन पर बुक करें', 'Book by phone call', 'ਫ਼ੋਨ ਤੇ ਬੁੱਕ ਕਰੋ', 'फोनवर बुक करा'),
+  ivr_callMeSub: r('हम +91 {phone} पर कॉल करेंगे। फ़ोन उठाकर बटन दबाकर स्लॉट बुक करें या टोकन की स्थिति सुनें।', 'We will call +91 {phone}. Answer and press keys to book a slot or hear your token status.', 'ਅਸੀਂ +91 {phone} ਤੇ ਕਾਲ ਕਰਾਂਗੇ। ਫ਼ੋਨ ਚੁੱਕ ਕੇ ਬਟਨ ਦਬਾ ਕੇ ਸਲਾਟ ਬੁੱਕ ਕਰੋ।', 'आम्ही +91 {phone} वर कॉल करू. फोन उचलून बटण दाबून स्लॉट बुक करा.'),
+  ivr_callNow: r('कॉल करें', 'Call me', 'ਕਾਲ ਕਰੋ', 'कॉल करा'),
+  ivr_calling: r('कॉल आ रही है', 'Calling you', 'ਕਾਲ ਆ ਰਹੀ ਹੈ', 'कॉल येत आहे'),
+  ivr_callingSub: r('कुछ सेकंड में आपका फ़ोन बजेगा।', 'Your phone will ring in a few seconds.', 'ਕੁਝ ਸਕਿੰਟਾਂ ਵਿੱਚ ਤੁਹਾਡਾ ਫ਼ੋਨ ਵੱਜੇਗਾ।', 'काही सेकंदांत तुमचा फोन वाजेल.'),
+  ivr_callFail: r('अभी कॉल नहीं हो सकी। कृपया थोड़ी देर बाद प्रयास करें।', 'Could not place the call right now. Please try again shortly.', 'ਹੁਣ ਕਾਲ ਨਹੀਂ ਹੋ ਸਕੀ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਕੋਸ਼ਿਸ਼ ਕਰੋ।', 'आत्ता कॉल होऊ शकला नाही. थोड्या वेळाने प्रयत्न करा.'),
+  // ---- install15: officer duty lock
+  'err.notYourDuty': r('यह काम आपकी ड्यूटी का नहीं है। संबंधित अधिकारी से कहें।', 'This step is not your duty. Ask the officer in charge of it.', 'ਇਹ ਕੰਮ ਤੁਹਾਡੀ ਡਿਊਟੀ ਦਾ ਨਹੀਂ। ਸਬੰਧਤ ਅਧਿਕਾਰੀ ਨੂੰ ਕਹੋ।', 'हे काम तुमच्या कर्तव्यात नाही. संबंधित अधिकाऱ्याला सांगा.'),
+  'err.notYourMandi': r('यह टोकन आपकी मंडी का नहीं है।', 'This token belongs to a different mandi.', 'ਇਹ ਟੋਕਨ ਤੁਹਾਡੀ ਮੰਡੀ ਦਾ ਨਹੀਂ।', 'हा टोकन तुमच्या मंडीचा नाही.'),
+  'err.badAdminCode': r('मंडी प्रशासक कोड गलत है।', 'Mandi admin code is incorrect.', 'ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਕ ਕੋਡ ਗਲਤ ਹੈ।', 'मंडी प्रशासक कोड चुकीचा आहे.'),
+  reg_adminCode: r('मंडी प्रशासक कोड *', 'Mandi admin code *', 'ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਕ ਕੋਡ *', 'मंडी प्रशासक कोड *'),
+  reg_adminCodeHelp: r('प्रशासक बनने के लिए मंडी सचिव से मिला कोड डालें।', 'Enter the code given by the mandi secretary to register as admin.', 'ਪ੍ਰਸ਼ਾਸਕ ਬਣਨ ਲਈ ਮੰਡੀ ਸਕੱਤਰ ਵੱਲੋਂ ਦਿੱਤਾ ਕੋਡ ਪਾਓ।', 'प्रशासक होण्यासाठी मंडी सचिवांकडून मिळालेला कोड टाका.'),
+  op_adminCode: r('मंडी प्रशासक कोड', 'Mandi admin code', 'ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਕ ਕੋਡ', 'मंडी प्रशासक कोड'),
+  op_adminCodeHelp: r('ड्यूटी या मंडी बदलने के लिए प्रशासक कोड ज़रूरी है।', 'Changing duty or mandi requires the admin code.', 'ਡਿਊਟੀ ਜਾਂ ਮੰਡੀ ਬਦਲਣ ਲਈ ਪ੍ਰਸ਼ਾਸਕ ਕੋਡ ਜ਼ਰੂਰੀ ਹੈ।', 'कर्तव्य किंवा मंडी बदलण्यासाठी प्रशासक कोड आवश्यक आहे.'),
+  tq_handledBy: r('{who} द्वारा किया जाएगा', 'Handled by {who}', '{who} ਵੱਲੋਂ ਕੀਤਾ ਜਾਵੇਗਾ', '{who} करतील'),
   /* ------------------------------------------------------------ */
   /* Voice guidance                                                */
   /* ------------------------------------------------------------ */

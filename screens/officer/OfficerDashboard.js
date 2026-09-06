@@ -39,7 +39,7 @@ export default function OfficerDashboard({ navigation }) {
 
   const unsub = useRef(null);
 
-  const duty = session?.officerDuty || 'admin';
+  const duty = session?.officerDuty || 'gate';
   const isAdmin = duty === 'admin';
   const stages = getStagesForDuty(duty);
 
