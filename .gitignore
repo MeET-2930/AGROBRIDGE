@@ -31,3 +31,5 @@ ivr/.env
 ivr/node_modules/
 serviceAccount*.json
 *.b64
+ivr/*service*account*.json
+backup-before-install17/

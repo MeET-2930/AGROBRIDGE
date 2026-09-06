@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroBridge – Phone Simulator</title>
+<style>
+  :root{--saffron:#FF9933;--green:#138808;--ink:#1b1b1b;--muted:#6b7280;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:var(--ink);
+       display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .strip{height:5px;width:100%}
+  .top{background:var(--saffron)} .bottom{background:var(--green);margin-top:auto}
+  h1{font-size:18px;font-weight:600;margin:18px 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px;text-align:center;max-width:360px}
+  .phone{width:340px;background:#111;border-radius:36px;padding:14px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .screen{background:#fff;border-radius:26px;min-height:560px;padding:18px 16px;display:flex;flex-direction:column}
+  .status{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+  .caller{margin:14px 0 6px;font-size:20px;font-weight:600;text-align:center}
+  .state{font-size:13px;color:var(--muted);text-align:center;min-height:18px}
+  .log{flex:1;overflow:auto;margin:12px 0;padding:10px;background:#f9fafb;border-radius:12px;font-size:14px;line-height:1.45}
+  .log .say{margin:0 0 8px;padding:8px 10px;background:#e8f5e9;border-radius:10px;border-left:3px solid var(--green)}
+  .log .you{margin:0 0 8px;padding:6px 10px;background:#fff3e0;border-radius:10px;border-left:3px solid var(--saffron);text-align:right}
+  .log .sys{color:var(--muted);font-size:12px;text-align:center;margin:6px 0}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .pad button{height:48px;font-size:20px;border:0;border-radius:12px;background:#f3f4f6;cursor:pointer}
+  .pad button:active{background:#e5e7eb}
+  .row{display:flex;gap:8px;margin-top:10px}
+  .btn{flex:1;height:46px;border:0;border-radius:14px;font-size:15px;font-weight:600;color:#fff;cursor:pointer}
+  .call{background:var(--green)} .end{background:#dc2626} .grey{background:#9ca3af}
+  input{width:100%;height:44px;border:1px solid #d1d5db;border-radius:12px;padding:0 12px;font-size:16px}
+  label{font-size:12px;color:var(--muted)}
+  .hidden{display:none !important}
+  .incall{display:flex;flex-direction:column;flex:1}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:#eef2ff;color:#3730a3}
+</style>
+</head>
+<body>
+<div class="strip top"></div>
+<h1>AgroBridge phone simulator</h1>
+<p class="sub">Same IVR code a real phone number would run. Use it on a laptop or a second phone: dial in, or receive the calls the app makes.</p>
+
+<div class="phone"><div class="screen">
+  <div class="status"><span id="clock">--:--</span><span class="pill" id="mode">idle</span></div>
+
+  <!-- HOME -->
+  <div id="home">
+    <div class="caller">📞</div>
+    <label>My mobile number (10 digits – this is the farmer)</label>
+    <input id="phone" inputmode="numeric" maxlength="10" placeholder="98xxxxxxxx">
+    <div class="row">
+      <button class="btn call" id="dial">Give missed call to AgroBridge</button>
+    </div>
+    <div class="row">
+      <button class="btn grey" id="direct">Call and talk (paid mode)</button>
+    </div>
+    <p class="state" id="homeState" style="margin-top:14px">Waiting for incoming calls…</p>
+  </div>
+
+  <!-- INCOMING -->
+  <div id="incoming" class="hidden">
+    <div class="caller">AgroBridge</div>
+    <div class="state">incoming call…</div>
+    <div class="row" style="margin-top:220px">
+      <button class="btn end" id="decline">Decline</button>
+      <button class="btn call" id="answer">Answer</button>
+    </div>
+  </div>
+
+  <!-- IN CALL -->
+  <div id="incall" class="hidden incall">
+    <div class="caller">AgroBridge</div>
+    <div class="state" id="callState">connected</div>
+    <div class="log" id="log"></div>
+    <div id="speechBox" class="hidden">
+      <input id="speech" placeholder="Say your name (type it here)">
+      <div class="row"><button class="btn call" id="speak">Speak</button></div>
+    </div>
+    <div class="pad" id="pad"></div>
+    <div class="row"><button class="btn end" id="hang">End call</button></div>
+  </div>
+</div></div>
+<div class="strip bottom"></div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const phoneEl=$('phone'); phoneEl.value=localStorage.getItem('agb_sim_phone')||'';
+  phoneEl.oninput=()=>localStorage.setItem('agb_sim_phone',phoneEl.value.replace(/\D/g,''));
+  setInterval(()=>{$('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});},1000);
+
+  let call=null;                 // {sid, direction, gather:{action,digits,numDigits,finishOnKey}, buffer}
+  let pendingRing=null;
+  const show=(id)=>{['home','incoming','incall'].forEach(x=>$(x).classList.toggle('hidden',x!==id));};
+  const setMode=(t)=>$('mode').textContent=t;
+  const myPhone=()=>phoneEl.value.replace(/\D/g,'');
+  const e164=()=>'+91'+myPhone();
+
+  // ---------- speech ----------
+  function speak(text, langTag){
+    return new Promise(res=>{
+      if(!('speechSynthesis' in window)) return res();
+      const u=new SpeechSynthesisUtterance(text); u.lang=langTag||'en-IN'; u.rate=0.95;
+      const vs=speechSynthesis.getVoices();
+      const v=vs.find(v=>v.lang.replace('_','-')===u.lang)||vs.find(v=>v.lang.startsWith(u.lang.slice(0,2)));
+      if(v) u.voice=v;
+      u.onend=res; u.onerror=res; speechSynthesis.speak(u);
+    });
+  }
+  function log(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;$('log').appendChild(d);$('log').scrollTop=1e9;}
+
+  // ---------- talking to the server ----------
+  function localise(url){            // action URLs are absolute (BASE_URL); use same origin as this page
+    try{const u=new URL(url, location.href); return u.pathname+u.search;}catch(e){return url;}
+  }
+  async function post(url, fields){
+    const body=new URLSearchParams(Object.assign({
+      CallSid:call.sid, Direction:call.direction,
+      From: call.direction==='inbound'? e164() : '+10000000000',
+      To:   call.direction==='inbound'? '+10000000000' : e164(),
+    },fields||{}));
+    const r=await fetch(localise(url),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+    return r.text();
+  }
+
+  async function run(xmlText){
+    if(!call) return;
+    const doc=new DOMParser().parseFromString(xmlText,'text/xml');
+    const root=doc.documentElement;
+    if(!root||root.nodeName!=='Response'){log('sys','bad response'); return end();}
+    call.gather=null; renderPad();
+    for(const node of Array.from(root.children)){
+      if(!call) return;
+      const tag=node.nodeName;
+      if(tag==='Say'){ log('say',node.textContent); await speak(node.textContent,node.getAttribute('language')); }
+      else if(tag==='Gather'){
+        const inputType=node.getAttribute('input')||'dtmf';
+        for(const k of Array.from(node.children)){ if(k.nodeName==='Say'){log('say',k.textContent); await speak(k.textContent,k.getAttribute('language'));} }
+        if(!call) return;
+        call.gather={action:node.getAttribute('action'),type:inputType,
+                     numDigits:Number(node.getAttribute('numDigits')||1),finishOnKey:node.getAttribute('finishOnKey')||''};
+        call.buffer='';
+        $('callState').textContent= inputType==='speech'?'listening…':'press a key…';
+        renderPad();
+        return;                                            // wait for the user
+      }
+      else if(tag==='Redirect'){ return run(await post(node.textContent)); }
+      else if(tag==='Reject'||tag==='Hangup'){ log('sys','call cut by AgroBridge (free for you)'); return end(true); }
+    }
+    log('sys','call ended'); end();
+  }
+
+  // ---------- keypad ----------
+  function renderPad(){
+    const pad=$('pad'); pad.innerHTML='';
+    const g=call&&call.gather;
+    $('speechBox').classList.toggle('hidden',!(g&&g.type==='speech'));
+    if(!g||g.type!=='dtmf') return;
+    '123456789*0#'.split('').forEach(k=>{
+      const b=document.createElement('button'); b.textContent=k; b.onclick=()=>press(k); pad.appendChild(b);
+    });
+  }
+  async function press(k){
+    const g=call&&call.gather; if(!g) return;
+    if(g.finishOnKey && k===g.finishOnKey){ return submitDigits(); }
+    call.buffer+=k;
+    if(!g.finishOnKey && call.buffer.length>=g.numDigits) return submitDigits();
+    $('callState').textContent='entered: '+call.buffer;
+  }
+  async function submitDigits(){
+    const g=call.gather; const digits=call.buffer; call.gather=null; renderPad();
+    log('you','pressed '+digits); $('callState').textContent='…';
+    run(await post(g.action,{Digits:digits}));
+  }
+  $('speak').onclick=async()=>{
+    const g=call&&call.gather; if(!g) return;
+    const text=$('speech').value.trim(); if(!text) return;
+    call.gather=null; renderPad(); log('you','said "'+text+'"'); $('speech').value='';
+    run(await post(g.action,{SpeechResult:text,Confidence:'0.9'}));
+  };
+
+  // ---------- call lifecycle ----------
+  function start(direction, url){
+    call={sid:'sim-'+Date.now(),direction,gather:null,buffer:''};
+    $('log').innerHTML=''; show('incall'); setMode(direction); $('callState').textContent='connected';
+    speechSynthesis.cancel();
+    post(url).then(run).catch(e=>{log('sys','network error: '+e.message);end();});
+  }
+  function end(silent){
+    speechSynthesis.cancel(); call=null; show('home'); setMode('idle');
+    if(!silent) $('homeState').textContent='Waiting for incoming calls…';
+  }
+  $('hang').onclick=()=>{log('sys','you hung up');end();};
+
+  $('dial').onclick=()=>{
+    if(myPhone().length!==10) return alert('Enter your 10-digit mobile number first.');
+    start('inbound','/voice?step=missedcall');
+    $('homeState').textContent='AgroBridge cut the call – it will ring you back in a few seconds…';
+  };
+  $('direct').onclick=()=>{
+    if(myPhone().length!==10) return alert('Enter your 10-digit mobile number first.');
+    start('inbound','/voice?step=language');
+  };
+
+  // incoming calls: poll the server (this is what the telecom network does for a real phone)
+  async function poll(){
+    if(!call && !pendingRing && myPhone().length===10){
+      try{
+        const r=await fetch('/sim/pending?phone='+myPhone()); const j=await r.json();
+        if(j&&j.url){ pendingRing=j; show('incoming'); setMode('ringing'); ring(); }
+      }catch(e){}
+    }
+    setTimeout(poll,2000);
+  }
+  let ringTimer=null;
+  function ring(){ try{ speak('', 'en-IN'); }catch(e){} ringTimer=setInterval(()=>navigator.vibrate&&navigator.vibrate(200),1500); }
+  $('answer').onclick=()=>{ clearInterval(ringTimer); const p=pendingRing; pendingRing=null; start('outbound-api',p.url); };
+  $('decline').onclick=()=>{ clearInterval(ringTimer); pendingRing=null; show('home'); setMode('idle'); };
+  poll();
+  if('speechSynthesis' in window) speechSynthesis.getVoices();
+})();
+</script>
+</body>
+</html>

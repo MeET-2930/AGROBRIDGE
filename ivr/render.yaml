@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: agrobridge-ivr
+    runtime: node
+    rootDir: ivr
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: BASE_URL
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_B64
+        sync: false
+      - key: PROVIDER
+        value: sim
+      - key: APP_SHARED_KEY
+        sync: false
