@@ -715,7 +715,7 @@ export const t = {
   pdf_slot: r('स्लॉट', 'Slot', 'ਸਲਾਟ', 'स्लॉट'),
   centreLabel_gate: r('गेट पर', 'At the gate', 'ਗੇਟ ਤੇ', 'गेटवर'),
 
-  // ---- install17: phone service (IVR)
+  // ---- install18: phone service (IVR)
   ivr_callMe: r('फ़ोन पर बुक करें', 'Book by phone call', 'ਫ਼ੋਨ ਤੇ ਬੁੱਕ ਕਰੋ', 'फोनवर बुक करा'),
   ivr_callMeSub: r('हम +91 {phone} पर कॉल करेंगे। फ़ोन उठाकर बटन दबाकर स्लॉट बुक करें या टोकन की स्थिति सुनें।', 'We will call +91 {phone}. Answer and press keys to book a slot or hear your token status.', 'ਅਸੀਂ +91 {phone} ਤੇ ਕਾਲ ਕਰਾਂਗੇ। ਫ਼ੋਨ ਚੁੱਕ ਕੇ ਬਟਨ ਦਬਾ ਕੇ ਸਲਾਟ ਬੁੱਕ ਕਰੋ।', 'आम्ही +91 {phone} वर कॉल करू. फोन उचलून बटण दाबून स्लॉट बुक करा.'),
   ivr_callNow: r('कॉल करें', 'Call me', 'ਕਾਲ ਕਰੋ', 'कॉल करा'),

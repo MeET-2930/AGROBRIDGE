@@ -55,6 +55,7 @@
       <button class="btn grey" id="direct">Call and talk (paid mode)</button>
     </div>
     <p class="state" id="homeState" style="margin-top:14px">Waiting for incoming calls…</p>
+    <p class="state"><label><input type="checkbox" id="mute"> Text only (no voice)</label></p>
   </div>
 
   <!-- INCOMING -->
@@ -97,14 +98,21 @@
   const e164=()=>'+91'+myPhone();
 
   // ---------- speech ----------
+  // Browser text-to-speech. Firefox/Chrome sometimes never fire "onend"
+  // (esp. Hindi) - so we also stop waiting after a time based on text length.
   function speak(text, langTag){
     return new Promise(res=>{
-      if(!('speechSynthesis' in window)) return res();
-      const u=new SpeechSynthesisUtterance(text); u.lang=langTag||'en-IN'; u.rate=0.95;
-      const vs=speechSynthesis.getVoices();
-      const v=vs.find(v=>v.lang.replace('_','-')===u.lang)||vs.find(v=>v.lang.startsWith(u.lang.slice(0,2)));
-      if(v) u.voice=v;
-      u.onend=res; u.onerror=res; speechSynthesis.speak(u);
+      let done=false; const finish=()=>{ if(!done){done=true;res();} };
+      const maxMs=$('mute').checked ? 50 : Math.min(12000, 1500+text.length*70);
+      setTimeout(finish, maxMs);
+      try{
+        if($('mute').checked || !('speechSynthesis' in window)) return finish();
+        const u=new SpeechSynthesisUtterance(text); u.lang=langTag||'en-IN'; u.rate=0.95;
+        const vs=speechSynthesis.getVoices();
+        const v=vs.find(v=>v.lang.replace('_','-')===u.lang)||vs.find(v=>v.lang.startsWith(u.lang.slice(0,2)));
+        if(v) u.voice=v;
+        u.onend=finish; u.onerror=finish; speechSynthesis.speak(u);
+      }catch(e){ finish(); }
     });
   }
   function log(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;$('log').appendChild(d);$('log').scrollTop=1e9;}
@@ -120,6 +128,7 @@
       To:   call.direction==='inbound'? '+10000000000' : e164(),
     },fields||{}));
     const r=await fetch(localise(url),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+    if(!r.ok) throw new Error('server '+r.status);
     return r.text();
   }
 
@@ -170,13 +179,15 @@
   async function submitDigits(){
     const g=call.gather; const digits=call.buffer; call.gather=null; renderPad();
     log('you','pressed '+digits); $('callState').textContent='…';
-    run(await post(g.action,{Digits:digits}));
+    try{ run(await post(g.action,{Digits:digits})); }
+    catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
   }
   $('speak').onclick=async()=>{
     const g=call&&call.gather; if(!g) return;
     const text=$('speech').value.trim(); if(!text) return;
     call.gather=null; renderPad(); log('you','said "'+text+'"'); $('speech').value='';
-    run(await post(g.action,{SpeechResult:text,Confidence:'0.9'}));
+    try{ run(await post(g.action,{SpeechResult:text,Confidence:'0.9'})); }
+    catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
   };
 
   // ---------- call lifecycle ----------
