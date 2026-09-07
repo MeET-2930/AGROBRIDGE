@@ -77,7 +77,10 @@
       <div class="row"><button class="btn call" id="mic">🎤 Speak your name</button></div>
       <p class="state" id="micState"></p>
       <input id="speech" placeholder="…or type your name here">
-      <div class="row"><button class="btn grey" id="speak">Send</button></div>
+      <div class="row">
+        <button class="btn grey" id="retry">↺ Retry</button>
+        <button class="btn call" id="speak">✓ Confirm name</button>
+      </div>
     </div>
     <div class="pad" id="pad"></div>
     <div class="row"><button class="btn end" id="hang">End call</button></div>
@@ -109,11 +112,13 @@
     const lang=(langTag||'en').startsWith('hi')?'hi':'en';
     return new Promise(res=>{
       let done=false; const finish=()=>{ if(!done){done=true;res();} };
-      let guard=setTimeout(finish, Math.min(20000, 4000+text.length*90));
+      // The server may need a few seconds to make a clip the first time (free
+      // hosting). Never skip a line just because it is slow: wait up to 25 s
+      // for the clip, then time the guard from when playback actually starts.
+      let guard=setTimeout(()=>{ if(stopped) return finish(); browserSpeak(text,langTag).then(finish); }, 25000);
       const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(text));
       player=a;
-      // once we know the clip length, continue exactly when it ends (even if "ended" never fires)
-      a.onloadedmetadata=()=>{ if(isFinite(a.duration)){ clearTimeout(guard); guard=setTimeout(finish, a.duration*1000+250); } };
+      a.onplaying=()=>{ clearTimeout(guard); guard=setTimeout(finish, (isFinite(a.duration)?a.duration*1000:4000+text.length*90)+400); };
       a.onended=()=>{clearTimeout(guard);finish();};
       a.onpause=()=>{ if(a.src===''||a.ended||stopped) {clearTimeout(guard);finish();} };
       a.onerror=()=>{ clearTimeout(guard); if(stopped) return finish(); browserSpeak(text,langTag).then(finish); };
@@ -244,7 +249,7 @@
       let interim='', final='';
       for(let i=e.resultIndex;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal) final+=t; else interim+=t; }
       if(interim){ heard=interim.trim(); $('speech').value=heard; $('micState').textContent='Hearing: '+heard; }
-      if(final){ heard=final.trim(); $('speech').value=heard; $('micState').textContent='Heard: '+heard; sendSpeech(heard); }
+      if(final){ heard=final.trim(); $('speech').value=heard; $('micState').textContent='Heard: "'+heard+'" - correct? Confirm, or Retry.'; }
     };
     rec.onerror=(e)=>{
       $('mic').textContent='🎤 Speak your name';
@@ -255,13 +260,14 @@
     };
     rec.onend=()=>{
       $('mic').textContent='🎤 Speak your name';
-      // Chrome sometimes ends without a "final" result: use what we heard.
-      if(heard && call && call.gather && call.gather.type==='speech'){ const h=heard; heard=''; sendSpeech(h); }
+      // Chrome sometimes ends without a "final" result: keep what we heard for confirmation.
+      if(heard && call && call.gather && call.gather.type==='speech'){ $('speech').value=heard; $('micState').textContent='Heard: "'+heard+'" - correct? Confirm, or Retry.'; }
     };
     try{ rec.start(); }catch(e){}
   }
   function stopMic(){ try{ if(rec){rec.onend=null;rec.abort();} }catch(e){} rec=null; }
   $('mic').onclick=()=>{ stopAudio(); startMic(); };
+  $('retry').onclick=()=>{ stopAudio(); $('speech').value=''; heard=''; startMic(); };
 
   async function sendSpeech(text){
     const g=call&&call.gather; if(!g||!text) return;
