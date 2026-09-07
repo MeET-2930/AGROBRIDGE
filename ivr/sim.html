@@ -98,15 +98,30 @@
   const e164=()=>'+91'+myPhone();
 
   // ---------- speech ----------
-  // Browser text-to-speech. Firefox/Chrome sometimes never fire "onend"
-  // (esp. Hindi) - so we also stop waiting after a time based on text length.
+  // Voice: 1) server /tts (Microsoft neural female Hindi/English - natural),
+  //        2) fallback: the browser's own voice. Never waits forever.
+  let player=null;
   function speak(text, langTag){
+    if($('mute').checked) return new Promise(r=>setTimeout(r,50));
+    const lang=(langTag||'en').startsWith('hi')?'hi':'en';
     return new Promise(res=>{
       let done=false; const finish=()=>{ if(!done){done=true;res();} };
-      const maxMs=$('mute').checked ? 50 : Math.min(12000, 1500+text.length*70);
-      setTimeout(finish, maxMs);
+      let guard=setTimeout(finish, Math.min(20000, 4000+text.length*90));
+      const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(text));
+      player=a;
+      // once we know the clip length, continue exactly when it ends (even if "ended" never fires)
+      a.onloadedmetadata=()=>{ if(isFinite(a.duration)){ clearTimeout(guard); guard=setTimeout(finish, a.duration*1000+250); } };
+      a.onended=()=>{clearTimeout(guard);finish();};
+      a.onerror=()=>{ clearTimeout(guard); browserSpeak(text,langTag).then(finish); };
+      a.play().catch(()=>{ clearTimeout(guard); browserSpeak(text,langTag).then(finish); });
+    });
+  }
+  function browserSpeak(text, langTag){
+    return new Promise(res=>{
+      let done=false; const finish=()=>{ if(!done){done=true;res();} };
+      setTimeout(finish, Math.min(12000, 1500+text.length*70));
       try{
-        if($('mute').checked || !('speechSynthesis' in window)) return finish();
+        if(!('speechSynthesis' in window)) return finish();
         const u=new SpeechSynthesisUtterance(text); u.lang=langTag||'en-IN'; u.rate=0.95;
         const vs=speechSynthesis.getVoices();
         const v=vs.find(v=>v.lang.replace('_','-')===u.lang)||vs.find(v=>v.lang.startsWith(u.lang.slice(0,2)));
@@ -115,6 +130,7 @@
       }catch(e){ finish(); }
     });
   }
+  function stopAudio(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} }
   function log(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;$('log').appendChild(d);$('log').scrollTop=1e9;}
 
   // ---------- talking to the server ----------
@@ -138,6 +154,11 @@
     const root=doc.documentElement;
     if(!root||root.nodeName!=='Response'){log('sys','bad response'); return end();}
     call.gather=null; renderPad();
+    // warm the voice cache for every prompt in this response, all at once
+    if(!$('mute').checked) Array.from(doc.getElementsByTagName('Say')).forEach(n=>{
+      const l=(n.getAttribute('language')||'en').startsWith('hi')?'hi':'en';
+      fetch('/tts?lang='+l+'&text='+encodeURIComponent(n.textContent)).catch(()=>{});
+    });
     for(const node of Array.from(root.children)){
       if(!call) return;
       const tag=node.nodeName;
@@ -194,11 +215,11 @@
   function start(direction, url){
     call={sid:'sim-'+Date.now(),direction,gather:null,buffer:''};
     $('log').innerHTML=''; show('incall'); setMode(direction); $('callState').textContent='connected';
-    speechSynthesis.cancel();
+    stopAudio();
     post(url).then(run).catch(e=>{log('sys','network error: '+e.message);end();});
   }
   function end(silent){
-    speechSynthesis.cancel(); call=null; show('home'); setMode('idle');
+    stopAudio(); call=null; show('home'); setMode('idle');
     if(!silent) $('homeState').textContent='Waiting for incoming calls…';
   }
   $('hang').onclick=()=>{log('sys','you hung up');end();};

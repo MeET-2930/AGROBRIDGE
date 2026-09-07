@@ -6,6 +6,7 @@
  *   POST /voice                  -> answer URL for the phone simulator / Plivo / Twilio
  *   GET  /sim                    -> browser "phone" (PROVIDER=sim, no telecom account needed)
  *   GET  /sim/pending?phone=     -> the simulator asks "is AgroBridge calling me?"
+ *   GET  /tts?lang=hi&text=       -> natural female voice (Microsoft neural, free) for the simulator
  *   POST /call-me    {phone}     -> ring the farmer, run the IVR   (app / website button)
  *   POST /notify-next {centreId,date} -> call the next waiting farmer (app calls this after gate entry)
  *
@@ -72,6 +73,35 @@ if (PROVIDER === "sim") {
   app.get("/sim/pending", (req, res) => {
     const c = caller.takePending(String(req.query.phone || ""));
     res.json(c ? {url: c.url, sid: c.sid} : {});
+  });
+
+  // Natural voice for the simulator. Same neural voices Edge "Read aloud" uses; no key needed.
+  // Cached in memory so every repeated prompt (menus) plays instantly.
+  const TTS_VOICE = {hi: "hi-IN-SwaraNeural", en: "en-IN-NeerjaNeural"};
+  const ttsCache = new Map();
+  app.get("/tts", async (req, res) => {
+    const lang = req.query.lang === "hi" ? "hi" : "en";
+    const text = String(req.query.text || "").slice(0, 600);
+    if (!text) return res.status(400).end();
+    const key = `${lang}|${text}`;
+    try {
+      if (!ttsCache.has(key)) {
+        const {MsEdgeTTS, OUTPUT_FORMAT} = require("msedge-tts");
+        const tts = new MsEdgeTTS();
+        await tts.setMetadata(TTS_VOICE[lang], OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        const {audioStream} = tts.toStream(text);
+        const buf = await new Promise((ok, bad) => {
+          const chunks = []; audioStream.on("data", (c) => chunks.push(c));
+          audioStream.on("end", () => ok(Buffer.concat(chunks))); audioStream.on("error", bad);
+        });
+        if (ttsCache.size > 300) ttsCache.delete(ttsCache.keys().next().value);
+        ttsCache.set(key, buf);
+      }
+      res.set({"Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400"}).send(ttsCache.get(key));
+    } catch (e) {
+      console.error("tts failed:", e.message);
+      res.status(503).end();          // simulator falls back to the browser voice
+    }
   });
 }
 app.get("/health", (_, res) => res.send("ok"));

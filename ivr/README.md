@@ -37,7 +37,7 @@ Never commit the JSON. `ivr/.gitignore` already blocks it.
 ## 2. Push the code
 ```bash
 cd ~/projects/AGROBRIDGE
-git add -A && git commit -m "install18: phone service" && git push
+git add -A && git commit -m "install19: phone service" && git push
 ```
 
 ## 3. Create the Render service  (5 min)
