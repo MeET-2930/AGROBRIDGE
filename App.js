@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Font from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -153,8 +154,19 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState('Auth');
 
   useEffect(() => {
-    restoreUserSession()
-      .then((session) => {
+    /*
+     * install26: load the icon font BEFORE showing any screen.
+     * On the website the Ionicons font is fetched lazily, so icons showed
+     * as empty boxes / question marks until it arrived (or never, on a slow
+     * connection). Waiting here (max 4 s) fixes every screen at once.
+     */
+    const icons = Promise.race([
+      Font.loadAsync(Ionicons.font),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
+    ]).catch(() => {});
+
+    Promise.all([icons, restoreUserSession().catch(() => null)])
+      .then(([, session]) => {
         if (session?.role === 'officer') setInitialRoute('Officer');
         else if (session?.role === 'trader') setInitialRoute('Trader');
         else if (session?.role === 'farmer') setInitialRoute('Farmer');
