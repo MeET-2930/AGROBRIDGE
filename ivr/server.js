@@ -64,7 +64,7 @@ const app = express();
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
-app.get("/", (_, res) => res.send(`AGROBRIDGE IVR up (${PROVIDER})` +
+app.get("/", (_, res) => res.send(`AgroBridge IVR up (${PROVIDER})` +
     (PROVIDER === "sim" ? ` - open <a href="/sim">/sim</a> for the phone simulator` : "")));
 
 // ---- phone simulator (PROVIDER=sim) --------------------------------

@@ -167,7 +167,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <View style={styles.loadingScreen}>
-          <Text style={styles.logo}>AGROBRIDGE</Text>
+          <Text style={styles.logo}>AgroBridge</Text>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>ऐप तैयार हो रहा है...</Text>
         </View>

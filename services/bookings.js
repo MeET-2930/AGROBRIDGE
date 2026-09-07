@@ -523,7 +523,9 @@ export function buildQueueView(booking, queue) {
 
     if (status === STATUS.IN_GATE) {
       headline = msg('qv_inside_h');
-      detail = msg('qv_inside_d');
+      detail = booking?.laneAssigned
+        ? msg('qv_inside_lane_d', { lane: booking.laneAssigned })
+        : msg('qv_inside_d');
     } else if (status === STATUS.PRICE_FIXED) {
       headline = msg('qv_priceFixed_h', { rate });
       detail = msg('qv_priceFixed_d', { buyer });
@@ -704,13 +706,35 @@ async function advanceStage(tokenId, patch, { entering = false } = {}) {
 
     const isClosing = CLOSED_STATUSES.includes(patch.status);
 
+    /*
+     * LANE GUIDANCE (install22)
+     * The mandi has `parallelLanes` unloading lanes. When a vehicle is
+     * admitted we send it to the lane with the fewest vehicles right now,
+     * so the farmer is told "Lane 2" at the gate and does not wander.
+     * laneCounts = { "1": 3, "2": 1 }  -> vehicles currently in each lane.
+     */
+    const lanes = Math.max(1, Number(data.parallelLanes) || 1);
+    const laneCounts = { ...(data.laneCounts || {}) };
+    let laneAssigned = Number(booking.laneAssigned) || null;
+
     if (entering && !insidePositions.includes(position)) {
       insidePositions.push(position);
+      let best = 1;
+      for (let l = 1; l <= lanes; l++) {
+        if ((Number(laneCounts[l]) || 0) < (Number(laneCounts[best]) || 0)) best = l;
+      }
+      laneAssigned = best;
+      laneCounts[best] = (Number(laneCounts[best]) || 0) + 1;
+      patch.laneAssigned = best;
+      tx.update(bookingRef, { laneAssigned: best });
     }
 
     if (isClosing) {
       openPositions = openPositions.filter((p) => p !== position);
       insidePositions = insidePositions.filter((p) => p !== position);
+      if (laneAssigned && laneCounts[laneAssigned] > 0) {
+        laneCounts[laneAssigned] = Number(laneCounts[laneAssigned]) - 1;
+      }
     }
 
     insidePositions.sort((a, b) => a - b);
@@ -726,6 +750,7 @@ async function advanceStage(tokenId, patch, { entering = false } = {}) {
       nowServingPosition: lowestInside,
       nowServingToken: lowestInside ? tokenLabel(lowestInside) : null,
       nowServingStatus: entering ? patch.status : data.nowServingStatus || null,
+      laneCounts,
       completedCount: isClosing
         ? (Number(data.completedCount) || 0) + 1
         : Number(data.completedCount) || 0,

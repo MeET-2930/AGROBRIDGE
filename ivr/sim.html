@@ -74,8 +74,10 @@
     <div class="state" id="callState">connected</div>
     <div class="log" id="log"></div>
     <div id="speechBox" class="hidden">
-      <input id="speech" placeholder="Say your name (type it here)">
-      <div class="row"><button class="btn call" id="speak">Speak</button></div>
+      <div class="row"><button class="btn call" id="mic">🎤 Speak your name</button></div>
+      <p class="state" id="micState"></p>
+      <input id="speech" placeholder="…or type your name here">
+      <div class="row"><button class="btn grey" id="speak">Send</button></div>
     </div>
     <div class="pad" id="pad"></div>
     <div class="row"><button class="btn end" id="hang">End call</button></div>
@@ -114,8 +116,8 @@
       a.onloadedmetadata=()=>{ if(isFinite(a.duration)){ clearTimeout(guard); guard=setTimeout(finish, a.duration*1000+250); } };
       a.onended=()=>{clearTimeout(guard);finish();};
       a.onpause=()=>{ if(a.src===''||a.ended||stopped) {clearTimeout(guard);finish();} };
-      a.onerror=()=>{ clearTimeout(guard); browserSpeak(text,langTag).then(finish); };
-      a.play().catch(()=>{ clearTimeout(guard); browserSpeak(text,langTag).then(finish); });
+      a.onerror=()=>{ clearTimeout(guard); if(stopped) return finish(); browserSpeak(text,langTag).then(finish); };
+      a.play().catch(()=>{ clearTimeout(guard); if(stopped) return finish(); browserSpeak(text,langTag).then(finish); });
     });
   }
   function browserSpeak(text, langTag){
@@ -170,7 +172,7 @@
         // Real IVRs accept a key while still talking ("barge-in"). So: arm the
         // keypad FIRST, then read the options; a key press stops the voice at once.
         const inputType=node.getAttribute('input')||'dtmf';
-        call.gather={action:node.getAttribute('action'),type:inputType,
+        call.gather={action:node.getAttribute('action'),type:inputType,lang:node.getAttribute('language')||'hi-IN',
                      numDigits:Number(node.getAttribute('numDigits')||1),finishOnKey:node.getAttribute('finishOnKey')||'',
                      speaking:true};
         call.buffer='';
@@ -181,8 +183,12 @@
           if(!call || call.gather!==myGather) return;        // farmer already answered
           if(k.nodeName==='Say'){ log('say',k.textContent); await speak(k.textContent,k.getAttribute('language')); }
         }
-        if(call && call.gather===myGather){ myGather.speaking=false; $('callState').textContent= inputType==='speech'?'listening…':'press a key…'; }
-        return;                                            // wait for the user
+        if(call && call.gather===myGather){
+          myGather.speaking=false;
+          $('callState').textContent= inputType==='speech'?'listening…':'press a key…';
+          if(inputType==='speech') startMic();               // open the microphone now
+        }
+        return;   // wait for the user. (Anything after <Gather>, e.g. <Redirect>, only runs on a real network when nobody answers.)
       }
       else if(tag==='Redirect'){ return run(await post(node.textContent)); }
       else if(tag==='Reject'||tag==='Hangup'){ log('sys','call cut by AgroBridge (free for you)'); return end(true); }
@@ -214,13 +220,33 @@
     try{ run(await post(g.action,{Digits:digits})); }
     catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
   }
+  // ---------- microphone (Chrome / Edge / Android Chrome) ----------
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null;
+  function startMic(){
+    if(!SR){ $('micState').textContent='Microphone not supported in this browser - type your name.'; $('mic').disabled=true; return; }
+    try{ if(rec) rec.abort(); }catch(e){}
+    rec=new SR(); rec.lang=(call&&call.gather&&call.gather.lang)||'hi-IN'; rec.interimResults=false; rec.maxAlternatives=1;
+    rec.onstart=()=>{ $('micState').textContent='Listening… say your name'; $('mic').textContent='🎤 Listening…'; };
+    rec.onresult=(e)=>{ const t=e.results[0][0].transcript.trim(); $('micState').textContent='Heard: '+t; sendSpeech(t); };
+    rec.onerror=(e)=>{ $('micState').textContent=(e.error==='not-allowed'?'Microphone blocked - allow it in the address bar, or type your name.':'Did not catch that - tap the mic again or type.'); $('mic').textContent='🎤 Speak your name'; };
+    rec.onend=()=>{ $('mic').textContent='🎤 Speak your name'; };
+    try{ rec.start(); }catch(e){}
+  }
+  function stopMic(){ try{ if(rec){rec.onend=null;rec.abort();} }catch(e){} rec=null; }
+  $('mic').onclick=()=>{ stopAudio(); startMic(); };
+
+  async function sendSpeech(text){
+    const g=call&&call.gather; if(!g||!text) return;
+    stopMic();
+    call.gather=null; renderPad(); log('you','said "'+text+'"'); $('speech').value=''; $('micState').textContent='';
+    try{ run(await post(g.action,{SpeechResult:text,Confidence:'0.9'})); }
+    catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
+  }
   $('speak').onclick=async()=>{
     const g=call&&call.gather; if(!g) return;
     stopAudio();
     const text=$('speech').value.trim(); if(!text) return;
-    call.gather=null; renderPad(); log('you','said "'+text+'"'); $('speech').value='';
-    try{ run(await post(g.action,{SpeechResult:text,Confidence:'0.9'})); }
-    catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
+    return sendSpeech(text);
   };
 
   // ---------- call lifecycle ----------
@@ -231,7 +257,7 @@
     post(url).then(run).catch(e=>{log('sys','network error: '+e.message);end();});
   }
   function end(silent){
-    stopAudio(); call=null; show('home'); setMode('idle');
+    stopAudio(); stopMic(); call=null; show('home'); setMode('idle');
     if(!silent) $('homeState').textContent='Waiting for incoming calls…';
   }
   $('hang').onclick=()=>{log('sys','you hung up');end();};

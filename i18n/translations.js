@@ -31,7 +31,7 @@ export const t = {
   /* ------------------------------------------------------------ */
   /* Brand / common                                                */
   /* ------------------------------------------------------------ */
-  brand: r('AGROBRIDGE', 'AGROBRIDGE', 'AGROBRIDGE', 'AGROBRIDGE'),
+  brand: r('AgroBridge', 'AgroBridge', 'AgroBridge', 'AgroBridge'),
   brandSub: r('किसानसेतु - डिजिटल मंडी खरीद', 'KisanSetu - Smart Procurement', 'ਕਿਸਾਨਸੇਤੁ - ਸਮਾਰਟ ਮੰਡੀ ਖਰੀਦ', 'किसानसेतु - स्मार्ट खरेदी'),
   appLoading: r('ऐप तैयार हो रहा है...', 'Getting the app ready...', 'ਐਪ ਤਿਆਰ ਹੋ ਰਹੀ ਹੈ...', 'अ‍ॅप तयार होत आहे...'),
   listen: r('सुनें', 'Listen', 'ਸੁਣੋ', 'ऐका'),
@@ -230,6 +230,7 @@ export const t = {
   qv_action_h: r('जांच पूरी — भाव तय करें', 'Assay done — fix your price', 'ਜਾਂਚ ਪੂਰੀ — ਭਾਅ ਤੈਅ ਕਰੋ', 'तपासणी पूर्ण — भाव ठरवा'),
   qv_action_d: r('ग्रेड {grade} • MSP पर बेचें या नीलामी शुरू करें। टैप करें →', 'Grade {grade} • Sell at MSP or start an auction. Tap →', 'ਗ੍ਰੇਡ {grade} • MSP ਤੇ ਵੇਚੋ ਜਾਂ ਨੀਲਾਮੀ ਸ਼ੁਰੂ ਕਰੋ। ਟੈਪ ਕਰੋ →', 'ग्रेड {grade} • MSP ला विका किंवा लिलाव सुरू करा. टॅप करा →'),
   qv_inside_h: r('आप मंडी के अंदर हैं', 'You are inside the mandi', 'ਤੁਸੀਂ ਮੰਡੀ ਦੇ ਅੰਦਰ ਹੋ', 'तुम्ही मंडीच्या आत आहात'),
+  qv_inside_lane_d: r('अपना वाहन लेन {lane} में ले जाएं। वहीं गुणवत्ता जांच होगी।', 'Take your vehicle to Lane {lane}. Quality check happens there.', 'ਆਪਣਾ ਵਾਹਨ ਲੇਨ {lane} ਵਿੱਚ ਲੈ ਜਾਓ। ਉੱਥੇ ਹੀ ਗੁਣਵੱਤਾ ਜਾਂਚ ਹੋਵੇਗੀ।', 'तुमचे वाहन लेन {lane} मध्ये न्या. तिथेच गुणवत्ता तपासणी होईल.'),
   qv_inside_d: r('गुणवत्ता जांच की प्रतीक्षा करें', 'Waiting for quality check', 'ਗੁਣਵੱਤਾ ਜਾਂਚ ਦੀ ਉਡੀਕ ਕਰੋ', 'गुणवत्ता तपासणीची प्रतीक्षा'),
   qv_priceFixed_h: r('भाव तय: ₹{rate} / क्विंटल', 'Price fixed: ₹{rate} / qtl', 'ਭਾਅ ਤੈਅ: ₹{rate} / ਕੁਇੰਟਲ', 'भाव निश्चित: ₹{rate} / क्विंटल'),
   qv_priceFixed_d: r('खरीदार: {buyer} • अब तौल के लिए जाएँ', 'Buyer: {buyer} • proceed to weighbridge', 'ਖਰੀਦਦਾਰ: {buyer} • ਹੁਣ ਤੋਲ ਲਈ ਜਾਓ', 'खरेदीदार: {buyer} • आता वजनासाठी जा'),
@@ -474,6 +475,11 @@ export const t = {
   gs_otherTokenSub: r('यह पास {a} का है, आपने {b} चुना था। फिर भी {a} को प्रवेश दें?', 'This pass belongs to {a}, you selected {b}. Admit {a} anyway?', 'ਇਹ ਪਾਸ {a} ਦਾ ਹੈ, ਤੁਸੀਂ {b} ਚੁਣਿਆ ਸੀ। ਫਿਰ ਵੀ {a} ਨੂੰ ਐਂਟਰੀ ਦਿਓ?', 'हा पास {a} चा आहे, तुम्ही {b} निवडले होते. तरीही {a} ला प्रवेश द्यायचा?'),
   gs_enterVehicle: r('कृपया वाहन नंबर दर्ज करें।', 'Please enter the vehicle number.', 'ਕਿਰਪਾ ਕਰਕੇ ਵਾਹਨ ਨੰਬਰ ਦਰਜ ਕਰੋ।', 'कृपया वाहन क्रमांक टाका.'),
   gs_admitted: r('प्रवेश दर्ज ✓', 'Entry recorded ✓', 'ਐਂਟਰੀ ਦਰਜ ✓', 'प्रवेश नोंदला ✓'),
+  gs_sendToLane: r('➡️ किसान को लेन {lane} भेजें (सबसे खाली)', '➡️ Send farmer to LANE {lane} (least busy)', '➡️ ਕਿਸਾਨ ਨੂੰ ਲੇਨ {lane} ਭੇਜੋ (ਸਭ ਤੋਂ ਖਾਲੀ)', '➡️ शेतकऱ्याला लेन {lane} पाठवा (सर्वात रिकामी)'),
+  tts_missing_t: r('{lang} आवाज़ इस फ़ोन पर नहीं है', '{lang} voice not installed on this phone', '{lang} ਆਵਾਜ਼ ਇਸ ਫ਼ੋਨ ਤੇ ਨਹੀਂ ਹੈ', '{lang} आवाज या फोनवर नाही'),
+  tts_missing_d: r('अभी अंग्रेज़ी में सुनाया जाएगा। {lang} आवाज़ जोड़ने के लिए फ़ोन की टेक्स्ट-टू-स्पीच सेटिंग खोलें → Google Speech Services → Install voice data।', 'Playing in English for now. To add the {lang} voice open the phone\'s Text-to-speech settings → Google Speech Services → Install voice data.', 'ਹੁਣ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਸੁਣਾਇਆ ਜਾਵੇਗਾ। {lang} ਆਵਾਜ਼ ਜੋੜਨ ਲਈ ਫ਼ੋਨ ਦੀ Text-to-speech ਸੈਟਿੰਗ ਖੋਲ੍ਹੋ → Google Speech Services → Install voice data।', 'सध्या इंग्रजीत ऐकवले जाईल. {lang} आवाज जोडण्यासाठी फोनची Text-to-speech सेटिंग उघडा → Google Speech Services → Install voice data.'),
+  tts_openSettings: r('सेटिंग खोलें', 'Open settings', 'ਸੈਟਿੰਗ ਖੋਲ੍ਹੋ', 'सेटिंग उघडा'),
+  tts_later: r('बाद में', 'Later', 'ਬਾਅਦ ਵਿੱਚ', 'नंतर'),
   gs_nextScan: r('अगला स्कैन', 'Next scan', 'ਅਗਲਾ ਸਕੈਨ', 'पुढील स्कॅन'),
   gs_entryFail: r('गेट प्रवेश दर्ज नहीं हुआ।', 'Could not record gate entry.', 'ਗੇਟ ਐਂਟਰੀ ਦਰਜ ਨਹੀਂ ਹੋਈ।', 'गेट प्रवेश नोंदला नाही.'),
 
@@ -706,7 +712,7 @@ export const t = {
   // PDF documents
   pdf_receiptTitle: r('भुगतान रसीद / PAYMENT RECEIPT', 'PAYMENT RECEIPT', 'ਭੁਗਤਾਨ ਰਸੀਦ / PAYMENT RECEIPT', 'पेमेंट पावती / PAYMENT RECEIPT'),
   pdf_gatePassTitle: r('गेट पास / GATE PASS', 'GATE PASS', 'ਗੇਟ ਪਾਸ / GATE PASS', 'गेट पास / GATE PASS'),
-  pdf_generated: r('यह रसीद AGROBRIDGE द्वारा डिजिटल रूप से बनाई गई है।', 'This receipt was generated digitally by AGROBRIDGE.', 'ਇਹ ਰਸੀਦ AGROBRIDGE ਵੱਲੋਂ ਡਿਜੀਟਲ ਰੂਪ ਵਿੱਚ ਬਣਾਈ ਗਈ ਹੈ।', 'ही पावती AGROBRIDGE ने डिजिटल स्वरूपात तयार केली आहे.'),
+  pdf_generated: r('यह रसीद AgroBridge द्वारा डिजिटल रूप से बनाई गई है।', 'This receipt was generated digitally by AgroBridge.', 'ਇਹ ਰਸੀਦ AgroBridge ਵੱਲੋਂ ਡਿਜੀਟਲ ਰੂਪ ਵਿੱਚ ਬਣਾਈ ਗਈ ਹੈ।', 'ही पावती AgroBridge ने डिजिटल स्वरूपात तयार केली आहे.'),
   pdf_farmerCopy: r('किसान प्रति', 'Farmer copy', 'ਕਿਸਾਨ ਕਾਪੀ', 'शेतकरी प्रत'),
   pdf_paidOn: r('भुगतान तिथि', 'Paid on', 'ਭੁਗਤਾਨ ਮਿਤੀ', 'पेमेंट दिनांक'),
   pdf_deductions: r('कटौती', 'Deductions', 'ਕਟੌਤੀ', 'कपात'),
@@ -715,7 +721,7 @@ export const t = {
   pdf_slot: r('स्लॉट', 'Slot', 'ਸਲਾਟ', 'स्लॉट'),
   centreLabel_gate: r('गेट पर', 'At the gate', 'ਗੇਟ ਤੇ', 'गेटवर'),
 
-  // ---- install19: phone service (IVR)
+  // ---- install16: phone service (IVR)
   ivr_callMe: r('फ़ोन पर बुक करें', 'Book by phone call', 'ਫ਼ੋਨ ਤੇ ਬੁੱਕ ਕਰੋ', 'फोनवर बुक करा'),
   ivr_callMeSub: r('हम +91 {phone} पर कॉल करेंगे। फ़ोन उठाकर बटन दबाकर स्लॉट बुक करें या टोकन की स्थिति सुनें।', 'We will call +91 {phone}. Answer and press keys to book a slot or hear your token status.', 'ਅਸੀਂ +91 {phone} ਤੇ ਕਾਲ ਕਰਾਂਗੇ। ਫ਼ੋਨ ਚੁੱਕ ਕੇ ਬਟਨ ਦਬਾ ਕੇ ਸਲਾਟ ਬੁੱਕ ਕਰੋ।', 'आम्ही +91 {phone} वर कॉल करू. फोन उचलून बटण दाबून स्लॉट बुक करा.'),
   ivr_callNow: r('कॉल करें', 'Call me', 'ਕਾਲ ਕਰੋ', 'कॉल करा'),
@@ -830,10 +836,10 @@ export const t = {
     'तुमची भूमिका निवडा. तुम्ही पीक विकणारे शेतकरी असाल तर शेतकरी निवडा. मंडीत काम करत असाल तर मंडी अधिकारी निवडा. पीक खरेदी करत असाल तर व्यापारी निवडा.'
   ),
   audio_farmer_dashboard: r(
-    'यह आपका मुख्य किसान पेज है। मंडी जाने के लिए स्लॉट बुक करें बटन पर टैप करें। अपनी टोकन स्थिति, कतार और संभावित समय आप ऊपर देख सकते हैं।',
-    'This is your farmer home page. Tap Book Slot to go to the mandi. Your token status, queue and expected time are shown at the top.',
-    'ਇਹ ਤੁਹਾਡਾ ਮੁੱਖ ਕਿਸਾਨ ਪੇਜ ਹੈ। ਮੰਡੀ ਜਾਣ ਲਈ ਸਲਾਟ ਬੁੱਕ ਕਰੋ ਦਬਾਓ। ਆਪਣਾ ਟੋਕਨ, ਕਤਾਰ ਅਤੇ ਸੰਭਾਵਿਤ ਸਮਾਂ ਉੱਪਰ ਵੇਖੋ।',
-    'हे तुमचे मुख्य शेतकरी पेज आहे. मंडीत जाण्यासाठी स्लॉट बुक करा दाबा. तुमचे टोकन, रांग व अपेक्षित वेळ वर दिसेल.'
+    'यह आपका मुख्य किसान पेज है। मंडी जाने के लिए स्लॉट बुक करें दबाएं। बुकिंग के बाद ऊपर आपका टोकन, कतार में आपसे आगे कितने हैं और अभी कौन सा टोकन चल रहा है दिखेगा। हरी बत्ती जलते ही गेट पर जाएं। फ़ोन पर बुक करें दबाने से हम आपको कॉल करके भी बुकिंग करा सकते हैं।',
+    'This is your farmer home page. Tap Book Slot to go to the mandi. After booking, the top shows your token, how many are ahead of you and which token is being served now. When the light turns green, go to the gate. Tap Book by phone call and we will call you to book by voice.',
+    'ਇਹ ਤੁਹਾਡਾ ਮੁੱਖ ਕਿਸਾਨ ਪੇਜ ਹੈ। ਮੰਡੀ ਜਾਣ ਲਈ ਸਲਾਟ ਬੁੱਕ ਕਰੋ ਦਬਾਓ। ਬੁਕਿੰਗ ਤੋਂ ਬਾਅਦ ਉੱਪਰ ਤੁਹਾਡਾ ਟੋਕਨ, ਤੁਹਾਡੇ ਤੋਂ ਅੱਗੇ ਕਿੰਨੇ ਹਨ ਅਤੇ ਹੁਣ ਕਿਹੜਾ ਟੋਕਨ ਚੱਲ ਰਿਹਾ ਹੈ ਦਿਖੇਗਾ। ਹਰੀ ਬੱਤੀ ਜਗਦੇ ਹੀ ਗੇਟ ਤੇ ਜਾਓ। ਫ਼ੋਨ ਤੇ ਬੁੱਕ ਕਰੋ ਦਬਾਉਣ ਨਾਲ ਅਸੀਂ ਕਾਲ ਕਰਕੇ ਬੁਕਿੰਗ ਕਰਵਾ ਸਕਦੇ ਹਾਂ।',
+    'हे तुमचे मुख्य शेतकरी पेज आहे. मंडीत जाण्यासाठी स्लॉट बुक करा दाबा. बुकिंगनंतर वर तुमचे टोकन, तुमच्या पुढे किती आहेत आणि आता कोणते टोकन सुरू आहे दिसेल. हिरवा दिवा लागताच गेटवर जा. फोनवर बुक करा दाबल्यास आम्ही कॉल करून बुकिंग करू शकतो.'
   ),
   audio_crop: r(
     'पहला चरण। वह फसल चुनें जिसे आप आज मंडी में बेचने जा रहे हैं। फसल चुनने के बाद नीचे आगे बढ़ें बटन पर टैप करें।',
@@ -858,6 +864,156 @@ export const t = {
     'Mandi officer portal. Your work cards are at the top. At the gate, scan the farmer\'s gate pass to admit them. Assay, weighing and payment each have their own card.',
     'ਮੰਡੀ ਅਧਿਕਾਰੀ ਪੋਰਟਲ। ਤੁਹਾਡੇ ਕੰਮ ਦੇ ਕਾਰਡ ਉੱਪਰ ਹਨ। ਗੇਟ ਤੇ ਕਿਸਾਨ ਦਾ ਗੇਟ ਪਾਸ ਸਕੈਨ ਕਰਕੇ ਐਂਟਰੀ ਦਿਓ।',
     'मंडी अधिकारी पोर्टल. तुमची कामाची कार्डे वर आहेत. गेटवर शेतकऱ्याचा गेट पास स्कॅन करून प्रवेश द्या.'
+  ),
+
+  /* ------------------------------------------------------------ */
+  /* Voice help per screen (install21) - key = audio_<RouteName>    */
+  /* Spoken when the speaker icon in the header is tapped.          */
+  /* Screens that pass their own audioKey keep using it.            */
+  /* ------------------------------------------------------------ */
+  audio_Login: r(
+    'लॉगिन पेज। अपना दस अंकों का मोबाइल नंबर भरें और ओटीपी भेजें बटन दबाएं। आपके फ़ोन पर एक कोड आएगा। अगर आपका खाता नहीं है, तो पहले पंजीकरण करें।',
+    'Login page. Enter your ten digit mobile number and tap Send OTP. A code will come to your phone. If you do not have an account yet, register first.',
+    'ਲੌਗਇਨ ਪੇਜ। ਆਪਣਾ ਦਸ ਅੰਕਾਂ ਦਾ ਮੋਬਾਈਲ ਨੰਬਰ ਭਰੋ ਅਤੇ ਓਟੀਪੀ ਭੇਜੋ ਦਬਾਓ। ਤੁਹਾਡੇ ਫ਼ੋਨ ਤੇ ਇੱਕ ਕੋਡ ਆਵੇਗਾ। ਜੇ ਖਾਤਾ ਨਹੀਂ ਹੈ ਤਾਂ ਪਹਿਲਾਂ ਰਜਿਸਟਰ ਕਰੋ।',
+    'लॉगिन पेज. तुमचा दहा अंकी मोबाईल नंबर भरा आणि ओटीपी पाठवा दाबा. तुमच्या फोनवर एक कोड येईल. खाते नसेल तर आधी नोंदणी करा.'
+  ),
+  audio_Otp: r(
+    'ओटीपी पेज। आपके फ़ोन पर आया चार अंकों का कोड यहाँ भरें और सत्यापित करें दबाएं। कोड न आए तो कुछ सेकंड रुककर दोबारा भेजें दबाएं।',
+    'OTP page. Type the four digit code that came to your phone and tap Verify. If the code does not arrive, wait a few seconds and tap Resend.',
+    'ਓਟੀਪੀ ਪੇਜ। ਫ਼ੋਨ ਤੇ ਆਇਆ ਚਾਰ ਅੰਕਾਂ ਦਾ ਕੋਡ ਇੱਥੇ ਭਰੋ ਅਤੇ ਪੁਸ਼ਟੀ ਕਰੋ ਦਬਾਓ। ਕੋਡ ਨਾ ਆਵੇ ਤਾਂ ਕੁਝ ਸਕਿੰਟ ਰੁਕ ਕੇ ਦੁਬਾਰਾ ਭੇਜੋ ਦਬਾਓ।',
+    'ओटीपी पेज. फोनवर आलेला चार अंकी कोड येथे भरा आणि पडताळा दाबा. कोड आला नाही तर काही सेकंद थांबून पुन्हा पाठवा दाबा.'
+  ),
+  audio_Register: r(
+    'पंजीकरण पेज। अपना नाम और मोबाइल नंबर भरें। किसान को बस इतना ही चाहिए। मंडी अधिकारी अपनी मंडी, ड्यूटी और कर्मचारी आईडी भी चुनें। फिर पंजीकरण करें दबाएं।',
+    'Registration page. Enter your name and mobile number. That is all a farmer needs. Mandi officers also choose their mandi, duty and employee ID. Then tap Register.',
+    'ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਪੇਜ। ਆਪਣਾ ਨਾਮ ਅਤੇ ਮੋਬਾਈਲ ਨੰਬਰ ਭਰੋ। ਕਿਸਾਨ ਲਈ ਇੰਨਾ ਹੀ ਕਾਫ਼ੀ ਹੈ। ਮੰਡੀ ਅਧਿਕਾਰੀ ਆਪਣੀ ਮੰਡੀ, ਡਿਊਟੀ ਅਤੇ ਕਰਮਚਾਰੀ ਆਈਡੀ ਵੀ ਚੁਣਨ। ਫਿਰ ਰਜਿਸਟਰ ਕਰੋ ਦਬਾਓ।',
+    'नोंदणी पेज. तुमचे नाव आणि मोबाईल नंबर भरा. शेतकऱ्यासाठी एवढेच पुरेसे आहे. मंडी अधिकाऱ्यांनी आपली मंडी, ड्युटी आणि कर्मचारी आयडी देखील निवडावा. मग नोंदणी करा दाबा.'
+  ),
+  audio_UserStatus: r(
+    'यदि आपने पहले यह ऐप इस्तेमाल किया है तो लॉगिन दबाएं। पहली बार आए हैं तो नया पंजीकरण दबाएं।',
+    'If you have used this app before, tap Login. If this is your first time, tap Register.',
+    'ਜੇ ਤੁਸੀਂ ਪਹਿਲਾਂ ਇਹ ਐਪ ਵਰਤੀ ਹੈ ਤਾਂ ਲੌਗਇਨ ਦਬਾਓ। ਪਹਿਲੀ ਵਾਰ ਆਏ ਹੋ ਤਾਂ ਨਵੀਂ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਦਬਾਓ।',
+    'तुम्ही आधी हे अ‍ॅप वापरले असेल तर लॉगिन दाबा. पहिल्यांदाच आला असाल तर नवीन नोंदणी दाबा.'
+  ),
+  audio_TokenConfirmation: r(
+    'बधाई हो, आपका टोकन बुक हो गया है। यह आपका गेट पास है। इसमें टोकन नंबर, मंडी, तारीख और समय लिखा है। मंडी गेट पर यह क्यू आर कोड या छह अंकों का कोड दिखाएं। स्क्रीनशॉट लेकर रख लें, इंटरनेट न होने पर भी काम आएगा।',
+    'Congratulations, your token is booked. This is your gate pass. It shows the token number, mandi, date and time. Show this QR code or the six digit code at the mandi gate. Take a screenshot so it works even without internet.',
+    'ਵਧਾਈਆਂ, ਤੁਹਾਡਾ ਟੋਕਨ ਬੁੱਕ ਹੋ ਗਿਆ ਹੈ। ਇਹ ਤੁਹਾਡਾ ਗੇਟ ਪਾਸ ਹੈ। ਇਸ ਵਿੱਚ ਟੋਕਨ ਨੰਬਰ, ਮੰਡੀ, ਤਾਰੀਖ ਅਤੇ ਸਮਾਂ ਲਿਖਿਆ ਹੈ। ਮੰਡੀ ਗੇਟ ਤੇ ਇਹ ਕਿਊ ਆਰ ਕੋਡ ਜਾਂ ਛੇ ਅੰਕਾਂ ਦਾ ਕੋਡ ਦਿਖਾਓ। ਸਕ੍ਰੀਨਸ਼ਾਟ ਲੈ ਕੇ ਰੱਖੋ।',
+    'अभिनंदन, तुमचे टोकन बुक झाले आहे. हा तुमचा गेट पास आहे. यात टोकन नंबर, मंडी, तारीख आणि वेळ आहे. मंडी गेटवर हा क्यूआर कोड किंवा सहा अंकी कोड दाखवा. स्क्रीनशॉट काढून ठेवा, इंटरनेट नसतानाही उपयोगी पडेल.'
+  ),
+  audio_TokenDetail: r(
+    'टोकन विवरण पेज। ऊपर आपकी वर्तमान स्थिति है, जैसे बुक, गेट प्रवेश, जांच, तौल या भुगतान। हरी बत्ती का मतलब है अब आपकी बारी है, गेट पर जाएं। नीचे आपकी फसल का ग्रेड, भाव, वजन और भुगतान की जानकारी आती जाएगी। भुगतान होने पर यहीं से रसीद डाउनलोड करें।',
+    'Token detail page. At the top is your current stage: booked, gate entry, assay, weighing or payment. A green light means it is your turn, go to the gate. Below, your grade, price, weight and payment details appear as they happen. Once paid, download the receipt from here.',
+    'ਟੋਕਨ ਵੇਰਵਾ ਪੇਜ। ਉੱਪਰ ਤੁਹਾਡੀ ਮੌਜੂਦਾ ਸਥਿਤੀ ਹੈ, ਜਿਵੇਂ ਬੁੱਕ, ਗੇਟ ਐਂਟਰੀ, ਜਾਂਚ, ਤੋਲ ਜਾਂ ਭੁਗਤਾਨ। ਹਰੀ ਬੱਤੀ ਦਾ ਮਤਲਬ ਹੁਣ ਤੁਹਾਡੀ ਵਾਰੀ ਹੈ, ਗੇਟ ਤੇ ਜਾਓ। ਹੇਠਾਂ ਗ੍ਰੇਡ, ਭਾਅ, ਵਜ਼ਨ ਅਤੇ ਭੁਗਤਾਨ ਦੀ ਜਾਣਕਾਰੀ ਆਉਂਦੀ ਜਾਵੇਗੀ। ਭੁਗਤਾਨ ਹੋਣ ਤੇ ਇੱਥੋਂ ਰਸੀਦ ਡਾਊਨਲੋਡ ਕਰੋ।',
+    'टोकन तपशील पेज. वर तुमची सध्याची स्थिती आहे: बुक, गेट प्रवेश, तपासणी, वजन किंवा पेमेंट. हिरवा दिवा म्हणजे आता तुमची पाळी, गेटवर जा. खाली ग्रेड, भाव, वजन आणि पेमेंटची माहिती येत जाईल. पेमेंट झाल्यावर येथून पावती डाउनलोड करा.'
+  ),
+  audio_History: r(
+    'इतिहास पेज। यहाँ आपकी सभी पुरानी और चालू मंडी बुकिंग हैं। किसी भी टोकन पर टैप करके उसका पूरा विवरण और रसीद देखें।',
+    'History page. All your past and current mandi bookings are here. Tap any token to see its full details and receipt.',
+    'ਇਤਿਹਾਸ ਪੇਜ। ਇੱਥੇ ਤੁਹਾਡੀਆਂ ਸਾਰੀਆਂ ਪੁਰਾਣੀਆਂ ਅਤੇ ਚਾਲੂ ਮੰਡੀ ਬੁਕਿੰਗਾਂ ਹਨ। ਕਿਸੇ ਵੀ ਟੋਕਨ ਤੇ ਟੈਪ ਕਰਕੇ ਪੂਰਾ ਵੇਰਵਾ ਅਤੇ ਰਸੀਦ ਵੇਖੋ।',
+    'इतिहास पेज. येथे तुमच्या सर्व जुन्या आणि चालू मंडी बुकिंग आहेत. कोणत्याही टोकनवर टॅप करून संपूर्ण तपशील आणि पावती पहा.'
+  ),
+  audio_Payments: r(
+    'भुगतान पेज। यहाँ आपकी हर बिक्री की राशि और भुगतान की स्थिति है। जिसमें भुगतान हो चुका है वहाँ से रसीद डाउनलोड या साझा कर सकते हैं।',
+    'Payments page. Here is the amount and payment status of every sale. Where payment is done, you can download or share the receipt.',
+    'ਭੁਗਤਾਨ ਪੇਜ। ਇੱਥੇ ਤੁਹਾਡੀ ਹਰ ਵਿਕਰੀ ਦੀ ਰਕਮ ਅਤੇ ਭੁਗਤਾਨ ਦੀ ਸਥਿਤੀ ਹੈ। ਜਿੱਥੇ ਭੁਗਤਾਨ ਹੋ ਚੁੱਕਾ ਹੈ ਉੱਥੋਂ ਰਸੀਦ ਡਾਊਨਲੋਡ ਜਾਂ ਸਾਂਝੀ ਕਰੋ।',
+    'पेमेंट पेज. येथे तुमच्या प्रत्येक विक्रीची रक्कम आणि पेमेंटची स्थिती आहे. पेमेंट झाले असेल तिथून पावती डाउनलोड किंवा शेअर करा.'
+  ),
+  audio_Help: r(
+    'सहायता केंद्र। यहाँ आम सवालों के जवाब हैं, जैसे टोकन कैसे बुक करें और भुगतान कब मिलेगा। नीचे से मंडी को कॉल या व्हाट्सएप कर सकते हैं, या कोई समस्या रिपोर्ट कर सकते हैं।',
+    'Help centre. Answers to common questions are here, such as how to book a token and when payment arrives. At the bottom you can call or WhatsApp the mandi, or report a problem.',
+    'ਸਹਾਇਤਾ ਕੇਂਦਰ। ਇੱਥੇ ਆਮ ਸਵਾਲਾਂ ਦੇ ਜਵਾਬ ਹਨ, ਜਿਵੇਂ ਟੋਕਨ ਕਿਵੇਂ ਬੁੱਕ ਕਰੀਏ ਅਤੇ ਭੁਗਤਾਨ ਕਦੋਂ ਮਿਲੇਗਾ। ਹੇਠਾਂ ਤੋਂ ਮੰਡੀ ਨੂੰ ਕਾਲ ਜਾਂ ਵਟਸਐਪ ਕਰੋ, ਜਾਂ ਸਮੱਸਿਆ ਰਿਪੋਰਟ ਕਰੋ।',
+    'मदत केंद्र. येथे सामान्य प्रश्नांची उत्तरे आहेत, जसे टोकन कसे बुक करावे आणि पेमेंट कधी मिळेल. खालून मंडीला कॉल किंवा व्हॉट्सअ‍ॅप करा, किंवा समस्या नोंदवा.'
+  ),
+  audio_OfficerDashboard: r(
+    'मंडी अधिकारी पोर्टल। ऊपर आज की संख्या है, कितने टोकन बुक हैं, कितने अंदर हैं और कितने पूरे हुए। आपकी ड्यूटी के कार्ड नीचे हैं। गेट अधिकारी गेट प्रवेश दबाकर किसान का पास स्कैन करें। जांच, तौल और भुगतान अपने-अपने कार्ड से करें।',
+    'Mandi officer portal. Today\'s numbers are at the top: tokens booked, inside and completed. Your duty cards are below. Gate officers tap Gate Entry to scan the farmer\'s pass. Assay, weighing and payment each have their own card.',
+    'ਮੰਡੀ ਅਧਿਕਾਰੀ ਪੋਰਟਲ। ਉੱਪਰ ਅੱਜ ਦੀ ਗਿਣਤੀ ਹੈ, ਕਿੰਨੇ ਟੋਕਨ ਬੁੱਕ ਹਨ, ਕਿੰਨੇ ਅੰਦਰ ਹਨ ਅਤੇ ਕਿੰਨੇ ਪੂਰੇ ਹੋਏ। ਤੁਹਾਡੀ ਡਿਊਟੀ ਦੇ ਕਾਰਡ ਹੇਠਾਂ ਹਨ। ਗੇਟ ਅਧਿਕਾਰੀ ਗੇਟ ਐਂਟਰੀ ਦਬਾ ਕੇ ਕਿਸਾਨ ਦਾ ਪਾਸ ਸਕੈਨ ਕਰਨ।',
+    'मंडी अधिकारी पोर्टल. वर आजची संख्या आहे: किती टोकन बुक, किती आत आणि किती पूर्ण. तुमच्या ड्युटीची कार्डे खाली आहेत. गेट अधिकाऱ्यांनी गेट प्रवेश दाबून शेतकऱ्याचा पास स्कॅन करावा.'
+  ),
+  audio_GateScan: r(
+    'गेट पास स्कैन। किसान के फ़ोन पर दिख रहे क्यू आर कोड पर कैमरा रखें, या नीचे उसका छह अंकों का कोड भरें। सही टोकन मिलने पर प्रवेश दें दबाएं। इससे किसान की स्क्रीन तुरंत बदल जाती है और अगले किसान को सूचना जाती है।',
+    'Gate pass scan. Point the camera at the QR code on the farmer\'s phone, or type the six digit code below. When the correct token appears, tap Admit. The farmer\'s screen updates instantly and the next farmer is notified.',
+    'ਗੇਟ ਪਾਸ ਸਕੈਨ। ਕਿਸਾਨ ਦੇ ਫ਼ੋਨ ਤੇ ਦਿਖ ਰਹੇ ਕਿਊ ਆਰ ਕੋਡ ਤੇ ਕੈਮਰਾ ਰੱਖੋ, ਜਾਂ ਹੇਠਾਂ ਉਸਦਾ ਛੇ ਅੰਕਾਂ ਦਾ ਕੋਡ ਭਰੋ। ਸਹੀ ਟੋਕਨ ਮਿਲਣ ਤੇ ਐਂਟਰੀ ਦਿਓ ਦਬਾਓ। ਇਸ ਨਾਲ ਕਿਸਾਨ ਦੀ ਸਕ੍ਰੀਨ ਤੁਰੰਤ ਬਦਲ ਜਾਂਦੀ ਹੈ।',
+    'गेट पास स्कॅन. शेतकऱ्याच्या फोनवरील क्यूआर कोडवर कॅमेरा धरा, किंवा खाली त्याचा सहा अंकी कोड भरा. योग्य टोकन दिसल्यावर प्रवेश द्या दाबा. यामुळे शेतकऱ्याची स्क्रीन लगेच बदलते आणि पुढील शेतकऱ्याला सूचना जाते.'
+  ),
+  audio_TodaysQueue: r(
+    'आज की कतार। यहाँ आज के सभी टोकन क्रम में हैं, उनकी स्थिति के साथ। जो किसान समय पर नहीं आया उसे नो शो चिह्नित कर सकते हैं ताकि अगला किसान आगे बढ़े।',
+    'Today\'s queue. All of today\'s tokens are listed in order with their status. If a farmer did not arrive on time, mark them No Show so the next farmer moves up.',
+    'ਅੱਜ ਦੀ ਕਤਾਰ। ਇੱਥੇ ਅੱਜ ਦੇ ਸਾਰੇ ਟੋਕਨ ਕ੍ਰਮ ਵਿੱਚ ਹਨ, ਉਹਨਾਂ ਦੀ ਸਥਿਤੀ ਨਾਲ। ਜੋ ਕਿਸਾਨ ਸਮੇਂ ਤੇ ਨਹੀਂ ਆਇਆ ਉਸਨੂੰ ਨੋ ਸ਼ੋ ਲਗਾਓ ਤਾਂ ਜੋ ਅਗਲਾ ਕਿਸਾਨ ਅੱਗੇ ਵਧੇ।',
+    'आजची रांग. येथे आजचे सर्व टोकन क्रमाने त्यांच्या स्थितीसह आहेत. जो शेतकरी वेळेवर आला नाही त्याला नो शो चिन्हांकित करा म्हणजे पुढील शेतकरी पुढे जाईल.'
+  ),
+  audio_StageQueue: r(
+    'यह आपके चरण की कतार है। यहाँ वही टोकन दिखते हैं जिन पर अभी आपकी कार्रवाई बाकी है। किसी टोकन पर टैप करके उसका काम पूरा करें। काम होते ही वह अगले अधिकारी की सूची में चला जाता है।',
+    'This is the queue for your stage. Only tokens waiting for your action appear here. Tap a token to complete its step. Once done, it moves to the next officer\'s list.',
+    'ਇਹ ਤੁਹਾਡੇ ਪੜਾਅ ਦੀ ਕਤਾਰ ਹੈ। ਇੱਥੇ ਉਹੀ ਟੋਕਨ ਦਿਖਦੇ ਹਨ ਜਿਨ੍ਹਾਂ ਤੇ ਤੁਹਾਡੀ ਕਾਰਵਾਈ ਬਾਕੀ ਹੈ। ਟੋਕਨ ਤੇ ਟੈਪ ਕਰਕੇ ਕੰਮ ਪੂਰਾ ਕਰੋ। ਫਿਰ ਉਹ ਅਗਲੇ ਅਧਿਕਾਰੀ ਦੀ ਸੂਚੀ ਵਿੱਚ ਚਲਾ ਜਾਂਦਾ ਹੈ।',
+    'ही तुमच्या टप्प्याची रांग आहे. येथे फक्त तेच टोकन दिसतात ज्यांवर तुमची कारवाई बाकी आहे. टोकनवर टॅप करून त्याचे काम पूर्ण करा. मग ते पुढील अधिकाऱ्याच्या यादीत जाते.'
+  ),
+  audio_Assay: r(
+    'गुणवत्ता जांच। नमी प्रतिशत और बाहरी पदार्थ भरें, ग्रेड चुनें और ज़रूरत हो तो टिप्पणी लिखें। फिर जांच दर्ज करें दबाएं। भाव ग्रेड के अनुसार अपने आप तय होता है और किसान को तुरंत दिखता है। फसल स्वीकार योग्य न हो तो अस्वीकार करें दबाएं।',
+    'Quality check. Enter moisture percentage and foreign matter, choose the grade and add notes if needed. Then tap Record Assay. The price is fixed automatically from the grade and shown to the farmer at once. If the lot is not acceptable, tap Reject.',
+    'ਗੁਣਵੱਤਾ ਜਾਂਚ। ਨਮੀ ਪ੍ਰਤੀਸ਼ਤ ਅਤੇ ਬਾਹਰੀ ਪਦਾਰਥ ਭਰੋ, ਗ੍ਰੇਡ ਚੁਣੋ ਅਤੇ ਲੋੜ ਹੋਵੇ ਤਾਂ ਟਿੱਪਣੀ ਲਿਖੋ। ਫਿਰ ਜਾਂਚ ਦਰਜ ਕਰੋ ਦਬਾਓ। ਭਾਅ ਗ੍ਰੇਡ ਅਨੁਸਾਰ ਆਪਣੇ ਆਪ ਤੈਅ ਹੁੰਦਾ ਹੈ। ਫਸਲ ਠੀਕ ਨਾ ਹੋਵੇ ਤਾਂ ਅਸਵੀਕਾਰ ਕਰੋ ਦਬਾਓ।',
+    'गुणवत्ता तपासणी. ओलावा टक्केवारी आणि परकीय पदार्थ भरा, ग्रेड निवडा आणि गरज असल्यास टिप्पणी लिहा. मग तपासणी नोंदवा दाबा. भाव ग्रेडनुसार आपोआप ठरतो आणि शेतकऱ्याला लगेच दिसतो. पीक स्वीकारण्यायोग्य नसेल तर नाकारा दाबा.'
+  ),
+  audio_Weighing: r(
+    'तौल पेज। धर्मकांटे से आया कुल वजन क्विंटल में भरें। ज़रूरत हो तो वाहन का खाली वजन भी भरें। कुल राशि भाव और वजन से अपने आप बनती है। तौल दर्ज करें दबाते ही टोकन कैशियर के पास चला जाता है।',
+    'Weighing page. Enter the total weight from the weighbridge in quintals. Enter the empty vehicle weight too if needed. The total amount is calculated from price and weight automatically. Tap Record Weighing and the token moves to the cashier.',
+    'ਤੋਲ ਪੇਜ। ਧਰਮਕੰਡੇ ਤੋਂ ਆਇਆ ਕੁੱਲ ਵਜ਼ਨ ਕੁਇੰਟਲ ਵਿੱਚ ਭਰੋ। ਲੋੜ ਹੋਵੇ ਤਾਂ ਖਾਲੀ ਵਾਹਨ ਦਾ ਵਜ਼ਨ ਵੀ ਭਰੋ। ਕੁੱਲ ਰਕਮ ਭਾਅ ਅਤੇ ਵਜ਼ਨ ਤੋਂ ਆਪਣੇ ਆਪ ਬਣਦੀ ਹੈ। ਤੋਲ ਦਰਜ ਕਰੋ ਦਬਾਉਂਦੇ ਹੀ ਟੋਕਨ ਕੈਸ਼ੀਅਰ ਕੋਲ ਚਲਾ ਜਾਂਦਾ ਹੈ।',
+    'वजन पेज. वजनकाट्यावरून आलेले एकूण वजन क्विंटलमध्ये भरा. गरज असल्यास रिकाम्या वाहनाचे वजन देखील भरा. एकूण रक्कम भाव आणि वजनावरून आपोआप तयार होते. वजन नोंदवा दाबताच टोकन कॅशियरकडे जाते.'
+  ),
+  audio_MarkPaid: r(
+    'भुगतान पेज। किसान को देय राशि ऊपर है। भुगतान का तरीका चुनें, जैसे बैंक ट्रांसफर या यूपीआई, और संदर्भ नंबर भरें। भुगतान हो गया दबाते ही किसान को रसीद मिल जाती है और टोकन पूरा हो जाता है।',
+    'Payment page. The amount due to the farmer is at the top. Choose the payment mode, such as bank transfer or UPI, and enter the reference number. Tap Mark Paid and the farmer gets the receipt instantly and the token is complete.',
+    'ਭੁਗਤਾਨ ਪੇਜ। ਕਿਸਾਨ ਨੂੰ ਦੇਣ ਵਾਲੀ ਰਕਮ ਉੱਪਰ ਹੈ। ਭੁਗਤਾਨ ਦਾ ਤਰੀਕਾ ਚੁਣੋ, ਜਿਵੇਂ ਬੈਂਕ ਟ੍ਰਾਂਸਫਰ ਜਾਂ ਯੂਪੀਆਈ, ਅਤੇ ਹਵਾਲਾ ਨੰਬਰ ਭਰੋ। ਭੁਗਤਾਨ ਹੋ ਗਿਆ ਦਬਾਉਂਦੇ ਹੀ ਕਿਸਾਨ ਨੂੰ ਰਸੀਦ ਮਿਲ ਜਾਂਦੀ ਹੈ।',
+    'पेमेंट पेज. शेतकऱ्याला देय रक्कम वर आहे. पेमेंटची पद्धत निवडा, जसे बँक ट्रान्सफर किंवा यूपीआय, आणि संदर्भ क्रमांक भरा. पेमेंट झाले दाबताच शेतकऱ्याला पावती मिळते आणि टोकन पूर्ण होते.'
+  ),
+  audio_Reports: r(
+    'दैनिक रिपोर्ट। आज की मंडी का सार, कुल टोकन, प्रवेश, जांच, तौल, भुगतान और कुल राशि। फसल के अनुसार आवक भी नीचे है। यह रिपोर्ट साझा भी कर सकते हैं।',
+    'Daily report. A summary of today\'s mandi: total tokens, entries, assays, weighings, payments and total amount. Arrivals by crop are below. You can share this report.',
+    'ਰੋਜ਼ਾਨਾ ਰਿਪੋਰਟ। ਅੱਜ ਦੀ ਮੰਡੀ ਦਾ ਸਾਰ, ਕੁੱਲ ਟੋਕਨ, ਐਂਟਰੀ, ਜਾਂਚ, ਤੋਲ, ਭੁਗਤਾਨ ਅਤੇ ਕੁੱਲ ਰਕਮ। ਫਸਲ ਅਨੁਸਾਰ ਆਮਦ ਵੀ ਹੇਠਾਂ ਹੈ। ਇਹ ਰਿਪੋਰਟ ਸਾਂਝੀ ਵੀ ਕਰ ਸਕਦੇ ਹੋ।',
+    'दैनिक अहवाल. आजच्या मंडीचा सारांश: एकूण टोकन, प्रवेश, तपासणी, वजन, पेमेंट आणि एकूण रक्कम. पिकानुसार आवक खाली आहे. हा अहवाल शेअर करू शकता.'
+  ),
+  audio_DelayReport: r(
+    'देरी की सूचना। अगर मंडी में काम धीमा चल रहा है, तो कितने मिनट की देरी है और कारण चुनकर भेजें। इससे सभी प्रतीक्षारत किसानों का अनुमानित समय अपने आप आगे बढ़ जाता है।',
+    'Delay report. If work at the mandi is running slow, choose how many minutes of delay and the reason, then submit. Every waiting farmer\'s expected time is pushed forward automatically.',
+    'ਦੇਰੀ ਦੀ ਸੂਚਨਾ। ਜੇ ਮੰਡੀ ਵਿੱਚ ਕੰਮ ਹੌਲੀ ਚੱਲ ਰਿਹਾ ਹੈ ਤਾਂ ਕਿੰਨੇ ਮਿੰਟ ਦੀ ਦੇਰੀ ਹੈ ਅਤੇ ਕਾਰਨ ਚੁਣ ਕੇ ਭੇਜੋ। ਇਸ ਨਾਲ ਸਾਰੇ ਉਡੀਕ ਰਹੇ ਕਿਸਾਨਾਂ ਦਾ ਅਨੁਮਾਨਿਤ ਸਮਾਂ ਆਪਣੇ ਆਪ ਅੱਗੇ ਵਧ ਜਾਂਦਾ ਹੈ।',
+    'विलंब सूचना. मंडीत काम हळू चालत असेल तर किती मिनिटांचा विलंब आणि कारण निवडून पाठवा. यामुळे सर्व प्रतीक्षेत असलेल्या शेतकऱ्यांची अपेक्षित वेळ आपोआप पुढे जाते.'
+  ),
+  audio_OfficerProfile: r(
+    'अधिकारी प्रोफ़ाइल। यहाँ आपका नाम, मंडी, ड्यूटी और कर्मचारी आईडी है। ड्यूटी बदलने के लिए मंडी प्रशासक कोड चाहिए। नीचे से लॉगआउट कर सकते हैं।',
+    'Officer profile. Your name, mandi, duty and employee ID are here. Changing duty needs the mandi admin code. You can log out at the bottom.',
+    'ਅਧਿਕਾਰੀ ਪ੍ਰੋਫ਼ਾਈਲ। ਇੱਥੇ ਤੁਹਾਡਾ ਨਾਮ, ਮੰਡੀ, ਡਿਊਟੀ ਅਤੇ ਕਰਮਚਾਰੀ ਆਈਡੀ ਹੈ। ਡਿਊਟੀ ਬਦਲਣ ਲਈ ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਕ ਕੋਡ ਚਾਹੀਦਾ ਹੈ। ਹੇਠਾਂ ਤੋਂ ਲੌਗਆਊਟ ਕਰ ਸਕਦੇ ਹੋ।',
+    'अधिकारी प्रोफाइल. येथे तुमचे नाव, मंडी, ड्युटी आणि कर्मचारी आयडी आहे. ड्युटी बदलण्यासाठी मंडी प्रशासक कोड लागतो. खालून लॉगआउट करू शकता.'
+  ),
+  audio_TraderDashboard: r(
+    'व्यापारी पेज। नीलामी बोर्ड में आज के जांचे हुए लॉट हैं जिन पर बोली लगा सकते हैं। मेरी खरीद में आपके जीते हुए लॉट और उनका तौल व भुगतान है। ऊपर अवतार से प्रोफ़ाइल और लॉगआउट।',
+    'Trader page. The auction board shows today\'s assayed lots you can bid on. My Purchases shows the lots you won with their weighing and payment. Tap the avatar at the top for profile and logout.',
+    'ਵਪਾਰੀ ਪੇਜ। ਨੀਲਾਮੀ ਬੋਰਡ ਵਿੱਚ ਅੱਜ ਦੇ ਜਾਂਚੇ ਹੋਏ ਲਾਟ ਹਨ ਜਿਨ੍ਹਾਂ ਤੇ ਬੋਲੀ ਲਗਾ ਸਕਦੇ ਹੋ। ਮੇਰੀ ਖਰੀਦ ਵਿੱਚ ਜਿੱਤੇ ਹੋਏ ਲਾਟ ਅਤੇ ਉਹਨਾਂ ਦਾ ਤੋਲ ਤੇ ਭੁਗਤਾਨ ਹੈ। ਉੱਪਰ ਅਵਤਾਰ ਤੋਂ ਪ੍ਰੋਫ਼ਾਈਲ ਅਤੇ ਲੌਗਆਊਟ।',
+    'व्यापारी पेज. लिलाव बोर्डवर आजचे तपासलेले लॉट आहेत ज्यांवर बोली लावू शकता. माझी खरेदी मध्ये जिंकलेले लॉट व त्यांचे वजन आणि पेमेंट आहे. वर अवतारवरून प्रोफाइल आणि लॉगआउट.'
+  ),
+  audio_AuctionBoard: r(
+    'नीलामी बोर्ड। हर कार्ड एक लॉट है, फसल, ग्रेड, मात्रा और अभी की सबसे ऊँची बोली के साथ। समय खत्म होने से पहले बोली लगाने के लिए लॉट पर टैप करें।',
+    'Auction board. Each card is one lot with crop, grade, quantity and the current highest bid. Tap a lot to bid before its timer ends.',
+    'ਨੀਲਾਮੀ ਬੋਰਡ। ਹਰ ਕਾਰਡ ਇੱਕ ਲਾਟ ਹੈ, ਫਸਲ, ਗ੍ਰੇਡ, ਮਾਤਰਾ ਅਤੇ ਹੁਣ ਦੀ ਸਭ ਤੋਂ ਉੱਚੀ ਬੋਲੀ ਨਾਲ। ਸਮਾਂ ਖਤਮ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਬੋਲੀ ਲਈ ਲਾਟ ਤੇ ਟੈਪ ਕਰੋ।',
+    'लिलाव बोर्ड. प्रत्येक कार्ड एक लॉट आहे: पीक, ग्रेड, प्रमाण आणि सध्याची सर्वोच्च बोली. वेळ संपण्यापूर्वी बोली लावण्यासाठी लॉटवर टॅप करा.'
+  ),
+  audio_AuctionBidding: r(
+    'बोली पेज। ऊपर लॉट का विवरण और न्यूनतम भाव है। अपनी बोली प्रति क्विंटल भरें और बोली लगाएं दबाएं। बोली न्यूनतम से ऊपर होनी चाहिए। समय खत्म होने पर सबसे ऊँची बोली जीतती है।',
+    'Bidding page. Lot details and the minimum price are at the top. Enter your bid per quintal and tap Place Bid. The bid must be above the minimum. When the timer ends, the highest bid wins.',
+    'ਬੋਲੀ ਪੇਜ। ਉੱਪਰ ਲਾਟ ਦਾ ਵੇਰਵਾ ਅਤੇ ਘੱਟੋ-ਘੱਟ ਭਾਅ ਹੈ। ਆਪਣੀ ਬੋਲੀ ਪ੍ਰਤੀ ਕੁਇੰਟਲ ਭਰੋ ਅਤੇ ਬੋਲੀ ਲਗਾਓ ਦਬਾਓ। ਬੋਲੀ ਘੱਟੋ-ਘੱਟ ਤੋਂ ਉੱਪਰ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ। ਸਮਾਂ ਖਤਮ ਹੋਣ ਤੇ ਸਭ ਤੋਂ ਉੱਚੀ ਬੋਲੀ ਜਿੱਤਦੀ ਹੈ।',
+    'बोली पेज. वर लॉटचा तपशील आणि किमान भाव आहे. तुमची बोली प्रति क्विंटल भरा आणि बोली लावा दाबा. बोली किमानपेक्षा जास्त हवी. वेळ संपल्यावर सर्वोच्च बोली जिंकते.'
+  ),
+  audio_MyPurchases: r(
+    'मेरी खरीद। यहाँ आपके जीते हुए लॉट हैं। हर लॉट का तौला हुआ वजन और कुल राशि तौल के बाद यहाँ दिखती है, और भुगतान की स्थिति भी।',
+    'My purchases. The lots you won are here. Each lot\'s weighed quantity and total amount appear after weighing, along with the payment status.',
+    'ਮੇਰੀ ਖਰੀਦ। ਇੱਥੇ ਤੁਹਾਡੇ ਜਿੱਤੇ ਹੋਏ ਲਾਟ ਹਨ। ਹਰ ਲਾਟ ਦਾ ਤੋਲਿਆ ਹੋਇਆ ਵਜ਼ਨ ਅਤੇ ਕੁੱਲ ਰਕਮ ਤੋਲ ਤੋਂ ਬਾਅਦ ਇੱਥੇ ਦਿਖਦੀ ਹੈ, ਅਤੇ ਭੁਗਤਾਨ ਦੀ ਸਥਿਤੀ ਵੀ।',
+    'माझी खरेदी. येथे तुम्ही जिंकलेले लॉट आहेत. प्रत्येक लॉटचे वजन केलेले प्रमाण आणि एकूण रक्कम वजनानंतर येथे दिसते, आणि पेमेंटची स्थिती देखील.'
+  ),
+  audio_TraderProfile: r(
+    'व्यापारी प्रोफ़ाइल। यहाँ आपका नाम, मोबाइल और मंडी है। मंडी बदल सकते हैं। नीचे से लॉगआउट करें।',
+    'Trader profile. Your name, mobile and mandi are here. You can change your mandi. Log out at the bottom.',
+    'ਵਪਾਰੀ ਪ੍ਰੋਫ਼ਾਈਲ। ਇੱਥੇ ਤੁਹਾਡਾ ਨਾਮ, ਮੋਬਾਈਲ ਅਤੇ ਮੰਡੀ ਹੈ। ਮੰਡੀ ਬਦਲ ਸਕਦੇ ਹੋ। ਹੇਠਾਂ ਤੋਂ ਲੌਗਆਊਟ ਕਰੋ।',
+    'व्यापारी प्रोफाइल. येथे तुमचे नाव, मोबाईल आणि मंडी आहे. मंडी बदलू शकता. खालून लॉगआउट करा.'
   ),
 };
 
@@ -886,6 +1042,11 @@ export function translate(key, lang = DEFAULT_LANG, params) {
   if (!row) return fill(String(key || ''), params, lang);
   const text = row[lang] || row.hi || row.en || '';
   return fill(text, params, lang);
+}
+
+/** Does a translation key exist? (used by AppHeader for per-screen voice help) */
+export function hasKey(key) {
+  return !!t[key];
 }
 
 /** Crop display name in a language. */

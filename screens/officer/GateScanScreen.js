@@ -89,8 +89,9 @@ export default function GateScanScreen({ navigation, route }) {
     }
     setBusy(true);
     try {
-      await markGateEntry(match.tokenId, vehicle, how);
-      Alert.alert(tr('gs_admitted'), `${match.tokenNumber} • ${match.farmerName}`, [
+      const done = await markGateEntry(match.tokenId, vehicle, how);
+      const laneLine = done?.laneAssigned ? `\n\n${tr('gs_sendToLane', { lane: done.laneAssigned })}` : '';
+      Alert.alert(tr('gs_admitted'), `${match.tokenNumber} • ${match.farmerName}${laneLine}`, [
         { text: tr('gs_nextScan'), onPress: reset },
         { text: tr('back'), onPress: () => navigation.goBack() },
       ]);

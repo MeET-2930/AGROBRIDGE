@@ -2,8 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NavigationRouteContext } from '@react-navigation/native';
 import Colors from '../theme/colors';
 import { useLang } from '../i18n/LanguageContext';
+import { hasKey } from '../i18n/translations';
 
 /*
  * Original AGROBRIDGE header: centred brand + subtitle, round
@@ -21,18 +23,27 @@ export default function AppHeader({
   audioText,
 }) {
   const insets = useSafeAreaInsets();
-  const { tr, speak, stopSpeak, setPickerOpen } = useLang();
+  const { tr, speak, stopSpeak, speaking, setPickerOpen } = useLang();
+  // Which screen are we on?  -> default help text is  audio_<RouteName>
+  // (install21: every screen gets voice help without editing each screen)
+  const route = React.useContext(NavigationRouteContext);
+  const routeKey = route?.name ? `audio_${route.name}` : null;
 
   const displayTitle = title != null && String(title).trim() !== '' ? String(title) : tr('brand');
   const displaySub = tag != null && String(tag).trim() !== '' ? String(tag) : tr('brandSub');
-  const isBrand = !title || displayTitle === 'AGROBRIDGE' || displayTitle === tr('brand');
+  const isBrand = !title || displayTitle === 'AgroBridge' || displayTitle === 'AGROBRIDGE' || displayTitle === tr('brand');
 
   const handleSpeakerPress = () => {
-    stopSpeak();
+    if (speaking) {            // second tap = stop
+      stopSpeak();
+      return;
+    }
     if (audioText && String(audioText).trim() !== '') {
       speak(String(audioText), true);
+    } else if (routeKey && hasKey(routeKey)) {
+      speak(routeKey);           // screen-specific help (audio_<RouteName>)
     } else if (audioKey) {
-      speak(audioKey);
+      speak(audioKey);           // older shared keys (audio_crop, audio_slot ...)
     } else {
       speak('audio_welcome');
     }
@@ -87,7 +98,7 @@ export default function AppHeader({
             accessibilityLabel="Voice assistance"
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
           >
-            <Ionicons name="volume-medium" size={18} color={Colors.navy} />
+            <Ionicons name={speaking ? 'stop-circle' : 'volume-medium'} size={18} color={speaking ? Colors.secondary : Colors.navy} />
           </TouchableOpacity>
         ) : null}
       </View>

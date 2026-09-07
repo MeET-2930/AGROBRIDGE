@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AppHeader from '../../components/AppHeader';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
 
@@ -10,11 +9,9 @@ export default function WelcomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader navigation={navigation} showBack={false} audioKey="audio_welcome" />
-
       <View style={styles.content}>
         <Text style={styles.logo}>🌾</Text>
-        <Text style={styles.brand}>AGROBRIDGE</Text>
+        <Text style={styles.brand}>AgroBridge</Text>
         <Text style={styles.brandSub}>{tr('brandSub')}</Text>
         <Text style={styles.headline}>{tr('welcome_headline')}</Text>
         <Text style={styles.headlineSub}>{tr('welcome_sub')}</Text>

@@ -87,7 +87,7 @@ export function buildReceiptHtml(token, lang = 'hi') {
 <body>
   <div class="top">
     <div>
-      <div class="brand">AGROBRIDGE</div>
+      <div class="brand">AgroBridge</div>
       <div class="sub">${esc(t.centreName)}</div>
       <div class="sub">${esc(t.centreAddress || '')}</div>
     </div>
@@ -305,7 +305,7 @@ export function buildGatePassHtml(token, lang = 'hi') {
       <span>${T('gp_hint')}</span>
     </div>
   </div>
-  <div class="brand">AGROBRIDGE • ${esc(fmtDateTime(new Date().toISOString()))}</div>
+  <div class="brand">AgroBridge • ${esc(fmtDateTime(new Date().toISOString()))}</div>
 </body></html>`;
 }
 
