@@ -100,8 +100,9 @@
   // ---------- speech ----------
   // Voice: 1) server /tts (Microsoft neural female Hindi/English - natural),
   //        2) fallback: the browser's own voice. Never waits forever.
-  let player=null;
+  let player=null, stopped=false;
   function speak(text, langTag){
+    stopped=false;
     if($('mute').checked) return new Promise(r=>setTimeout(r,50));
     const lang=(langTag||'en').startsWith('hi')?'hi':'en';
     return new Promise(res=>{
@@ -112,6 +113,7 @@
       // once we know the clip length, continue exactly when it ends (even if "ended" never fires)
       a.onloadedmetadata=()=>{ if(isFinite(a.duration)){ clearTimeout(guard); guard=setTimeout(finish, a.duration*1000+250); } };
       a.onended=()=>{clearTimeout(guard);finish();};
+      a.onpause=()=>{ if(a.src===''||a.ended||stopped) {clearTimeout(guard);finish();} };
       a.onerror=()=>{ clearTimeout(guard); browserSpeak(text,langTag).then(finish); };
       a.play().catch(()=>{ clearTimeout(guard); browserSpeak(text,langTag).then(finish); });
     });
@@ -120,6 +122,7 @@
     return new Promise(res=>{
       let done=false; const finish=()=>{ if(!done){done=true;res();} };
       setTimeout(finish, Math.min(12000, 1500+text.length*70));
+      const poll=setInterval(()=>{ if(stopped){clearInterval(poll);finish();} if(done) clearInterval(poll); },100);
       try{
         if(!('speechSynthesis' in window)) return finish();
         const u=new SpeechSynthesisUtterance(text); u.lang=langTag||'en-IN'; u.rate=0.95;
@@ -130,7 +133,7 @@
       }catch(e){ finish(); }
     });
   }
-  function stopAudio(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} }
+  function stopAudio(){ stopped=true; try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} }
   function log(cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;$('log').appendChild(d);$('log').scrollTop=1e9;}
 
   // ---------- talking to the server ----------
@@ -164,14 +167,21 @@
       const tag=node.nodeName;
       if(tag==='Say'){ log('say',node.textContent); await speak(node.textContent,node.getAttribute('language')); }
       else if(tag==='Gather'){
+        // Real IVRs accept a key while still talking ("barge-in"). So: arm the
+        // keypad FIRST, then read the options; a key press stops the voice at once.
         const inputType=node.getAttribute('input')||'dtmf';
-        for(const k of Array.from(node.children)){ if(k.nodeName==='Say'){log('say',k.textContent); await speak(k.textContent,k.getAttribute('language'));} }
-        if(!call) return;
         call.gather={action:node.getAttribute('action'),type:inputType,
-                     numDigits:Number(node.getAttribute('numDigits')||1),finishOnKey:node.getAttribute('finishOnKey')||''};
+                     numDigits:Number(node.getAttribute('numDigits')||1),finishOnKey:node.getAttribute('finishOnKey')||'',
+                     speaking:true};
         call.buffer='';
-        $('callState').textContent= inputType==='speech'?'listening…':'press a key…';
+        $('callState').textContent= inputType==='speech'?'listening…':'press a key any time…';
         renderPad();
+        const myGather=call.gather;
+        for(const k of Array.from(node.children)){
+          if(!call || call.gather!==myGather) return;        // farmer already answered
+          if(k.nodeName==='Say'){ log('say',k.textContent); await speak(k.textContent,k.getAttribute('language')); }
+        }
+        if(call && call.gather===myGather){ myGather.speaking=false; $('callState').textContent= inputType==='speech'?'listening…':'press a key…'; }
         return;                                            // wait for the user
       }
       else if(tag==='Redirect'){ return run(await post(node.textContent)); }
@@ -192,6 +202,7 @@
   }
   async function press(k){
     const g=call&&call.gather; if(!g) return;
+    stopAudio();                                            // answer received - stop talking
     if(g.finishOnKey && k===g.finishOnKey){ return submitDigits(); }
     call.buffer+=k;
     if(!g.finishOnKey && call.buffer.length>=g.numDigits) return submitDigits();
@@ -205,6 +216,7 @@
   }
   $('speak').onclick=async()=>{
     const g=call&&call.gather; if(!g) return;
+    stopAudio();
     const text=$('speech').value.trim(); if(!text) return;
     call.gather=null; renderPad(); log('you','said "'+text+'"'); $('speech').value='';
     try{ run(await post(g.action,{SpeechResult:text,Confidence:'0.9'})); }
