@@ -18,7 +18,7 @@
   .status{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
   .caller{margin:14px 0 6px;font-size:20px;font-weight:600;text-align:center}
   .state{font-size:13px;color:var(--muted);text-align:center;min-height:18px}
-  .log{flex:1;overflow:auto;margin:12px 0;padding:10px;background:#f9fafb;border-radius:12px;font-size:14px;line-height:1.45}
+  .log{flex:1;overflow:auto;margin:12px 0;padding:10px;background:#f9fafb;border-radius:12px;font-size:15px;line-height:1.5}
   .log .say{margin:0 0 8px;padding:8px 10px;background:#e8f5e9;border-radius:10px;border-left:3px solid var(--green)}
   .log .you{margin:0 0 8px;padding:6px 10px;background:#fff3e0;border-radius:10px;border-left:3px solid var(--saffron);text-align:right}
   .log .sys{color:var(--muted);font-size:12px;text-align:center;margin:6px 0}
@@ -92,7 +92,7 @@
   phoneEl.oninput=()=>localStorage.setItem('agb_sim_phone',phoneEl.value.replace(/\D/g,''));
   setInterval(()=>{$('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});},1000);
 
-  let call=null;                 // {sid, direction, gather:{action,digits,numDigits,finishOnKey}, buffer}
+  let call=null, lastYou='';                 // {sid, direction, gather:{action,digits,numDigits,finishOnKey}, buffer}
   let pendingRing=null;
   const show=(id)=>{['home','incoming','incall'].forEach(x=>$(x).classList.toggle('hidden',x!==id));};
   const setMode=(t)=>$('mode').textContent=t;
@@ -159,6 +159,8 @@
     const root=doc.documentElement;
     if(!root||root.nodeName!=='Response'){log('sys','bad response'); return end();}
     call.gather=null; renderPad();
+    $('log').innerHTML='';                 // show only the current step, not the whole call
+    if(lastYou){ log('you',lastYou); lastYou=''; }
     // warm the voice cache for every prompt in this response, all at once
     if(!$('mute').checked) Array.from(doc.getElementsByTagName('Say')).forEach(n=>{
       const l=(n.getAttribute('language')||'en').startsWith('hi')?'hi':'en';
@@ -216,20 +218,46 @@
   }
   async function submitDigits(){
     const g=call.gather; const digits=call.buffer; call.gather=null; renderPad();
-    log('you','pressed '+digits); $('callState').textContent='…';
+    log('you','pressed '+digits); $('callState').textContent='…'; lastYou='pressed '+digits;
     try{ run(await post(g.action,{Digits:digits})); }
     catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
   }
   // ---------- microphone (Chrome / Edge / Android Chrome) ----------
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null;
+  function beep(){                                   // the "beep" the prompt promises
+    try{
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='sine'; o.frequency.value=880; g.gain.value=0.15;
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.25);
+      o.onended=()=>ctx.close();
+    }catch(e){}
+  }
+  let heard='';
   function startMic(){
     if(!SR){ $('micState').textContent='Microphone not supported in this browser - type your name.'; $('mic').disabled=true; return; }
     try{ if(rec) rec.abort(); }catch(e){}
-    rec=new SR(); rec.lang=(call&&call.gather&&call.gather.lang)||'hi-IN'; rec.interimResults=false; rec.maxAlternatives=1;
-    rec.onstart=()=>{ $('micState').textContent='Listening… say your name'; $('mic').textContent='🎤 Listening…'; };
-    rec.onresult=(e)=>{ const t=e.results[0][0].transcript.trim(); $('micState').textContent='Heard: '+t; sendSpeech(t); };
-    rec.onerror=(e)=>{ $('micState').textContent=(e.error==='not-allowed'?'Microphone blocked - allow it in the address bar, or type your name.':'Did not catch that - tap the mic again or type.'); $('mic').textContent='🎤 Speak your name'; };
-    rec.onend=()=>{ $('mic').textContent='🎤 Speak your name'; };
+    heard='';
+    rec=new SR(); rec.lang=(call&&call.gather&&call.gather.lang)||'hi-IN'; rec.interimResults=true; rec.maxAlternatives=1; rec.continuous=false;
+    rec.onstart=()=>{ beep(); $('micState').textContent='Listening… say your name'; $('mic').textContent='🎤 Listening…'; };
+    rec.onresult=(e)=>{
+      let interim='', final='';
+      for(let i=e.resultIndex;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal) final+=t; else interim+=t; }
+      if(interim){ heard=interim.trim(); $('speech').value=heard; $('micState').textContent='Hearing: '+heard; }
+      if(final){ heard=final.trim(); $('speech').value=heard; $('micState').textContent='Heard: '+heard; sendSpeech(heard); }
+    };
+    rec.onerror=(e)=>{
+      $('mic').textContent='🎤 Speak your name';
+      if(e.error==='not-allowed'||e.error==='service-not-allowed') $('micState').textContent='Microphone blocked - allow it (lock icon in address bar), or type your name.';
+      else if(e.error==='no-speech') $('micState').textContent='Did not hear anything - tap the mic and speak right after the beep, or type.';
+      else if(e.error==='network') $('micState').textContent='Speech service needs internet (Chrome) - or type your name.';
+      else $('micState').textContent='Could not recognise - tap the mic again or type.';
+    };
+    rec.onend=()=>{
+      $('mic').textContent='🎤 Speak your name';
+      // Chrome sometimes ends without a "final" result: use what we heard.
+      if(heard && call && call.gather && call.gather.type==='speech'){ const h=heard; heard=''; sendSpeech(h); }
+    };
     try{ rec.start(); }catch(e){}
   }
   function stopMic(){ try{ if(rec){rec.onend=null;rec.abort();} }catch(e){} rec=null; }
@@ -238,7 +266,7 @@
   async function sendSpeech(text){
     const g=call&&call.gather; if(!g||!text) return;
     stopMic();
-    call.gather=null; renderPad(); log('you','said "'+text+'"'); $('speech').value=''; $('micState').textContent='';
+    call.gather=null; renderPad(); log('you','said "'+text+'"'); lastYou='said "'+text+'"'; $('speech').value=''; $('micState').textContent='';
     try{ run(await post(g.action,{SpeechResult:text,Confidence:'0.9'})); }
     catch(e){ log('sys','network error: '+e.message+' - press End call and try again'); }
   }
