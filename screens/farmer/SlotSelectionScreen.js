@@ -16,8 +16,7 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
-import { fetchCentreSlots, createBooking } from '../../services/bookings';
-import { getCurrentUserSession } from '../../services/auth';
+import { fetchCentreSlots } from '../../services/bookings';
 import {
   todayLocal,
   dateOffsetLocal,
@@ -48,8 +47,6 @@ export default function SlotSelectionScreen({ navigation, route }) {
   const [slots, setSlots] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [quantity, setQuantity] = useState('10');
 
   const loadSlots = async () => {
     if (!centre?.id) {
@@ -101,47 +98,9 @@ export default function SlotSelectionScreen({ navigation, route }) {
       return;
     }
 
-    const session = await getCurrentUserSession();
-
-    if (!session?.uid) {
-      Alert.alert(tr('loginRequired'), tr('loginAgain'));
-      return;
-    }
-
-    if (!quantity || Number(quantity) <= 0) {
-      Alert.alert(tr('quantity'), tr('ss_enterQty'));
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const booking = await createBooking({
-        farmerId: session.uid,
-        farmerName: session.name,
-        farmerPhone: session.phone,
-        centreId: centre.id,
-        crop: crop.id,
-        cropName: crop.name,
-        approxQuantityQuintals: Number(quantity),
-        date,
-        slotTime: selected.slotTime,
-        slotWindow: selected.windowLabel,
-      });
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'TokenConfirmation', params: { booking } }],
-      });
-    } catch (error) {
-      console.error('Booking error:', error);
-      Alert.alert(tr('ss_bookFail'), trError(error, 'ss_bookFailSub'));
-
-      // The slot may have filled up while the farmer was deciding.
-      loadSlots();
-    } finally {
-      setSubmitting(false);
-    }
+    // Quantity is asked on its own screen (install27) so the farmer cannot
+    // miss it under a long list of slots.
+    navigation.navigate('Quantity', { crop, centre, date, slot: selected });
   };
 
   return (
@@ -250,43 +209,13 @@ export default function SlotSelectionScreen({ navigation, route }) {
           })
         )}
 
-        <Text style={styles.sectionTitle}>{tr('ss_qtyTitle')}</Text>
-
-        <View style={styles.quantityBox}>
-          <Text style={styles.quantityLabel}>{tr('ss_qtyLabel')}</Text>
-
-          <View style={styles.quantityInputRow}>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() =>
-                setQuantity(
-                  String(Math.max(1, Number(quantity || 0) - 1))
-                )
-              }
-            >
-              <Text style={styles.quantityButtonText}>−</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.quantityValue}>{quantity || '0'}</Text>
-
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => setQuantity(String(Number(quantity || 0) + 1))}
-            >
-              <Text style={styles.quantityButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.quantityUnit}>{tr('quintal')}</Text>
-        </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
-          loading={submitting}
-          title={tr('confirmToken')}
+          title={tr('ss_next')}
           onPress={confirm}
-          disabled={!selected || selected?.isFull || loading || submitting}
+          disabled={!selected || selected?.isFull || loading}
         />
       </View>
     </SafeAreaView>
@@ -351,39 +280,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginLeft: 10,
   },
-
-  quantityBox: {
-    backgroundColor: Colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 16,
-    alignItems: 'center',
-  },
-  quantityLabel: { fontSize: 12, fontWeight: '700', color: Colors.subText },
-  quantityInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 22,
-  },
-  quantityButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quantityButtonText: { fontSize: 25, fontWeight: '800', color: Colors.navy },
-  quantityValue: {
-    minWidth: 70,
-    textAlign: 'center',
-    fontSize: 25,
-    fontWeight: '900',
-    color: Colors.navy,
-  },
-  quantityUnit: { fontSize: 11, color: Colors.subText, marginTop: 4 },
 
   empty: {
     backgroundColor: Colors.white,

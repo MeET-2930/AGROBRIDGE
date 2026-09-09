@@ -41,6 +41,7 @@ import FarmerDashboard from './screens/farmer/FarmerDashboard';
 import CropSelectionScreen from './screens/farmer/CropSelectionScreen';
 import CentreSelectionScreen from './screens/farmer/CentreSelectionScreen';
 import SlotSelectionScreen from './screens/farmer/SlotSelectionScreen';
+import QuantityScreen from './screens/farmer/QuantityScreen';
 import TokenConfirmationScreen from './screens/farmer/TokenConfirmationScreen';
 import TokenDetailScreen from './screens/farmer/TokenDetailScreen';
 import HistoryScreen from './screens/farmer/HistoryScreen';
@@ -75,6 +76,7 @@ function FarmerStack() {
       <FarmerNav.Screen name="CropSelection" component={CropSelectionScreen} />
       <FarmerNav.Screen name="CentreSelection" component={CentreSelectionScreen} />
       <FarmerNav.Screen name="SlotSelection" component={SlotSelectionScreen} />
+      <FarmerNav.Screen name="Quantity" component={QuantityScreen} />
       <FarmerNav.Screen name="TokenConfirmation" component={TokenConfirmationScreen} />
       <FarmerNav.Screen name="TokenDetail" component={TokenDetailScreen} />
       <FarmerNav.Screen name="History" component={HistoryScreen} />

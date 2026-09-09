@@ -279,12 +279,6 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('myCrops')}
-            icon="leaf-outline"
-            onPress={() => navigation.navigate('CropSelection')}
-          />
-
-          <DashboardCard
             title={tr('help')}
             icon="help-circle-outline"
             onPress={() => navigation.navigate('Help', { role: 'farmer' })}
