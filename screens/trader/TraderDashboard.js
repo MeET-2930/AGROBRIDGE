@@ -175,23 +175,23 @@ const styles = StyleSheet.create({
   },
   greet: { fontSize: 20, color: Colors.secondary, fontWeight: '800' },
   name: { fontSize: 18, fontWeight: '800', color: Colors.navy },
-  phone: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+  phone: { fontSize: 12, color: Colors.subText, marginTop: 2 },
 
   bookingCard: {
     backgroundColor: Colors.white, borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: Colors.border, marginBottom: 18,
   },
   bookingCardLive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  bookingLabel: { fontSize: 11, color: Colors.subText, fontWeight: '700' },
+  bookingLabel: { fontSize: 12, color: Colors.subText, fontWeight: '700' },
   bookingCentre: { fontSize: 15, fontWeight: '800', color: Colors.navy, marginTop: 4 },
-  bookingMeta: { fontSize: 12, color: Colors.subText, marginTop: 4 },
+  bookingMeta: { fontSize: 13, color: Colors.subText, marginTop: 4 },
 
   emptyCard: {
     backgroundColor: Colors.white, borderRadius: 16, padding: 22, alignItems: 'center',
     marginBottom: 18, borderWidth: 1, borderColor: Colors.border,
   },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: Colors.navy },
-  emptySub: { fontSize: 12, color: Colors.subText, textAlign: 'center', marginTop: 6 },
+  emptySub: { fontSize: 13, color: Colors.subText, textAlign: 'center', marginTop: 6 },
   link: { marginTop: 12, color: Colors.primary, fontWeight: '800' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },

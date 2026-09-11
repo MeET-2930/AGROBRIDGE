@@ -6,6 +6,7 @@
  * portal: Auth / Farmer / Officer / Trader.
  * ---------------------------------------------------------------
  */
+import './utils/webAlert';   // install34: makes Alert.alert work on the website
 import React, { useEffect, useState } from 'react';
 import {
   Image,
@@ -29,7 +30,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { LanguageProvider, useLang } from './i18n/LanguageContext';
 import Colors from './theme/colors';
-import { LOGO_FULL, WATERMARK, WATERMARK_OPACITY } from './theme/brand';
+import { LOGO_FULL } from './theme/brand';
 import { restoreUserSession } from './services/auth';
 
 // Auth
@@ -156,11 +157,6 @@ function RootApp({ initialRoute }) {
             <GlobalLanguageModalHost />
           </NotificationProvider>
         </NavigationContainer>
-        {/* install29: faint brand watermark over every screen. pointerEvents="none"
-            so it never blocks a tap; 6% opacity so it "just exists there". */}
-        <View style={styles.watermarkWrap} pointerEvents="none">
-          <Image source={WATERMARK} style={styles.watermark} resizeMode="contain" />
-        </View>
       </View>
 
       <View style={{ height: 5, backgroundColor: Colors.secondary }} />
@@ -218,8 +214,6 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingScreen: { flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' },
   logoImg: { width: 220, height: 220, marginBottom: 12 },
-  watermarkWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  watermark: { width: '80%', maxWidth: 420, aspectRatio: 1, opacity: WATERMARK_OPACITY },
   loadingText: { marginTop: 12, color: Colors.subText, fontWeight: '600' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },

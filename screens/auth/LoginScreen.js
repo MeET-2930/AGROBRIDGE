@@ -57,7 +57,7 @@ export default function LoginScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { flex: 1, padding: 20 },
-  label: { fontSize: 13, fontWeight: '700', color: Colors.navy, marginBottom: 8 },
+  label: { fontSize: 14, fontWeight: '700', color: Colors.navy, marginBottom: 8 },
   row: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: 14, height: 52,

@@ -110,9 +110,9 @@ const styles = StyleSheet.create({
 
   success: { alignItems: 'center', marginBottom: 18, marginTop: 6 },
   successTitle: { fontSize: 20, fontWeight: '900', color: Colors.navy, marginTop: 8 },
-  successSub: { fontSize: 12, color: Colors.subText, marginTop: 10, fontWeight: '700' },
+  successSub: { fontSize: 13, color: Colors.subText, marginTop: 10, fontWeight: '700' },
   tokenNumber: { fontSize: 44, fontWeight: '900', color: Colors.primary },
-  eta: { fontSize: 13, color: Colors.navy, fontWeight: '700', marginTop: 2 },
+  eta: { fontSize: 14, color: Colors.navy, fontWeight: '700', marginTop: 2 },
 
   tips: {
     backgroundColor: Colors.white,
@@ -123,8 +123,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   tipTitle: { fontWeight: '900', color: Colors.navy, marginBottom: 8 },
-  tip: { color: Colors.text, marginBottom: 4, fontSize: 13 },
-  tipNote: { color: Colors.subText, fontSize: 11, marginTop: 6 },
+  tip: { color: Colors.text, marginBottom: 4, fontSize: 14 },
+  tipNote: { color: Colors.subText, fontSize: 12, marginTop: 6 },
 
   footer: {
     padding: 18,

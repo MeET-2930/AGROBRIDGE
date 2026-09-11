@@ -93,7 +93,7 @@ export default function OtpScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { flex: 1, padding: 20 },
-  testText: { textAlign: 'center', color: Colors.subText, fontSize: 12, marginTop: 14 },
+  testText: { textAlign: 'center', color: Colors.subText, fontSize: 13, marginTop: 14 },
   otp: {
     marginTop: 20, alignSelf: 'center', width: 180, height: 56, borderWidth: 2,
     borderColor: Colors.primary, borderRadius: 12, textAlign: 'center', fontSize: 28,

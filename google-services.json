@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "857662235864",
+    "project_id": "agrobridge-sih26",
+    "storage_bucket": "agrobridge-sih26.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:857662235864:android:4e25fc9ed8e4241c6d23ad",
+        "android_client_info": {
+          "package_name": "com.agrobridge.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBI1pvZNuijkENTHcHI40qa8aK7rWy2M1Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

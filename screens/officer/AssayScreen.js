@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  infoText: { color: Colors.navy, fontWeight: '700', fontSize: 12 },
+  infoText: { color: Colors.navy, fontWeight: '700', fontSize: 13 },
   label: {
     fontWeight: '700',
     color: Colors.navy,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   textArea: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
-  hint: { fontSize: 11, color: Colors.subText, marginTop: 4 },
+  hint: { fontSize: 12, color: Colors.subText, marginTop: 4 },
   grades: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   grade: {
     paddingHorizontal: 14,

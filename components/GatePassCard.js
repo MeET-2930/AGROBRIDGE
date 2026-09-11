@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headText: { color: Colors.white, fontWeight: '900', fontSize: 13 },
+  headText: { color: Colors.white, fontWeight: '900', fontSize: 14 },
   headToken: { color: Colors.white, fontWeight: '900', fontSize: 20 },
   body: { flexDirection: 'row', padding: 14, gap: 14 },
   qrBox: {
@@ -83,14 +83,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   info: { flex: 1 },
-  label: { fontSize: 10, color: Colors.subText, fontWeight: '700', marginTop: 6 },
+  label: { fontSize: 11, color: Colors.subText, fontWeight: '700', marginTop: 6 },
   code: {
     fontSize: 26,
     fontWeight: '900',
     color: Colors.primary,
     letterSpacing: 2,
   },
-  value: { fontSize: 13, fontWeight: '700', color: Colors.navy },
+  value: { fontSize: 14, fontWeight: '700', color: Colors.navy },
   foot: {
     borderTopWidth: 1,
     borderTopColor: Colors.border,
@@ -98,6 +98,6 @@ const styles = StyleSheet.create({
     padding: 10,
     alignItems: 'center',
   },
-  footText: { fontSize: 12, fontWeight: '800', color: Colors.navy },
-  footHint: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+  footText: { fontSize: 13, fontWeight: '800', color: Colors.navy },
+  footHint: { fontSize: 12, color: Colors.subText, marginTop: 2 },
 });

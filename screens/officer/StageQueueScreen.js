@@ -240,8 +240,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   scanBtnText: { flex: 1, color: Colors.white, fontWeight: '900', fontSize: 14 },
-  passCode: { marginTop: 4, color: Colors.primary, fontWeight: '900', fontSize: 13 },
-  sheetPass: { color: Colors.primary, fontWeight: '800', fontSize: 12, marginBottom: 10 },
+  passCode: { marginTop: 4, color: Colors.primary, fontWeight: '900', fontSize: 14 },
+  sheetPass: { color: Colors.primary, fontWeight: '800', fontSize: 13, marginBottom: 10 },
 
   clearBox: {
     backgroundColor: Colors.white,
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginBottom: 8,
   },
-  nextTagText: { color: Colors.white, fontWeight: '900', fontSize: 10 },
+  nextTagText: { color: Colors.white, fontWeight: '900', fontSize: 11 },
 
   top: {
     flexDirection: 'row',
@@ -279,13 +279,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   token: { fontSize: 24, fontWeight: '900', color: Colors.navy },
-  slot: { fontSize: 11, color: Colors.subText, fontWeight: '700' },
+  slot: { fontSize: 12, color: Colors.subText, fontWeight: '700' },
 
   name: { marginTop: 8, fontWeight: '800', color: Colors.text, fontSize: 15 },
-  sub: { marginTop: 2, color: Colors.subText, fontSize: 12 },
+  sub: { marginTop: 2, color: Colors.subText, fontSize: 13 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 },
-  meta: { fontSize: 11, color: Colors.navy, fontWeight: '700' },
+  meta: { fontSize: 12, color: Colors.navy, fontWeight: '700' },
 
   actions: {
     flexDirection: 'row',
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: Colors.navy },
-  sheetSub: { color: Colors.subText, marginBottom: 12, fontSize: 12 },
+  sheetSub: { color: Colors.subText, marginBottom: 12, fontSize: 13 },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text,
   },
-  note: { fontSize: 11, color: Colors.subText, marginTop: 8, marginBottom: 14 },
+  note: { fontSize: 12, color: Colors.subText, marginTop: 8, marginBottom: 14 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cancel: { color: Colors.subText, fontWeight: '700', padding: 10 },
 });

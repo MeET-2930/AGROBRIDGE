@@ -44,5 +44,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
-  text: { fontSize: 11, fontWeight: '800' },
+  text: { fontSize: 12, fontWeight: '800' },
 });

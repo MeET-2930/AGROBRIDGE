@@ -16,7 +16,8 @@
  * bundles and runs when the package is not installed.
  * ---------------------------------------------------------------
  */
-import { Platform, Vibration } from 'react-native';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 let Notifications = null;
 let ready = false;
@@ -127,8 +128,7 @@ export async function showNow({ title, body, data }) {
     } catch (e) { /* fall through */ }
   }
 
-  try { Vibration.vibrate([0, 250, 150, 250]); } catch (e) { /* ignore */ }
-  return false;
+  return false;   // no in-app fallback: nothing shown on builds without expo-notifications
 }
 
 /**
@@ -156,6 +156,33 @@ export async function cancelScheduled(ids = []) {
   const N = loadModule();
   if (!N) return;
   await Promise.all(ids.filter(Boolean).map((id) => N.cancelScheduledNotificationAsync(id).catch(() => {})));
+}
+
+/**
+ * install34: Expo push token for THIS phone, so other devices can wake it
+ * when the app is closed. null on web / Expo Go / when permission denied.
+ */
+export let pushError = '';   // last reason a push token could not be obtained (shown on Notifications screen)
+
+export async function getPushToken() {
+  const N = loadModule();
+  if (Platform.OS === 'web') { pushError = 'web'; return null; }
+  if (!N) { pushError = 'expo-notifications not in this build (Expo Go / old APK)'; return null; }
+  if (!permitted) { pushError = 'notification permission not granted'; return null; }
+  try {
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ||
+      Constants?.easConfig?.projectId ||
+      undefined;
+    if (!projectId) { pushError = 'no EAS projectId in app.json'; return null; }
+    const t = await N.getExpoPushTokenAsync({ projectId });
+    pushError = t?.data ? '' : 'empty token';
+    return t?.data || null;
+  } catch (e) {
+    pushError = String(e?.message || e);
+    console.log('push token unavailable:', pushError);
+    return null;
+  }
 }
 
 /* ---- taps on OS notifications -> app navigation ---- */

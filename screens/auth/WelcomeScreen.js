@@ -45,19 +45,19 @@ const styles = StyleSheet.create({
   },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   logo: { width: 260, height: 260, marginBottom: -10 },
-  brandSub: { fontSize: 13, fontWeight: '700', color: Colors.navy, marginTop: 6, textAlign: 'center' },
+  brandSub: { fontSize: 14, fontWeight: '700', color: Colors.navy, marginTop: 6, textAlign: 'center' },
   headline: { fontSize: 22, fontWeight: '800', color: Colors.navy, marginTop: 28, textAlign: 'center' },
   headlineSub: { fontSize: 16, fontWeight: '700', color: Colors.primary, marginTop: 6, textAlign: 'center' },
   langPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 26,
     backgroundColor: Colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
   },
-  langPillText: { color: Colors.secondary, fontWeight: '800', fontSize: 13 },
+  langPillText: { color: Colors.secondary, fontWeight: '800', fontSize: 14 },
   footer: { padding: 20, paddingBottom: 28 },
   cta: {
     backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 16,
     alignItems: 'center', elevation: 3,
   },
   ctaText: { color: Colors.white, fontSize: 17, fontWeight: '800' },
-  footerTag: { fontSize: 11, color: Colors.subText, textAlign: 'center', marginTop: 12 },
+  footerTag: { fontSize: 12, color: Colors.subText, textAlign: 'center', marginTop: 12 },
 });

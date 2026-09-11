@@ -7,7 +7,6 @@ import Colors from '../theme/colors';
 import { useLang } from '../i18n/LanguageContext';
 import { hasKey } from '../i18n/translations';
 import { LOGO_MARK } from '../theme/brand';
-import { useNotifications } from '../notifications/NotificationContext';
 
 /*
  * Original AGROBRIDGE header: centred brand + subtitle, round
@@ -19,7 +18,6 @@ export default function AppHeader({
   showBack = false,
   showSpeaker = true,
   showLang = true,
-  showBell = true,
   title,
   tag,
   audioKey,
@@ -27,13 +25,10 @@ export default function AppHeader({
 }) {
   const insets = useSafeAreaInsets();
   const { tr, speak, stopSpeak, speaking, setPickerOpen } = useLang();
-  const { unread, session } = useNotifications();
   // Which screen are we on?  -> default help text is  audio_<RouteName>
   // (install21: every screen gets voice help without editing each screen)
   const route = React.useContext(NavigationRouteContext);
   const routeKey = route?.name ? `audio_${route.name}` : null;
-  // install31: must come AFTER `route` is defined (was above it -> crash after login on web)
-  const bellVisible = showBell && !!session?.uid && route?.name !== 'Notifications';
 
   const displayTitle = title != null && String(title).trim() !== '' ? String(title) : tr('brand');
   const displaySub = tag != null && String(tag).trim() !== '' ? String(tag) : tr('brandSub');
@@ -89,20 +84,7 @@ export default function AppHeader({
         <Text style={styles.sub} numberOfLines={1}>{displaySub}</Text>
       </View>
 
-      <View style={[styles.sideSlotRight, bellVisible && { width: 130 }]}>
-        {bellVisible ? (
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => navigation?.navigate('Notifications')}
-            accessibilityLabel="Notifications"
-            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-          >
-            <Ionicons name={unread > 0 ? 'notifications' : 'notifications-outline'} size={18} color={Colors.navy} />
-            {unread > 0 ? (
-              <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>
-            ) : null}
-          </TouchableOpacity>
-        ) : null}
+      <View style={styles.sideSlotRight}>
         {showLang ? (
           <TouchableOpacity
             style={styles.iconBtn}
@@ -144,7 +126,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   mark: { width: 26, height: 26 },
   title: { fontSize: 18, fontWeight: '800', letterSpacing: 1 },
-  sub: { fontSize: 11.5, fontWeight: '600', color: Colors.navy, marginTop: 2, textAlign: 'center' },
+  sub: { fontSize: 12.5, fontWeight: '600', color: Colors.navy, marginTop: 2, textAlign: 'center' },
   iconBtn: {
     width: 36,
     height: 36,

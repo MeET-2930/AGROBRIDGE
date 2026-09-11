@@ -273,7 +273,7 @@ export default function TodaysQueueScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  viewOnly: { color: Colors.subText, fontSize: 12, fontStyle: 'italic', paddingVertical: 8 },
+  viewOnly: { color: Colors.subText, fontSize: 13, fontStyle: 'italic', paddingVertical: 8 },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, paddingBottom: 30 },
 
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  nowLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700' },
+  nowLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '700' },
   nowToken: {
     color: Colors.white,
     fontSize: 24,
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
   },
-  nowCount: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700' },
+  nowCount: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '700' },
 
   empty: { textAlign: 'center', marginTop: 40, color: Colors.subText },
 
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   },
   token: { fontSize: 22, fontWeight: '900', color: Colors.navy },
   name: { marginTop: 8, fontWeight: '700', color: Colors.text },
-  sub: { marginTop: 3, color: Colors.subText, fontSize: 12 },
+  sub: { marginTop: 3, color: Colors.subText, fontSize: 13 },
 
   actions: {
     flexDirection: 'row',
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: Colors.navy },
-  sheetSub: { color: Colors.subText, marginBottom: 12, fontSize: 12 },
+  sheetSub: { color: Colors.subText, marginBottom: 12, fontSize: 13 },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   note: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.subText,
     marginTop: 8,
     marginBottom: 14,

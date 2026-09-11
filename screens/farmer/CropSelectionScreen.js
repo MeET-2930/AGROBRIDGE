@@ -42,6 +42,6 @@ const styles = StyleSheet.create({
   card: { backgroundColor: Colors.white, borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: Colors.border, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
   cardOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   name: { fontSize: 16, fontWeight: '800', color: Colors.navy },
-  msp: { fontSize: 12, color: Colors.secondary, fontWeight: '700', marginTop: 4 },
+  msp: { fontSize: 13, color: Colors.secondary, fontWeight: '700', marginTop: 4 },
   footer: { padding: 20, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.border },
 });

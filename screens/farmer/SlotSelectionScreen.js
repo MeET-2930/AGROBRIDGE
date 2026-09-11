@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  sectionHint: { fontSize: 11, fontWeight: '600', color: Colors.subText },
+  sectionHint: { fontSize: 12, fontWeight: '600', color: Colors.subText },
   testBanner: {
     backgroundColor: '#FFF4D6',
     borderColor: '#F0C36D',
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
   },
-  testBannerText: { color: '#7A5200', fontWeight: '700', fontSize: 12 },
+  testBannerText: { color: '#7A5200', fontWeight: '700', fontSize: 13 },
 
   dates: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   dateChip: {
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   dateOn: { backgroundColor: Colors.navy, borderColor: Colors.navy },
   dateText: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
-  dateSmall: { color: Colors.subText, fontSize: 10, marginTop: 2 },
+  dateSmall: { color: Colors.subText, fontSize: 11, marginTop: 2 },
   dateTextOn: { color: Colors.white },
 
   slot: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   slotOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   slotFull: { opacity: 0.55 },
   slotTitle: { fontWeight: '800', color: Colors.navy, fontSize: 15 },
-  slotSub: { color: Colors.subText, marginTop: 4, fontSize: 12 },
+  slotSub: { color: Colors.subText, marginTop: 4, fontSize: 13 },
   selectedText: {
     fontSize: 22,
     fontWeight: '900',

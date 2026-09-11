@@ -280,14 +280,12 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('myToken')}
+            title={others.length ? tr('fd_myTokensN', { n: others.length + 1 }) : tr('myToken')}
             icon="ticket-outline"
             onPress={() =>
-              booking
-                ? navigation.navigate('TokenDetail', {
-                    tokenId: booking.tokenId,
-                  })
-                : navigation.navigate('History')
+              booking && !others.length
+                ? navigation.navigate('TokenDetail', { tokenId: booking.tokenId })
+                : navigation.navigate('History')          // 2+ tokens (or none): the full list
             }
           />
 
@@ -370,7 +368,7 @@ const styles = StyleSheet.create({
   },
   greet: { fontSize: 20, color: Colors.secondary, fontWeight: '800' },
   name: { fontSize: 18, fontWeight: '800', color: Colors.navy },
-  phone: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+  phone: { fontSize: 12, color: Colors.subText, marginTop: 2 },
 
   bookingCard: {
     backgroundColor: Colors.white,
@@ -381,7 +379,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   bookingLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.subText,
     fontWeight: '700',
   },
@@ -391,9 +389,9 @@ const styles = StyleSheet.create({
     color: Colors.navy,
     marginTop: 4,
   },
-  bookingMeta: { fontSize: 12, color: Colors.subText, marginTop: 4 },
+  bookingMeta: { fontSize: 13, color: Colors.subText, marginTop: 4 },
   otherWrap: { marginTop: 4, marginBottom: 12 },
-  otherTitle: { fontSize: 12, fontWeight: '800', color: Colors.subText, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  otherTitle: { fontSize: 13, fontWeight: '800', color: Colors.subText, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   otherRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: Colors.white, borderRadius: 14, padding: 12, marginBottom: 8,
@@ -402,7 +400,7 @@ const styles = StyleSheet.create({
   otherToken: { backgroundColor: Colors.accent, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   otherTokenText: { fontWeight: '900', color: Colors.secondary, fontSize: 14 },
   otherMain: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
-  otherSub: { fontSize: 12, color: Colors.subText, marginTop: 2 },
+  otherSub: { fontSize: 13, color: Colors.subText, marginTop: 2 },
 
   emptyCard: {
     backgroundColor: Colors.white,
@@ -415,7 +413,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: Colors.navy },
   emptySub: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.subText,
     textAlign: 'center',
     marginTop: 6,

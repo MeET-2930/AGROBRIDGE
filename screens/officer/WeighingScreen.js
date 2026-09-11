@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  infoText: { color: Colors.navy, fontWeight: '700', fontSize: 12 },
+  infoText: { color: Colors.navy, fontWeight: '700', fontSize: 13 },
   label: {
     fontWeight: '700',
     color: Colors.navy,
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-  hint: { fontSize: 11, color: Colors.subText, marginTop: 4 },
+  hint: { fontSize: 12, color: Colors.subText, marginTop: 4 },
   netBox: {
     marginTop: 22,
     backgroundColor: Colors.navy,
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   },
   netLabel: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   netValue: {
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   variance: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 6,
     fontWeight: '700',
   },
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     color: '#E65100',
     padding: 12,
     borderRadius: 10,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   footer: {

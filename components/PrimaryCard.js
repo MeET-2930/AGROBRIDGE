@@ -41,5 +41,5 @@ const styles = StyleSheet.create({
   iconWrapImage: { width: 68, height: 68, borderRadius: 34, backgroundColor: Colors.white },
   image: { width: 64, height: 64 },
   title: { fontSize: 17, fontWeight: '800', color: Colors.navy },
-  subtitle: { fontSize: 12.5, color: Colors.subText, marginTop: 3, lineHeight: 17 },
+  subtitle: { fontSize: 13.5, color: Colors.subText, marginTop: 3, lineHeight: 17 },
 });

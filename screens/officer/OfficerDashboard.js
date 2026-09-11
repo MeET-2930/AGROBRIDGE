@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     marginTop: 5,
   },
-  dutyPillText: { color: Colors.secondary, fontWeight: '800', fontSize: 11 },
+  dutyPillText: { color: Colors.secondary, fontWeight: '800', fontSize: 12 },
 
   banner: {
     flexDirection: 'row',
@@ -408,10 +408,10 @@ const styles = StyleSheet.create({
   bannerBusy: { backgroundColor: '#FFF8E1', borderColor: '#FFB300' },
   bannerClear: { backgroundColor: '#E8F5E9', borderColor: '#66BB6A' },
   bannerTitle: { fontSize: 15, fontWeight: '900' },
-  bannerSub: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+  bannerSub: { fontSize: 12, color: Colors.subText, marginTop: 2 },
 
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: Colors.subText,
     marginBottom: 10,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   workTitle: { fontSize: 15, fontWeight: '800', color: Colors.navy },
-  workSub: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+  workSub: { fontSize: 12, color: Colors.subText, marginTop: 2 },
   countPill: {
     minWidth: 32,
     height: 28,
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   num: { color: Colors.white, fontSize: 22, fontWeight: '900' },
-  lbl: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 2 },
+  lbl: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
 
   toolRow: {
     flexDirection: 'row',
@@ -495,10 +495,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   setupTitle: { fontSize: 15, fontWeight: '900', color: '#E65100' },
-  setupSub: { fontSize: 11, color: '#8D6E63', marginTop: 3, lineHeight: 15 },
+  setupSub: { fontSize: 12, color: '#8D6E63', marginTop: 3, lineHeight: 15 },
 
   centreLine: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.subText,
     fontWeight: '700',
     marginTop: 4,
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     marginBottom: 12,
   },
-  profileLinkText: { color: Colors.secondary, fontWeight: '800', fontSize: 13 },
+  profileLinkText: { color: Colors.secondary, fontWeight: '800', fontSize: 14 },
 
   overlay: {
     flex: 1,
@@ -539,13 +539,11 @@ const styles = StyleSheet.create({
     color: Colors.subText,
     marginTop: 4,
     marginBottom: 20,
-    fontSize: 12,
+    fontSize: 13,
   },
   logout: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.error, borderRadius: 12, paddingVertical: 12, marginTop: 6,
   },
   logoutText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });

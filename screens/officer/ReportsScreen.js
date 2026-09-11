@@ -110,6 +110,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  rowLabel: { color: Colors.subText, fontSize: 13 },
-  rowValue: { color: Colors.navy, fontWeight: '800', fontSize: 13 },
+  rowLabel: { color: Colors.subText, fontSize: 14 },
+  rowValue: { color: Colors.navy, fontWeight: '800', fontSize: 14 },
 });

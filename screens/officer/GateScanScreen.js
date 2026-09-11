@@ -229,10 +229,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   expectBarPlain: { backgroundColor: Colors.navy, padding: 10, alignItems: 'center' },
-  expectLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700' },
+  expectLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700' },
   expectToken: { color: Colors.white, fontSize: 34, fontWeight: '900' },
   expectName: { color: Colors.white, fontWeight: '700' },
-  expectHint: { color: '#FFD54F', fontSize: 11, marginTop: 4, textAlign: 'center', fontWeight: '700' },
+  expectHint: { color: '#FFD54F', fontSize: 12, marginTop: 4, textAlign: 'center', fontWeight: '700' },
 
   verifiedTop: {
     backgroundColor: '#16A34A',
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  verifiedLabel: { color: Colors.white, fontWeight: '800', fontSize: 12 },
+  verifiedLabel: { color: Colors.white, fontWeight: '800', fontSize: 13 },
   verifiedToken: { color: Colors.white, fontWeight: '900', fontSize: 48 },
 
   cameraBox: {
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hint: { color: Colors.subText, fontSize: 12, marginTop: 10 },
+  hint: { color: Colors.subText, fontSize: 13, marginTop: 10 },
 
   result: { padding: 18 },
   okBadge: {
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   token: { fontSize: 44, fontWeight: '900', color: Colors.navy, marginTop: 10 },
   name: { fontSize: 18, fontWeight: '800', color: Colors.text },
   sub: { color: Colors.subText, marginTop: 2 },
-  label: { marginTop: 18, fontWeight: '800', color: Colors.navy, fontSize: 12 },
+  label: { marginTop: 18, fontWeight: '800', color: Colors.navy, fontSize: 13 },
   inputBig: {
     backgroundColor: Colors.white,
     borderWidth: 1.5,

@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginBottom: 16,
   },
-  summaryTitle: { fontSize: 12, fontWeight: '800', color: Colors.subText, marginTop: 6, marginBottom: 2 },
+  summaryTitle: { fontSize: 13, fontWeight: '800', color: Colors.subText, marginTop: 6, marginBottom: 2 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -180,8 +180,8 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     gap: 12,
   },
-  rowLabel: { fontSize: 13, color: Colors.subText, fontWeight: '600' },
-  rowValue: { fontSize: 13, color: Colors.navy, fontWeight: '800', flex: 1, textAlign: 'right' },
+  rowLabel: { fontSize: 14, color: Colors.subText, fontWeight: '600' },
+  rowValue: { fontSize: 14, color: Colors.navy, fontWeight: '800', flex: 1, textAlign: 'right' },
 
   quantityBox: {
     backgroundColor: Colors.white,
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   quickText: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
   quickTextOn: { color: Colors.white },
 
-  hint: { fontSize: 12, color: Colors.subText, textAlign: 'center', marginTop: 14, lineHeight: 18 },
+  hint: { fontSize: 13, color: Colors.subText, textAlign: 'center', marginTop: 14, lineHeight: 18 },
 
   footer: {
     padding: 20,

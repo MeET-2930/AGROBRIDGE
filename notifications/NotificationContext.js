@@ -7,8 +7,7 @@
  *    (farmer: own doc; officer: mandi doc filtered by duty; trader: own
  *    doc + mandi traders doc).
  *  - Every NEW item (arrived after the listener started) -> phone /
- *    browser notification via deviceNotify; if the build cannot show one
- *    (Expo Go / APK without expo-notifications) an in-app banner instead.
+ *    browser notification via deviceNotify (no in-app banner).
  *  - Keeps unread count (per user, in AsyncStorage) for the bell icon.
  *  - Exposes useNotifications() -> { items, unread, markAllRead, open }.
  *
@@ -19,16 +18,14 @@
  * ---------------------------------------------------------------
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Colors from '../theme/colors';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useLang } from '../i18n/LanguageContext';
 import { getCurrentUserSession } from '../services/auth';
-import { subscribeUser, subscribeCentreOfficers, subscribeCentreTraders } from '../services/notifications';
+import { subscribeUser, subscribeCentreOfficers, subscribeCentreTraders, registerPushToken } from '../services/notifications';
 import {
-  initDeviceNotifications, showNow, onNotificationTap, scheduleAt, cancelScheduled, askWebPermission, capability,
+  initDeviceNotifications, showNow, onNotificationTap, scheduleAt, cancelScheduled, askWebPermission, capability, getPushToken, pushError,
 } from '../services/deviceNotify';
 import { fetchActiveFarmerBooking, STATUS } from '../services/bookings';
 
@@ -49,17 +46,16 @@ const remKey = (uid) => `agrobridge.notif.reminders.${uid}`;
  *                   we re-read the session
  */
 export function NotificationProvider({ children, navigationRef, routeName }) {
-  const { tr } = useLang();
+  const { tr, lang } = useLang();
   const rootRoute = routeName;
+  const hasPushRef = useRef(false);
 
   const [session, setSession] = useState(null);
+  const [pushStatus, setPushStatus] = useState({ token: '', error: 'checking...' });
   const [items, setItems] = useState([]);
   const [lastReadAt, setLastReadAt] = useState('');
-  const [banner, setBanner] = useState(null);
   const seenRef = useRef(new Set());
   const startedAtRef = useRef('');
-  const slide = useRef(new Animated.Value(-120)).current;
-  const bannerTimer = useRef(null);
 
   useEffect(() => { initDeviceNotifications(); }, []);
 
@@ -81,16 +77,20 @@ export function NotificationProvider({ children, navigationRef, routeName }) {
 
   useEffect(() => onNotificationTap((data) => { if (data?.route) open({ route: data.route }); }), [open]);
 
-  const hideBanner = useCallback(() => {
-    Animated.timing(slide, { toValue: -120, duration: 220, useNativeDriver: true }).start(() => setBanner(null));
-  }, [slide]);
-
-  const showBanner = useCallback((item, title, body) => {
-    setBanner({ item, title, body });
-    Animated.timing(slide, { toValue: 0, duration: 260, useNativeDriver: true }).start();
-    if (bannerTimer.current) clearTimeout(bannerTimer.current);
-    bannerTimer.current = setTimeout(hideBanner, 6000);
-  }, [slide, hideBanner]);
+  // install34: tell Firestore how to reach THIS phone while the app is closed.
+  useEffect(() => {
+    if (!session?.uid) return;
+    let alive = true;
+    (async () => {
+      await initDeviceNotifications();
+      const token = await getPushToken();
+      if (!alive) return;
+      hasPushRef.current = !!token;
+      setPushStatus({ token: token || '', error: token ? '' : pushError });
+      if (token) registerPushToken(session.uid, token, lang);
+    })();
+    return () => { alive = false; };
+  }, [session?.uid, lang]);
 
   // ---------- listeners ----------
   useEffect(() => {
@@ -114,11 +114,10 @@ export function NotificationProvider({ children, navigationRef, routeName }) {
         if (String(it.at) <= startedAtRef.current) return;         // history, not news
         const title = tr({ key: it.titleKey, params: it.params });
         const body = tr({ key: it.bodyKey, params: it.params });
-        // install33: phone/browser notification when the build can; otherwise
-        // (Expo Go, old APK) the in-app banner + vibration. Automatic - no setting.
-        showNow({ title, body, data: { id: it.id, route: it.route } }).then((shownByOs) => {
-          if (!shownByOs) showBanner(it, title, body);
-        });
+        // Phones with a push token already got this from Expo's push service
+        // (even with the app closed) - do not show it twice. Web still needs it.
+        if (hasPushRef.current) return;
+        showNow({ title, body, data: { id: it.id, route: it.route } });
       });
     };
 
@@ -132,7 +131,7 @@ export function NotificationProvider({ children, navigationRef, routeName }) {
       unsubs.push(subscribeUser(session.uid, push('a')));
     }
     return () => unsubs.forEach((u) => u && u());
-  }, [session?.uid, session?.role, session?.centreId, session?.officerDuty, tr, showBanner]);
+  }, [session?.uid, session?.role, session?.centreId, session?.officerDuty, tr]);
 
   // ---------- slot reminders (farmer, native builds only) ----------
   useEffect(() => {
@@ -172,39 +171,24 @@ export function NotificationProvider({ children, navigationRef, routeName }) {
     if (Platform.OS === 'web') askWebPermission();          // first bell tap asks Chrome for permission
   }, [session?.uid]);
 
-  const value = useMemo(() => ({ items, unread, markAllRead, open, session }), [items, unread, markAllRead, open, session]);
+  // "Send test" on the Notifications screen: goes through Expo's push servers, so it
+  // proves the whole chain (FCM credentials -> Expo -> this phone), even with the app closed.
+  const sendTestPush = useCallback(async () => {
+    if (!pushStatus.token) return false;
+    try {
+      const r = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ to: pushStatus.token, title: 'AgroBridge', body: tr('nt_testBody'), channelId: 'agrobridge', priority: 'high', sound: 'default' }),
+      });
+      const j = await r.json().catch(() => ({}));
+      const st = j?.data?.status || j?.data?.[0]?.status;
+      if (st !== 'ok') { setPushStatus((p) => ({ ...p, error: JSON.stringify(j?.data?.details || j?.data?.message || j?.errors || j).slice(0, 200) })); return false; }
+      return true;
+    } catch (e) { setPushStatus((p) => ({ ...p, error: String(e?.message || e) })); return false; }
+  }, [pushStatus.token, tr]);
 
-  return (
-    <Ctx.Provider value={value}>
-      {children}
-      {banner ? (
-        <Animated.View style={[styles.banner, { transform: [{ translateY: slide }] }]} pointerEvents="box-none">
-          <TouchableOpacity style={styles.bannerInner} activeOpacity={0.9} onPress={() => { hideBanner(); open(banner.item); }}>
-            <View style={styles.bannerIcon}><Ionicons name="notifications" size={20} color={Colors.white} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bannerTitle} numberOfLines={1}>{banner.title}</Text>
-              <Text style={styles.bannerBody} numberOfLines={2}>{banner.body}</Text>
-            </View>
-            <TouchableOpacity onPress={hideBanner} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={18} color={Colors.subText} />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Animated.View>
-      ) : null}
-    </Ctx.Provider>
-  );
+  const value = useMemo(() => ({ items, unread, markAllRead, open, session, pushStatus, sendTestPush }),
+    [items, unread, markAllRead, open, session, pushStatus, sendTestPush]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
-
-const styles = StyleSheet.create({
-  banner: { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: Platform.OS === 'web' ? 10 : 40, paddingHorizontal: 12, zIndex: 999, elevation: 30 },
-  bannerInner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: Colors.white, borderRadius: 14, padding: 12,
-    borderWidth: 1, borderColor: Colors.border,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 8,
-    maxWidth: 520, alignSelf: 'center', width: '100%',
-  },
-  bannerIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.secondary, alignItems: 'center', justifyContent: 'center' },
-  bannerTitle: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
-  bannerBody: { color: Colors.subText, fontSize: 12.5, marginTop: 2 },
-});

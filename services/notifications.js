@@ -23,6 +23,7 @@
  */
 import {
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   onSnapshot,
@@ -33,6 +34,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { translate } from '../i18n/translations';
 
 export const MAX_ITEMS = 60; // kept per document (older ones trimmed by the reader)
 
@@ -79,21 +81,98 @@ async function append(ref, item) {
   }
 }
 
+/* =====================================================================
+ * install34: PUSH to phones whose app is closed.
+ * Each phone stores { token, lang } under users/{uid}.pushTokens when the
+ * app starts (see NotificationContext). The device that causes an event
+ * posts directly to Expo's free push API - no server, nothing to keep awake.
+ * ===================================================================== */
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+async function pushToUsers(userDocs, item) {
+  const messages = [];
+  userDocs.forEach((u) => {
+    const tokens = Array.isArray(u.pushTokens) ? u.pushTokens : [];
+    tokens.forEach((pt) => {
+      const token = typeof pt === 'string' ? pt : pt?.token;
+      const lang = (typeof pt === 'object' && pt?.lang) || u.lang || 'hi';
+      if (!token || !String(token).startsWith('ExponentPushToken')) return;
+      messages.push({
+        to: token,
+        title: translate(item.titleKey, lang, item.params),
+        body: translate(item.bodyKey, lang, item.params),
+        sound: 'default',
+        channelId: 'agrobridge',
+        priority: 'high',
+        data: { id: item.id, route: item.route || null },
+      });
+    });
+  });
+  if (!messages.length) return;
+  try {
+    for (let i = 0; i < messages.length; i += 90) {
+      await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(messages.slice(i, i + 90)),
+      });
+    }
+  } catch (e) {
+    console.log('push send skipped:', e?.message);
+  }
+}
+
+async function pushToUid(uid, item) {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (snap.exists()) await pushToUsers([snap.data()], item);
+  } catch (e) { /* ignore */ }
+}
+
+async function pushToCentre(centreId, role, item, duties) {
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), where('centreId', '==', centreId), where('role', '==', role)));
+    let users = snap.docs.map((d) => d.data());
+    if (role === 'officer' && duties && !duties.includes('*')) {
+      users = users.filter((u) => u.officerDuty === 'admin' || duties.includes(u.officerDuty));
+    }
+    await pushToUsers(users, item);
+  } catch (e) { /* ignore */ }
+}
+
+/** Called by the app on start-up / language change. */
+export async function registerPushToken(uid, token, lang) {
+  if (!uid || !token) return;
+  try {
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    const prev = (snap.exists() && Array.isArray(snap.data().pushTokens)) ? snap.data().pushTokens : [];
+    const rest = prev.filter((pt) => (typeof pt === 'string' ? pt : pt?.token) !== token).slice(-4); // max 5 phones
+    await setDoc(ref, { pushTokens: [...rest, { token, lang: lang || 'hi', at: new Date().toISOString() }] }, { merge: true });
+  } catch (e) {
+    console.log('push token save skipped:', e?.message);
+  }
+}
+
 /* ---------------- writers (all best-effort, never throw) ---------------- */
 
 export function notifyUser(uid, item) {
   if (!uid || !item) return Promise.resolve();
+  pushToUid(uid, item);
   return append(userDocRef(uid), item);
 }
 
 /** duties: ['gate'] | ['assay'] | ['*'] ... admin always sees everything. */
 export function notifyCentreOfficers(centreId, duties, item) {
   if (!centreId || !item) return Promise.resolve();
-  return append(centreDocRef(centreId), { ...item, duties: duties && duties.length ? duties : ['*'] });
+  const d = duties && duties.length ? duties : ['*'];
+  pushToCentre(centreId, 'officer', item, d);
+  return append(centreDocRef(centreId), { ...item, duties: d });
 }
 
 export function notifyCentreTraders(centreId, item) {
   if (!centreId || !item) return Promise.resolve();
+  pushToCentre(centreId, 'trader', item);
   return append(tradersDocRef(centreId), item);
 }
 
@@ -109,7 +188,7 @@ export async function notifyFarmersAtCentre(centreId, date, item) {
       const b = d.data();
       if (b.farmerId && !['paid', 'rejected', 'no-show', 'cancelled'].includes(b.status)) uids.add(b.farmerId);
     });
-    await Promise.all([...uids].map((uid) => append(userDocRef(uid), item)));
+    await Promise.all([...uids].map((uid) => { pushToUid(uid, item); return append(userDocRef(uid), item); }));
   } catch (e) {
     console.log('delay fan-out skipped:', e?.message);
   }

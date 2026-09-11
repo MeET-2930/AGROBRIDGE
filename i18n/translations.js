@@ -212,6 +212,7 @@ export const t = {
   help: r('सहायता', 'Help', 'ਮਦਦ', 'मदत'),
   activeBooking: r('सक्रिय बुकिंग', 'Active Booking', 'ਸਰਗਰਮ ਬੁਕਿੰਗ', 'सक्रिय बुकिंग'),
   trackStatus: r('पूरा विवरण देखें', 'View full details', 'ਪੂਰਾ ਵੇਰਵਾ ਵੇਖੋ', 'संपूर्ण तपशील पहा'),
+  fd_myTokensN: r('मेरे टोकन ({n})', 'My Tokens ({n})', 'ਮੇਰੇ ਟੋਕਨ ({n})', 'माझे टोकन ({n})'),
   fd_otherTokens: r('आपके अन्य टोकन ({n})', 'Your other tokens ({n})', 'ਤੁਹਾਡੇ ਹੋਰ ਟੋਕਨ ({n})', 'तुमचे इतर टोकन ({n})'),
   fd_cropLine: r('फसल: {crop} • {qty} क्विंटल', 'Crop: {crop} • {qty} qtl', 'ਫਸਲ: {crop} • {qty} ਕੁਇੰਟਲ', 'पीक: {crop} • {qty} क्विंटल'),
 
@@ -306,6 +307,12 @@ export const t = {
    * install28: notifications (bell, banner, phone notifications)
    * ------------------------------------------------------------ */
   nt_title: r('सूचनाएं', 'Notifications', 'ਸੂਚਨਾਵਾਂ', 'सूचना'),
+  nt_pushOn: r('फ़ोन सूचनाएं चालू हैं (ऐप बंद होने पर भी)', 'Phone notifications ON (even when app is closed)', 'ਫ਼ੋਨ ਸੂਚਨਾਵਾਂ ਚਾਲੂ ਹਨ', 'फोन सूचना चालू आहेत'),
+  nt_pushOff: r('फ़ोन सूचनाएं बंद हैं - केवल ऐप खुला होने पर', 'Phone notifications OFF - only while app is open', 'ਫ਼ੋਨ ਸੂਚਨਾਵਾਂ ਬੰਦ ਹਨ', 'फोन सूचना बंद आहेत'),
+  nt_testBtn: r('टेस्ट सूचना भेजें', 'Send test notification', 'ਟੈਸਟ ਸੂਚਨਾ ਭੇਜੋ', 'चाचणी सूचना पाठवा'),
+  nt_testBody: r('टेस्ट सफल! ऐप बंद होने पर भी सूचना आएगी।', 'Test OK! Notifications reach you even when the app is closed.', 'ਟੈਸਟ ਸਫਲ!', 'चाचणी यशस्वी!'),
+  nt_testSent: r('भेजा गया - अब ऐप बंद करके देखें', 'Sent - now close the app and watch', 'ਭੇਜਿਆ ਗਿਆ', 'पाठवले'),
+  nt_testFail: r('भेजना असफल - ऊपर कारण देखें', 'Failed - see reason above', 'ਅਸਫਲ', 'अयशस्वी'),
   nt_sub: r('आपके टोकन और मंडी की खबर', 'Updates on your token and mandi', 'ਤੁਹਾਡੇ ਟੋਕਨ ਅਤੇ ਮੰਡੀ ਦੀ ਖ਼ਬਰ', 'तुमच्या टोकन व मंडीच्या बातम्या'),
   nt_empty: r('अभी कोई सूचना नहीं। टोकन बुक करते ही यहां खबर आएगी।', 'No notifications yet. Updates appear here as soon as something happens.', 'ਹਾਲੇ ਕੋਈ ਸੂਚਨਾ ਨਹੀਂ।', 'अजून सूचना नाही.'),
   nt_justNow: r('अभी', 'just now', 'ਹੁਣੇ', 'आत्ताच'),

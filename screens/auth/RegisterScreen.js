@@ -173,9 +173,9 @@ export default function RegisterScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, paddingBottom: 40 },
-  label: { fontSize: 13, fontWeight: '700', color: Colors.navy, marginBottom: 6, marginTop: 14 },
-  help: { fontSize: 11, color: Colors.subText, marginBottom: 8, lineHeight: 16 },
-  warn: { backgroundColor: '#FFF3E0', color: '#E65100', padding: 10, borderRadius: 8, fontSize: 12, fontWeight: '700' },
+  label: { fontSize: 14, fontWeight: '700', color: Colors.navy, marginBottom: 6, marginTop: 14 },
+  help: { fontSize: 12, color: Colors.subText, marginBottom: 8, lineHeight: 16 },
+  warn: { backgroundColor: '#FFF3E0', color: '#E65100', padding: 10, borderRadius: 8, fontSize: 13, fontWeight: '700' },
   input: {
     backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
     paddingHorizontal: 14, height: 50, fontSize: 15, color: Colors.text,
@@ -185,13 +185,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.border, borderRadius: 12, padding: 13, marginBottom: 8,
   },
   centreCardOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  centreName: { fontWeight: '800', color: Colors.navy, fontSize: 13 },
-  centreAddr: { color: Colors.subText, fontSize: 11, marginTop: 3 },
+  centreName: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
+  centreAddr: { color: Colors.subText, fontSize: 12, marginTop: 3 },
   chip: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, borderWidth: 1.5,
     borderColor: Colors.border, borderRadius: 10, padding: 12, marginBottom: 8,
   },
   chipOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  chipText: { fontWeight: '700', color: Colors.navy, fontSize: 13 },
-  chipDesc: { color: Colors.subText, fontSize: 11, marginTop: 3 },
+  chipText: { fontWeight: '700', color: Colors.navy, fontSize: 14 },
+  chipDesc: { color: Colors.subText, fontSize: 12, marginTop: 3 },
 });

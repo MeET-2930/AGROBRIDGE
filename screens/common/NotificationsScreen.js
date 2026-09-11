@@ -2,7 +2,7 @@
  * screens/common/NotificationsScreen.js   (install28)
  * The list behind the bell icon. Same screen for all three roles.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -47,13 +47,30 @@ function timeAgo(iso, tr) {
 
 export default function NotificationsScreen({ navigation }) {
   const { tr } = useLang();
-  const { items, markAllRead, open } = useNotifications();
+  const { items, markAllRead, open, pushStatus, sendTestPush } = useNotifications();
+  const [testMsg, setTestMsg] = useState('');
 
   useEffect(() => { markAllRead(); }, [markAllRead]);
 
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack title={tr('nt_title')} tag={tr('nt_sub')} />
+
+      <View style={[styles.status, { borderColor: pushStatus?.token ? Colors.success : Colors.error }]}>
+        <Text style={styles.statusTitle}>
+          {pushStatus?.token ? tr('nt_pushOn') : tr('nt_pushOff')}
+        </Text>
+        {!pushStatus?.token && pushStatus?.error ? <Text style={styles.statusErr} selectable>{pushStatus.error}</Text> : null}
+        {pushStatus?.token ? (
+          <TouchableOpacity
+            style={styles.testBtn}
+            onPress={async () => { setTestMsg('...'); const ok = await sendTestPush(); setTestMsg(ok ? tr('nt_testSent') : tr('nt_testFail')); }}
+          >
+            <Text style={styles.testBtnText}>{tr('nt_testBtn')}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {testMsg ? <Text style={styles.statusErr}>{testMsg}</Text> : null}
+      </View>
 
       <FlatList
         data={items}
@@ -93,8 +110,13 @@ const styles = StyleSheet.create({
   },
   icon: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
   title: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
-  body: { color: Colors.subText, fontSize: 13, marginTop: 2, lineHeight: 18 },
-  time: { color: Colors.subText, fontSize: 11, marginTop: 4 },
+  body: { color: Colors.subText, fontSize: 14, marginTop: 2, lineHeight: 18 },
+  time: { color: Colors.subText, fontSize: 12, marginTop: 4 },
   empty: { alignItems: 'center', padding: 40, gap: 10 },
+  status: { marginHorizontal: 16, marginTop: 12, backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1, padding: 12, gap: 6 },
+  statusTitle: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
+  statusErr: { color: Colors.subText, fontSize: 12 },
+  testBtn: { alignSelf: 'flex-start', backgroundColor: Colors.secondary, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, marginTop: 4 },
+  testBtnText: { color: Colors.white, fontWeight: '700', fontSize: 13 },
   emptyText: { color: Colors.subText, fontWeight: '600', textAlign: 'center' },
 });

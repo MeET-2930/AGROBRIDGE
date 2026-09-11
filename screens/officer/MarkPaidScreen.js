@@ -336,9 +336,9 @@ export default function MarkPaidScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 20, paddingBottom: 30 },
-  warn: { backgroundColor: '#FFF3E0', color: '#E65100', padding: 10, borderRadius: 8, fontSize: 12, fontWeight: '700' },
+  warn: { backgroundColor: '#FFF3E0', color: '#E65100', padding: 10, borderRadius: 8, fontSize: 13, fontWeight: '700' },
   label: { fontWeight: '700', color: Colors.navy, marginTop: 12, marginBottom: 6 },
-  hint: { fontSize: 12, color: Colors.subText, marginBottom: 8, lineHeight: 17 },
+  hint: { fontSize: 13, color: Colors.subText, marginBottom: 8, lineHeight: 17 },
   input: {
     backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border, borderRadius: 10,
     height: 48, paddingHorizontal: 12, color: Colors.text,
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   },
   basisOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   basisTitle: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
-  basisDesc: { fontSize: 11, color: Colors.subText, marginTop: 2 },
+  basisDesc: { fontSize: 12, color: Colors.subText, marginTop: 2 },
   parchiBox: {
     marginTop: 6, backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B',
     borderRadius: 12, padding: 14,
@@ -361,8 +361,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 46,
     borderRadius: 10, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.white,
   },
-  smallBtnText: { fontWeight: '700', color: Colors.navy, fontSize: 12 },
-  matchText: { marginTop: 6, fontSize: 12, fontWeight: '700', padding: 8, borderRadius: 8 },
+  smallBtnText: { fontWeight: '700', color: Colors.navy, fontSize: 13 },
+  matchText: { marginTop: 6, fontSize: 13, fontWeight: '700', padding: 8, borderRadius: 8 },
   matchOk: { backgroundColor: '#DCFCE7', color: '#166534' },
   matchBad: { backgroundColor: '#FEE2E2', color: '#991B1B' },
   grades: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   gradeOn: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary, color: Colors.primary, fontWeight: '800' },
   preview: { marginTop: 18, backgroundColor: Colors.accent, borderRadius: 12, padding: 14 },
   previewTitle: { fontWeight: '800', color: Colors.navy, marginBottom: 8 },
-  previewRow: { color: Colors.navy, marginBottom: 4, fontSize: 13 },
+  previewRow: { color: Colors.navy, marginBottom: 4, fontSize: 14 },
   previewNet: { fontWeight: '900', color: Colors.secondary, fontSize: 18, marginTop: 8 },
   footer: { padding: 20, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.border },
 });

@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
   },
-  alertText: { flex: 1, color: '#E65100', fontWeight: '800', fontSize: 13 },
+  alertText: { flex: 1, color: '#E65100', fontWeight: '800', fontSize: 14 },
 
   card: {
     backgroundColor: Colors.white,
@@ -330,8 +330,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  rowLabel: { fontSize: 12, color: Colors.subText },
-  rowValue: { fontSize: 12, color: Colors.navy, fontWeight: '700' },
+  rowLabel: { fontSize: 13, color: Colors.subText },
+  rowValue: { fontSize: 13, color: Colors.navy, fontWeight: '700' },
 
   sectionTitle: {
     fontSize: 14,
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   help: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.subText,
     marginBottom: 10,
     lineHeight: 16,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     color: '#E65100',
     padding: 10,
     borderRadius: 8,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
 
@@ -366,8 +366,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pickOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  pickTitle: { fontWeight: '800', color: Colors.navy, fontSize: 13 },
-  pickSub: { color: Colors.subText, fontSize: 11, marginTop: 3 },
+  pickTitle: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
+  pickSub: { color: Colors.subText, fontSize: 12, marginTop: 3 },
 
   input: {
     backgroundColor: Colors.white,
