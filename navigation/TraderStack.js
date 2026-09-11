@@ -7,6 +7,7 @@ import AuctionBiddingScreen from '../screens/trader/AuctionBiddingScreen';
 import MyPurchasesScreen from '../screens/trader/MyPurchasesScreen';
 import TraderProfileScreen from '../screens/trader/TraderProfileScreen';
 import HelpScreen from '../screens/common/HelpScreen';
+import NotificationsScreen from '../screens/common/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,6 +20,7 @@ export default function TraderStack() {
       <Stack.Screen name="MyPurchases" component={MyPurchasesScreen} />
       <Stack.Screen name="TraderProfile" component={TraderProfileScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

@@ -41,6 +41,9 @@ import { todayLocal, parseLocalDate } from './dates';
 import { tErr } from './i18nError';
 import { requireOfficerDuty, DUTY_FOR_STAGE } from './auth';
 import { notifyNextFarmer } from './ivr';
+import {
+  notifyUser, notifyCentreOfficers, notifyCentreTraders, notifyFarmersAtCentre, makeItem, routes,
+} from './notifications';
 
 /* ===============================================================
  * STATUS STATE MACHINE
@@ -440,6 +443,11 @@ export async function createBooking({
     return record;
   });
 
+  // install28: tell the farmer and the gate staff (fire-and-forget).
+  const bp = { token: booking.tokenNumber, mandi: booking.centreName, date: booking.date, time: booking.slotWindow, crop: booking.cropName, qty: booking.approxQuantityQuintals, farmer: booking.farmerName || booking.farmerPhone };
+  notifyUser(booking.farmerId, makeItem('nt_booked_t', 'nt_booked_b', bp, routes.farmerToken(booking.tokenId)));
+  notifyCentreOfficers(booking.centreId, ['gate'], makeItem('nt_off_newToken_t', 'nt_off_newToken_b', bp, routes.officerStage('gate')));
+
   return booking;
 }
 
@@ -758,7 +766,80 @@ async function advanceStage(tokenId, patch, { entering = false } = {}) {
     });
 
     return { ...booking, ...patch };
+  }).then((result) => {
+    afterStageNotify(result, patch).catch(() => {});
+    return result;
   });
+}
+
+/*
+ * install28: who is told what, after each stage.
+ * Keys live in i18n/translations.js (nt_*). Never throws.
+ */
+async function afterStageNotify(b, patch) {
+  const p = {
+    token: b.tokenNumber, mandi: b.centreName, farmer: b.farmerName || b.farmerPhone || '',
+    crop: b.cropName, grade: b.grade || 'FAQ', rate: b.ratePerQuintal || '', qty: b.actualQuantity || b.approxQuantityQuintals || '',
+    lane: b.laneAssigned || '', amount: b.netPayable || '', buyer: typeof b.buyerName === 'string' ? b.buyerName : '',
+  };
+  const farmer = (t, body, route) => notifyUser(b.farmerId, makeItem(t, body, p, route || routes.farmerToken(b.tokenId)));
+  const officers = (duties, t, body, stage) => notifyCentreOfficers(b.centreId, duties, makeItem(t, body, p, routes.officerStage(stage)));
+
+  switch (patch.status) {
+    case STATUS.IN_GATE:
+      await farmer('nt_gate_t', b.laneAssigned ? 'nt_gate_lane_b' : 'nt_gate_b');
+      await officers(['assay'], 'nt_off_arrived_t', 'nt_off_arrived_b', 'assay');
+      await notifyNextInQueue(b);
+      break;
+    case STATUS.ASSAY:
+      await farmer('nt_assay_t', 'nt_assay_b');
+      break;
+    case STATUS.REJECTED:
+      await farmer('nt_rejected_t', 'nt_rejected_b');
+      break;
+    case STATUS.PRICE_FIXED:
+      await farmer('nt_price_t', 'nt_price_b');
+      await officers(['weighbridge'], 'nt_off_priceFixed_t', 'nt_off_priceFixed_b', 'weighing');
+      break;
+    case STATUS.PAYMENT_PENDING:
+      await farmer('nt_weighed_t', 'nt_weighed_b');
+      await officers(['accounts'], 'nt_off_weighed_t', 'nt_off_weighed_b', 'payment');
+      break;
+    case STATUS.PAID:
+      await farmer('nt_paid_t', 'nt_paid_b', routes.farmerPayments());
+      break;
+    case STATUS.NO_SHOW:
+      await farmer('nt_noShow_t', 'nt_noShow_b', routes.farmerHome());
+      break;
+    default:
+      break;
+  }
+}
+
+/* "It is your turn" for the farmer whose token is next after a vehicle went in. */
+async function notifyNextInQueue(justEntered) {
+  try {
+    const qSnap = await getDoc(queueRef(justEntered.centreId, justEntered.date));
+    if (!qSnap.exists()) return;
+    const q = qSnap.data();
+    const inside = new Set(q.insidePositions || []);
+    const lanes = Math.max(1, Number(q.parallelLanes) || 1);
+    const free = Math.max(0, lanes - inside.size);
+    if (free <= 0) return;
+    const waiting = (q.openPositions || []).filter((pos) => !inside.has(pos)).sort((a, c) => a - c).slice(0, free);
+    if (!waiting.length) return;
+    const snap = await getDocs(
+      query(collection(db, 'bookings'), where('centreId', '==', justEntered.centreId), where('date', '==', justEntered.date), where('positionAssigned', 'in', waiting))
+    );
+    await Promise.all(snap.docs.map((d) => {
+      const nb = d.data();
+      if (nb.status !== STATUS.BOOKED || nb.turnNotifiedAt) return null;
+      updateDoc(d.ref, { turnNotifiedAt: new Date().toISOString() }).catch(() => {});
+      return notifyUser(nb.farmerId, makeItem('nt_yourTurn_t', 'nt_yourTurn_b', { token: nb.tokenNumber, mandi: nb.centreName, now: q.nowServingToken || '' }, routes.farmerToken(nb.tokenId)));
+    }));
+  } catch (e) {
+    console.log('turn notify skipped:', e?.message);
+  }
 }
 
 /**
@@ -1176,6 +1257,11 @@ export async function reportCentreDelay(centreId, delayMinutes, reason) {
     },
     { merge: true }
   );
+
+  // install28: everyone waiting today hears about it.
+  const item = makeItem('nt_delay_t', 'nt_delay_b', { minutes: parseInt(delayMinutes, 10) || 0, reason: reason || '' }, routes.farmerHome());
+  notifyFarmersAtCentre(centreId, todayString(), item);
+  notifyCentreOfficers(centreId, ['*'], { ...item, route: routes.officerQueue() });
 
   return true;
 }

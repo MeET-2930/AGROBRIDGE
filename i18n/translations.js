@@ -300,6 +300,72 @@ export const t = {
     'ਚੌਥਾ ਪੜਾਅ। ਪਲੱਸ ਅਤੇ ਮਾਈਨਸ ਬਟਨ ਨਾਲ ਦੱਸੋ ਕਿ ਤੁਸੀਂ ਲਗਭਗ ਕਿੰਨੇ ਕੁਇੰਟਲ ਫਸਲ ਲਿਆ ਰਹੇ ਹੋ, ਫਿਰ ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਟੋਕਨ ਲਓ।',
     'चौथी पायरी. प्लस आणि मायनस बटणांनी सांगा की तुम्ही साधारण किती क्विंटल पीक आणत आहात, मग पुष्टी करा आणि टोकन घ्या.'
   ),
+
+  /* ------------------------------------------------------------
+   * install28: notifications (bell, banner, phone notifications)
+   * ------------------------------------------------------------ */
+  nt_title: r('सूचनाएं', 'Notifications', 'ਸੂਚਨਾਵਾਂ', 'सूचना'),
+  nt_sub: r('आपके टोकन और मंडी की खबर', 'Updates on your token and mandi', 'ਤੁਹਾਡੇ ਟੋਕਨ ਅਤੇ ਮੰਡੀ ਦੀ ਖ਼ਬਰ', 'तुमच्या टोकन व मंडीच्या बातम्या'),
+  nt_empty: r('अभी कोई सूचना नहीं। टोकन बुक करते ही यहां खबर आएगी।', 'No notifications yet. Updates appear here as soon as something happens.', 'ਹਾਲੇ ਕੋਈ ਸੂਚਨਾ ਨਹੀਂ।', 'अजून सूचना नाही.'),
+  nt_justNow: r('अभी', 'just now', 'ਹੁਣੇ', 'आत्ताच'),
+  nt_minAgo: r('{n} मिनट पहले', '{n} min ago', '{n} ਮਿੰਟ ਪਹਿਲਾਂ', '{n} मिनिटांपूर्वी'),
+  nt_hrAgo: r('{n} घंटे पहले', '{n} h ago', '{n} ਘੰਟੇ ਪਹਿਲਾਂ', '{n} तासांपूर्वी'),
+
+  // farmer
+  nt_booked_t: r('टोकन बुक हो गया', 'Token booked', 'ਟੋਕਨ ਬੁੱਕ ਹੋ ਗਿਆ', 'टोकन बुक झाले'),
+  nt_booked_b: r('टोकन {token} • {mandi} • {date}, {time}। समय से 30 मिनट पहले पहुंचें।', 'Token {token} • {mandi} • {date}, {time}. Reach 30 min before your slot.', 'ਟੋਕਨ {token} • {mandi} • {date}, {time}। 30 ਮਿੰਟ ਪਹਿਲਾਂ ਪਹੁੰਚੋ।', 'टोकन {token} • {mandi} • {date}, {time}. ३० मिनिटे आधी पोहोचा.'),
+  nt_remEve_t: r('कल मंडी जाना है', 'Mandi visit tomorrow', 'ਕੱਲ੍ਹ ਮੰਡੀ ਜਾਣਾ ਹੈ', 'उद्या मंडीत जायचे आहे'),
+  nt_remEve_b: r('टोकन {token}, {mandi}, {time}। आधार, बैंक पासबुक और तिरपाल साथ रखें।', 'Token {token}, {mandi}, {time}. Carry Aadhaar, bank passbook and tarpaulin.', 'ਟੋਕਨ {token}, {mandi}, {time}। ਆਧਾਰ, ਪਾਸਬੁੱਕ ਅਤੇ ਤਿਰਪਾਲ ਨਾਲ ਰੱਖੋ।', 'टोकन {token}, {mandi}, {time}. आधार, पासबुक व ताडपत्री सोबत ठेवा.'),
+  nt_remHour_t: r('एक घंटे में आपका स्लॉट', 'Your slot is in one hour', 'ਇੱਕ ਘੰਟੇ ਵਿੱਚ ਤੁਹਾਡਾ ਸਲਾਟ', 'एका तासात तुमचा स्लॉट'),
+  nt_remHour_b: r('टोकन {token} • {mandi} • {time}। अब निकल जाइए।', 'Token {token} • {mandi} • {time}. Time to leave.', 'ਟੋਕਨ {token} • {mandi} • {time}। ਹੁਣ ਨਿਕਲੋ।', 'टोकन {token} • {mandi} • {time}. आता निघा.'),
+  nt_yourTurn_t: r('आपकी बारी है - गेट पर जाएं', 'Your turn — go to the gate', 'ਤੁਹਾਡੀ ਵਾਰੀ ਹੈ - ਗੇਟ ਤੇ ਜਾਓ', 'तुमची पाळी - गेटवर जा'),
+  nt_yourTurn_b: r('टोकन {token}। एक लेन खाली है, गेट पर QR दिखाएं।', 'Token {token}. A lane is free — show your QR at the gate.', 'ਟੋਕਨ {token}। ਲੇਨ ਖਾਲੀ ਹੈ, ਗੇਟ ਤੇ QR ਦਿਖਾਓ।', 'टोकन {token}. लेन रिकामी आहे, गेटवर QR दाखवा.'),
+  nt_gate_t: r('मंडी में प्रवेश हो गया', 'Entered the mandi', 'ਮੰਡੀ ਵਿੱਚ ਦਾਖਲਾ ਹੋ ਗਿਆ', 'मंडीत प्रवेश झाला'),
+  nt_gate_b: r('टोकन {token}। अब जांच (assay) के लिए जाएं।', 'Token {token}. Proceed to quality check (assay).', 'ਟੋਕਨ {token}। ਹੁਣ ਜਾਂਚ ਲਈ ਜਾਓ।', 'टोकन {token}. आता तपासणीसाठी जा.'),
+  nt_gate_lane_b: r('टोकन {token}। लेन {lane} में गाड़ी लगाएं, फिर जांच होगी।', 'Token {token}. Park in lane {lane}; quality check is next.', 'ਟੋਕਨ {token}। ਲੇਨ {lane} ਵਿੱਚ ਗੱਡੀ ਲਗਾਓ।', 'टोकन {token}. लेन {lane} मध्ये गाडी लावा.'),
+  nt_assay_t: r('जांच पूरी - आपका फैसला चाहिए', 'Quality check done — your decision needed', 'ਜਾਂਚ ਪੂਰੀ - ਤੁਹਾਡਾ ਫੈਸਲਾ ਚਾਹੀਦਾ', 'तपासणी पूर्ण - तुमचा निर्णय हवा'),
+  nt_assay_b: r('ग्रेड {grade}। MSP पर बेचें या नीलामी चुनें - ऐप खोलें।', 'Grade {grade}. Choose MSP or auction — open the app.', 'ਗ੍ਰੇਡ {grade}। MSP ਜਾਂ ਨੀਲਾਮੀ ਚੁਣੋ।', 'ग्रेड {grade}. MSP किंवा लिलाव निवडा.'),
+  nt_rejected_t: r('फसल अस्वीकृत', 'Produce rejected', 'ਫਸਲ ਅਸਵੀਕਾਰ', 'पीक नाकारले'),
+  nt_rejected_b: r('टोकन {token} की जांच में फसल मानक पर खरी नहीं उतरी। विवरण ऐप में देखें।', 'Token {token} did not meet quality standards. See details in the app.', 'ਟੋਕਨ {token} ਮਿਆਰ ਤੇ ਖਰਾ ਨਹੀਂ ਉਤਰਿਆ।', 'टोकन {token} दर्जा निकषात बसले नाही.'),
+  nt_price_t: r('भाव तय हुआ', 'Price fixed', 'ਭਾਅ ਤੈਅ ਹੋਇਆ', 'भाव ठरला'),
+  nt_price_b: r('₹{rate} प्रति क्विंटल। अब तौल के लिए जाएं।', '₹{rate} per quintal. Proceed to the weighbridge.', '₹{rate} ਪ੍ਰਤੀ ਕੁਇੰਟਲ। ਹੁਣ ਤੋਲ ਲਈ ਜਾਓ।', '₹{rate} प्रति क्विंटल. आता वजनासाठी जा.'),
+  nt_weighed_t: r('तौल पूरी', 'Weighing done', 'ਤੋਲ ਪੂਰੀ', 'वजन पूर्ण'),
+  nt_weighed_b: r('{qty} क्विंटल @ ₹{rate}। भुगतान काउंटर पर जाएं।', '{qty} quintals @ ₹{rate}. Go to the payment counter.', '{qty} ਕੁਇੰਟਲ @ ₹{rate}। ਭੁਗਤਾਨ ਕਾਊਂਟਰ ਤੇ ਜਾਓ।', '{qty} क्विंटल @ ₹{rate}. पेमेंट काउंटरवर जा.'),
+  nt_paid_t: r('भुगतान हो गया', 'Payment done', 'ਭੁਗਤਾਨ ਹੋ ਗਿਆ', 'पेमेंट झाले'),
+  nt_paid_b: r('₹{amount} आपके खाते में भेजे गए। रसीद ऐप में है।', '₹{amount} sent to your bank account. Receipt is in the app.', '₹{amount} ਤੁਹਾਡੇ ਖਾਤੇ ਵਿੱਚ ਭੇਜੇ ਗਏ।', '₹{amount} तुमच्या खात्यात पाठवले.'),
+  nt_noShow_t: r('टोकन रद्द (अनुपस्थित)', 'Token cancelled (no-show)', 'ਟੋਕਨ ਰੱਦ (ਗੈਰਹਾਜ਼ਰ)', 'टोकन रद्द (गैरहजर)'),
+  nt_noShow_b: r('टोकन {token} समय पर नहीं आया। नया स्लॉट बुक करें।', 'Token {token} did not arrive in time. Please book a new slot.', 'ਟੋਕਨ {token} ਸਮੇਂ ਤੇ ਨਹੀਂ ਆਇਆ। ਨਵਾਂ ਸਲਾਟ ਬੁੱਕ ਕਰੋ।', 'टोकन {token} वेळेत आले नाही. नवीन स्लॉट बुक करा.'),
+  nt_delay_t: r('मंडी में देरी', 'Delay at the mandi', 'ਮੰਡੀ ਵਿੱਚ ਦੇਰੀ', 'मंडीत उशीर'),
+  nt_delay_b: r('लगभग {minutes} मिनट की देरी: {reason}', 'About {minutes} min delay: {reason}', 'ਲਗਭਗ {minutes} ਮਿੰਟ ਦੀ ਦੇਰੀ: {reason}', 'सुमारे {minutes} मिनिटे उशीर: {reason}'),
+  nt_auctionBid_t: r('नई बोली आई', 'New bid received', 'ਨਵੀਂ ਬੋਲੀ ਆਈ', 'नवीन बोली आली'),
+  nt_auctionBid_b: r('{crop} पर ₹{bid}/क्विंटल की बोली ({bidder})।', '₹{bid}/quintal bid on your {crop} ({bidder}).', '{crop} ਤੇ ₹{bid}/ਕੁਇੰਟਲ ਦੀ ਬੋਲੀ।', '{crop} वर ₹{bid}/क्विंटल बोली.'),
+
+  // officers
+  nt_off_newToken_t: r('नया टोकन', 'New token', 'ਨਵਾਂ ਟੋਕਨ', 'नवीन टोकन'),
+  nt_off_newToken_b: r('{token} • {farmer} • {crop} {qty} क्विं • {date} {time}', '{token} • {farmer} • {crop} {qty} q • {date} {time}', '{token} • {farmer} • {crop} {qty} ਕੁਇੰ • {date} {time}', '{token} • {farmer} • {crop} {qty} क्विं • {date} {time}'),
+  nt_off_arrived_t: r('गाड़ी अंदर आई - जांच के लिए', 'Vehicle in — ready for assay', 'ਗੱਡੀ ਅੰਦਰ ਆਈ - ਜਾਂਚ ਲਈ', 'गाडी आत आली - तपासणीसाठी'),
+  nt_off_arrived_b: r('{token} • {farmer} • {crop} • लेन {lane}', '{token} • {farmer} • {crop} • lane {lane}', '{token} • {farmer} • {crop} • ਲੇਨ {lane}', '{token} • {farmer} • {crop} • लेन {lane}'),
+  nt_off_priceFixed_t: r('भाव तय - तौल के लिए तैयार', 'Price fixed — ready to weigh', 'ਭਾਅ ਤੈਅ - ਤੋਲ ਲਈ ਤਿਆਰ', 'भाव ठरला - वजनासाठी तयार'),
+  nt_off_priceFixed_b: r('{token} • {farmer} • {crop} @ ₹{rate}', '{token} • {farmer} • {crop} @ ₹{rate}', '{token} • {farmer} • {crop} @ ₹{rate}', '{token} • {farmer} • {crop} @ ₹{rate}'),
+  nt_off_weighed_t: r('तौल पूरी - भुगतान बाकी', 'Weighed — payment pending', 'ਤੋਲ ਪੂਰੀ - ਭੁਗਤਾਨ ਬਾਕੀ', 'वजन पूर्ण - पेमेंट बाकी'),
+  nt_off_weighed_b: r('{token} • {farmer} • {qty} क्विं @ ₹{rate}', '{token} • {farmer} • {qty} q @ ₹{rate}', '{token} • {farmer} • {qty} ਕੁਇੰ @ ₹{rate}', '{token} • {farmer} • {qty} क्विं @ ₹{rate}'),
+
+  // traders
+  nt_tr_newLot_t: r('नई नीलामी शुरू', 'New auction open', 'ਨਵੀਂ ਨੀਲਾਮੀ ਸ਼ੁਰੂ', 'नवीन लिलाव सुरू'),
+  nt_tr_newLot_b: r('{crop} {qty} क्विं, ग्रेड {grade}, न्यूनतम ₹{msp}। {minutes} मिनट में बंद।', '{crop} {qty} q, grade {grade}, reserve ₹{msp}. Closes in {minutes} min.', '{crop} {qty} ਕੁਇੰ, ਗ੍ਰੇਡ {grade}, ਘੱਟੋ-ਘੱਟ ₹{msp}। {minutes} ਮਿੰਟ ਵਿੱਚ ਬੰਦ।', '{crop} {qty} क्विं, ग्रेड {grade}, किमान ₹{msp}. {minutes} मिनिटांत बंद.'),
+  nt_tr_outbid_t: r('आपकी बोली पीछे रह गई', 'You have been outbid', 'ਤੁਹਾਡੀ ਬੋਲੀ ਪਿੱਛੇ ਰਹਿ ਗਈ', 'तुमची बोली मागे पडली'),
+  nt_tr_outbid_b: r('{crop} ({token}) पर अब ₹{bid}/क्विं। फिर बोली लगाएं?', '{crop} ({token}) is now at ₹{bid}/q. Bid again?', '{crop} ({token}) ਤੇ ਹੁਣ ₹{bid}/ਕੁਇੰ।', '{crop} ({token}) आता ₹{bid}/क्विं.'),
+  nt_tr_won_t: r('बधाई - लॉट आपका हुआ', 'Congratulations — lot is yours', 'ਵਧਾਈ - ਲਾਟ ਤੁਹਾਡਾ ਹੋਇਆ', 'अभिनंदन - लॉट तुमचा'),
+  nt_tr_won_b: r('{crop} {qty} क्विं @ ₹{bid} ({token})। तौल के बाद भुगतान करें।', '{crop} {qty} q @ ₹{bid} ({token}). Pay after weighing.', '{crop} {qty} ਕੁਇੰ @ ₹{bid} ({token})।', '{crop} {qty} क्विं @ ₹{bid} ({token}).'),
+  nt_tr_lost_t: r('लॉट किसी और को मिला', 'Lot went to another trader', 'ਲਾਟ ਕਿਸੇ ਹੋਰ ਨੂੰ ਮਿਲਿਆ', 'लॉट दुसऱ्याला मिळाला'),
+  nt_tr_lost_b: r('{crop} ({token}) ₹{bid} पर बिका।', '{crop} ({token}) sold at ₹{bid}.', '{crop} ({token}) ₹{bid} ਤੇ ਵਿਕਿਆ।', '{crop} ({token}) ₹{bid} ला विकले.'),
+  audio_Notifications: r(
+    'यह आपकी सूचनाओं की सूची है। टोकन बुक होने, गेट प्रवेश, जांच, भाव, तौल और भुगतान की हर खबर यहां आती है। किसी सूचना पर दबाकर उसका विवरण देखें।',
+    'This is your list of notifications. Booking, gate entry, quality check, price, weighing and payment updates all appear here. Tap one to see its details.',
+    'ਇਹ ਤੁਹਾਡੀਆਂ ਸੂਚਨਾਵਾਂ ਦੀ ਸੂਚੀ ਹੈ। ਬੁਕਿੰਗ, ਗੇਟ, ਜਾਂਚ, ਭਾਅ, ਤੋਲ ਅਤੇ ਭੁਗਤਾਨ ਦੀ ਹਰ ਖ਼ਬਰ ਇੱਥੇ ਆਉਂਦੀ ਹੈ।',
+    'ही तुमच्या सूचनांची यादी आहे. बुकिंग, गेट, तपासणी, भाव, वजन आणि पेमेंटच्या सर्व बातम्या इथे येतात.'
+  ),
+
   confirmToken: r('पुष्टि करें और टोकन लें', 'Confirm & Get Token', 'ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਟੋਕਨ ਲਓ', 'पुष्टी करा आणि टोकन घ्या'),
 
   /* ------------------------------------------------------------ */

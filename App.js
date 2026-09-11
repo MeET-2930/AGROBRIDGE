@@ -20,7 +20,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+
+export const navigationRef = createNavigationContainerRef();
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -47,6 +49,8 @@ import TokenDetailScreen from './screens/farmer/TokenDetailScreen';
 import HistoryScreen from './screens/farmer/HistoryScreen';
 import PaymentsScreen from './screens/farmer/PaymentsScreen';
 import HelpScreen from './screens/common/HelpScreen';
+import NotificationsScreen from './screens/common/NotificationsScreen';
+import { NotificationProvider } from './notifications/NotificationContext';
 
 // Officer & Trader portals
 import OfficerStack from './navigation/OfficerStack';
@@ -82,6 +86,7 @@ function FarmerStack() {
       <FarmerNav.Screen name="History" component={HistoryScreen} />
       <FarmerNav.Screen name="Payments" component={PaymentsScreen} />
       <FarmerNav.Screen name="Help" component={HelpScreen} />
+      <FarmerNav.Screen name="Notifications" component={NotificationsScreen} />
     </FarmerNav.Navigator>
   );
 }
@@ -129,20 +134,25 @@ function GlobalLanguageModalHost() {
  * bottom, app in between - on EVERY screen.
  */
 function RootApp({ initialRoute }) {
+  const [routeName, setRouteName] = useState(initialRoute);
+  const syncRoute = () => setRouteName(navigationRef.getCurrentRoute()?.name || '');
+
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <View style={{ height: 5, backgroundColor: Colors.primary }} />
 
       <View style={{ flex: 1 }}>
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef} onReady={syncRoute} onStateChange={syncRoute}>
           <StatusBar style="dark" />
-          <Root.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
-            <Root.Screen name="Auth" component={AuthStack} />
-            <Root.Screen name="Farmer" component={FarmerStack} />
-            <Root.Screen name="Officer" component={OfficerStack} />
-            <Root.Screen name="Trader" component={TraderStack} />
-          </Root.Navigator>
-          <GlobalLanguageModalHost />
+          <NotificationProvider navigationRef={navigationRef} routeName={routeName}>
+            <Root.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+              <Root.Screen name="Auth" component={AuthStack} />
+              <Root.Screen name="Farmer" component={FarmerStack} />
+              <Root.Screen name="Officer" component={OfficerStack} />
+              <Root.Screen name="Trader" component={TraderStack} />
+            </Root.Navigator>
+            <GlobalLanguageModalHost />
+          </NotificationProvider>
         </NavigationContainer>
       </View>
 

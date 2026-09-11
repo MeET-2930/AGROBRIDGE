@@ -6,6 +6,7 @@ import { NavigationRouteContext } from '@react-navigation/native';
 import Colors from '../theme/colors';
 import { useLang } from '../i18n/LanguageContext';
 import { hasKey } from '../i18n/translations';
+import { useNotifications } from '../notifications/NotificationContext';
 
 /*
  * Original AGROBRIDGE header: centred brand + subtitle, round
@@ -17,6 +18,7 @@ export default function AppHeader({
   showBack = false,
   showSpeaker = true,
   showLang = true,
+  showBell = true,
   title,
   tag,
   audioKey,
@@ -24,6 +26,8 @@ export default function AppHeader({
 }) {
   const insets = useSafeAreaInsets();
   const { tr, speak, stopSpeak, speaking, setPickerOpen } = useLang();
+  const { unread, session } = useNotifications();
+  const bellVisible = showBell && !!session?.uid && route?.name !== 'Notifications';
   // Which screen are we on?  -> default help text is  audio_<RouteName>
   // (install21: every screen gets voice help without editing each screen)
   const route = React.useContext(NavigationRouteContext);
@@ -80,7 +84,20 @@ export default function AppHeader({
         <Text style={styles.sub} numberOfLines={1}>{displaySub}</Text>
       </View>
 
-      <View style={styles.sideSlotRight}>
+      <View style={[styles.sideSlotRight, bellVisible && { width: 130 }]}>
+        {bellVisible ? (
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => navigation?.navigate('Notifications')}
+            accessibilityLabel="Notifications"
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Ionicons name={unread > 0 ? 'notifications' : 'notifications-outline'} size={18} color={Colors.navy} />
+            {unread > 0 ? (
+              <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>
+            ) : null}
+          </TouchableOpacity>
+        ) : null}
         {showLang ? (
           <TouchableOpacity
             style={styles.iconBtn}
@@ -130,4 +147,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconPlaceholder: { width: 36, height: 36 },
+  badge: {
+    position: 'absolute', top: -3, right: -3, minWidth: 17, height: 17, borderRadius: 9,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    borderWidth: 1.5, borderColor: Colors.white,
+  },
+  badgeText: { color: Colors.white, fontSize: 9.5, fontWeight: '900' },
 });

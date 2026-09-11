@@ -36,7 +36,7 @@ const CENTRE_ID = 'centre_gurugram_01';
 const CENTRE_NAME = 'गुरुग्राम अनाज मंडी (Gurugram Grain Market)';
 
 const COLLECTIONS_TO_WIPE = [
-  'users', 'bookings', 'centreQueues', 'auctions', 'delays', 'feedback', 'ivrIdempotency',
+  'users', 'bookings', 'centreQueues', 'auctions', 'delays', 'feedback', 'ivrIdempotency', 'notifications',
 ];
 
 // ----- test accounts (phone = login id; OTP in the app is always 1234) -----
