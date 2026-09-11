@@ -1148,6 +1148,25 @@ export async function fetchMyBookings(farmerId) {
   }
 }
 
+/**
+ * install33: EVERY active booking of a farmer (wheat today + mustard tomorrow,
+ * or two trolleys). Sorted by nearest slot first.
+ */
+export async function fetchActiveFarmerBookings(farmerId) {
+  if (!farmerId) return [];
+  try {
+    const snapshot = await getDocs(
+      query(collection(db, 'bookings'), where('farmerId', '==', farmerId), where('status', 'in', ACTIVE_STATUSES))
+    );
+    return snapshot.docs
+      .map((item) => item.data())
+      .sort((a, b) => `${a.date} ${a.slotTime}`.localeCompare(`${b.date} ${b.slotTime}`));
+  } catch (error) {
+    console.error('Error fetching active bookings:', error);
+    return [];
+  }
+}
+
 export async function fetchActiveFarmerBooking(farmerId) {
   if (!farmerId) return null;
 

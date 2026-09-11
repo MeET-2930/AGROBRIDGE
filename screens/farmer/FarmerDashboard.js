@@ -28,7 +28,7 @@ import { requestCallback, warmUpIvr } from '../../services/ivr';
 import { IVR_BASE_URL } from '../../services/config';
 
 import {
-  fetchActiveFarmerBooking,
+  fetchActiveFarmerBookings,
   subscribeToBooking,
   subscribeToQueue,
   buildQueueView,
@@ -43,7 +43,8 @@ export default function FarmerDashboard({ navigation }) {
   const { tr, lang } = useLang();
 
   const [session, setSession] = useState(null);
-  const [booking, setBooking] = useState(null);
+  const [booking, setBooking] = useState(null);     // nearest slot: gets the live queue light
+  const [others, setOthers] = useState([]);         // install33: the farmer's other active tokens
   const [queue, setQueue] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -85,9 +86,11 @@ export default function FarmerDashboard({ navigation }) {
       return;
     }
 
-    const active = await fetchActiveFarmerBooking(user.uid);
+    const all = await fetchActiveFarmerBookings(user.uid);
+    const active = all[0] || null;
 
     stopListening();
+    setOthers(all.slice(1));
 
     if (!active) {
       setBooking(null);
@@ -226,6 +229,28 @@ export default function FarmerDashboard({ navigation }) {
                 }
               />
             </View>
+
+            {/* install33: other active tokens, compact */}
+            {others.length > 0 ? (
+              <View style={styles.otherWrap}>
+                <Text style={styles.otherTitle}>{tr('fd_otherTokens', { n: others.length })}</Text>
+                {others.map((b) => (
+                  <TouchableOpacity
+                    key={b.tokenId}
+                    style={styles.otherRow}
+                    onPress={() => navigation.navigate('TokenDetail', { tokenId: b.tokenId })}
+                  >
+                    <View style={styles.otherToken}><Text style={styles.otherTokenText}>{b.tokenNumber}</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.otherMain} numberOfLines={1}>{cropLabel(b, lang)} • {b.approxQuantityQuintals} {tr('quintal')}</Text>
+                      <Text style={styles.otherSub} numberOfLines={1}>{b.centreName}</Text>
+                      <Text style={styles.otherSub}>{b.slotWindow} • {b.date}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
           </>
         ) : (
           <View style={styles.emptyCard}>
@@ -367,6 +392,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   bookingMeta: { fontSize: 12, color: Colors.subText, marginTop: 4 },
+  otherWrap: { marginTop: 4, marginBottom: 12 },
+  otherTitle: { fontSize: 12, fontWeight: '800', color: Colors.subText, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  otherRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.white, borderRadius: 14, padding: 12, marginBottom: 8,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  otherToken: { backgroundColor: Colors.accent, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  otherTokenText: { fontWeight: '900', color: Colors.secondary, fontSize: 14 },
+  otherMain: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
+  otherSub: { fontSize: 12, color: Colors.subText, marginTop: 2 },
 
   emptyCard: {
     backgroundColor: Colors.white,

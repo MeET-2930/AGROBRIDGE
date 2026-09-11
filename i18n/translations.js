@@ -212,6 +212,7 @@ export const t = {
   help: r('सहायता', 'Help', 'ਮਦਦ', 'मदत'),
   activeBooking: r('सक्रिय बुकिंग', 'Active Booking', 'ਸਰਗਰਮ ਬੁਕਿੰਗ', 'सक्रिय बुकिंग'),
   trackStatus: r('पूरा विवरण देखें', 'View full details', 'ਪੂਰਾ ਵੇਰਵਾ ਵੇਖੋ', 'संपूर्ण तपशील पहा'),
+  fd_otherTokens: r('आपके अन्य टोकन ({n})', 'Your other tokens ({n})', 'ਤੁਹਾਡੇ ਹੋਰ ਟੋਕਨ ({n})', 'तुमचे इतर टोकन ({n})'),
   fd_cropLine: r('फसल: {crop} • {qty} क्विंटल', 'Crop: {crop} • {qty} qtl', 'ਫਸਲ: {crop} • {qty} ਕੁਇੰਟਲ', 'पीक: {crop} • {qty} क्विंटल'),
 
   /* ------------------------------------------------------------ */
