@@ -28,11 +28,12 @@ export default function AppHeader({
   const insets = useSafeAreaInsets();
   const { tr, speak, stopSpeak, speaking, setPickerOpen } = useLang();
   const { unread, session } = useNotifications();
-  const bellVisible = showBell && !!session?.uid && route?.name !== 'Notifications';
   // Which screen are we on?  -> default help text is  audio_<RouteName>
   // (install21: every screen gets voice help without editing each screen)
   const route = React.useContext(NavigationRouteContext);
   const routeKey = route?.name ? `audio_${route.name}` : null;
+  // install31: must come AFTER `route` is defined (was above it -> crash after login on web)
+  const bellVisible = showBell && !!session?.uid && route?.name !== 'Notifications';
 
   const displayTitle = title != null && String(title).trim() !== '' ? String(title) : tr('brand');
   const displaySub = tag != null && String(tag).trim() !== '' ? String(tag) : tr('brandSub');
