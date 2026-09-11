@@ -5,6 +5,7 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryCard from '../../components/PrimaryCard';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
+import { ROLE_ICON } from '../../theme/brand';
 
 export default function RoleSelectionScreen({ navigation }) {
   const { tr } = useLang();
@@ -13,11 +14,11 @@ export default function RoleSelectionScreen({ navigation }) {
       <AppHeader navigation={navigation} showBack audioKey="audio_role" />
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle title={tr('selectRole')} />
-        <PrimaryCard title={tr('roleFarmer')} subtitle={tr('roleFarmerSub')} icon="leaf-outline"
+        <PrimaryCard title={tr('roleFarmer')} subtitle={tr('roleFarmerSub')} image={ROLE_ICON.farmer}
           onPress={() => navigation.navigate('UserStatus', { role: 'farmer' })} />
-        <PrimaryCard title={tr('roleOfficer')} subtitle={tr('roleOfficerSub')} icon="shield-checkmark-outline"
+        <PrimaryCard title={tr('roleOfficer')} subtitle={tr('roleOfficerSub')} image={ROLE_ICON.officer}
           onPress={() => navigation.navigate('UserStatus', { role: 'officer' })} />
-        <PrimaryCard title={tr('roleTrader')} subtitle={tr('roleTraderSub')} icon="cart-outline"
+        <PrimaryCard title={tr('roleTrader')} subtitle={tr('roleTraderSub')} image={ROLE_ICON.trader}
           onPress={() => navigation.navigate('UserStatus', { role: 'trader' })} />
       </ScrollView>
     </SafeAreaView>

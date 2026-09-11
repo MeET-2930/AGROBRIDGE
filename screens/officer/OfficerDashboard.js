@@ -366,7 +366,7 @@ export default function OfficerDashboard({ navigation }) {
               <Ionicons
                 name="log-out-outline"
                 size={20}
-                color={Colors.error}
+                color={Colors.white}
               />
               <Text style={styles.logoutText}>
                 {tr('logout')}
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 30 },
 
   headRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  greet: { color: Colors.subText, fontWeight: '600', fontSize: 12 },
+  greet: { color: Colors.secondary, fontWeight: '800', fontSize: 20 },
   name: { fontSize: 19, fontWeight: '800', color: Colors.navy },
   dutyPill: {
     alignSelf: 'flex-start',
@@ -547,5 +547,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  logoutText: { color: Colors.error, fontWeight: '800', fontSize: 16 },
+  logoutText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });

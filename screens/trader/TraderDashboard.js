@@ -154,7 +154,7 @@ export default function TraderDashboard({ navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-              <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+              <Ionicons name="log-out-outline" size={20} color={Colors.white} />
               <Text style={styles.logoutText}>{tr('logout')}</Text>
             </TouchableOpacity>
           </View>
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.navy,
     alignItems: 'center', justifyContent: 'center',
   },
-  greet: { fontSize: 12, color: Colors.subText, fontWeight: '600' },
+  greet: { fontSize: 20, color: Colors.secondary, fontWeight: '800' },
   name: { fontSize: 18, fontWeight: '800', color: Colors.navy },
   phone: { fontSize: 11, color: Colors.subText, marginTop: 2 },
 
@@ -205,6 +205,9 @@ const styles = StyleSheet.create({
     marginTop: 18, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border,
   },
   profileLinkText: { color: Colors.secondary, fontWeight: '800', fontSize: 15 },
-  logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 6 },
-  logoutText: { color: Colors.error, fontWeight: '800', fontSize: 16 },
+  logoutBtn: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.error, borderRadius: 12, paddingVertical: 12, marginTop: 6,
+  },
+  logoutText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });

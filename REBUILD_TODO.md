@@ -24,3 +24,9 @@ After the new APK is installed, `eas update` keeps working as before.
 1. First launch asks "Allow AgroBridge to send notifications" → Allow.
 2. Book a token on phone A (farmer) while phone B (gate officer) is locked → B's status bar shows "New token".
 3. Slot reminders are scheduled on the farmer's phone when the dashboard opens (19:00 the evening before, and 60 min before the slot).
+
+## install29 brand assets (do at the rebuild)
+In app.json set  "icon": "./assets/brand/icon_1024.png",
+                 "splash": { "image": "./assets/brand/splash.png", "resizeMode": "contain", "backgroundColor": "#ffffff" },
+                 "android": { "adaptiveIcon": { "foregroundImage": "./assets/brand/icon_1024.png", "backgroundColor": "#ffffff" } }
+then `eas build --profile preview --platform android`.

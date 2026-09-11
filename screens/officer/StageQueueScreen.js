@@ -297,6 +297,7 @@ const styles = StyleSheet.create({
   },
   outline: {
     flex: 1,
+    backgroundColor: Colors.error,
     borderWidth: 1,
     borderColor: Colors.error,
     borderRadius: 8,
@@ -304,7 +305,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  outlineText: { color: Colors.error, fontWeight: '800' },
+  outlineText: { color: Colors.white, fontWeight: '800' },
   primary: {
     flex: 1.4,
     backgroundColor: Colors.primary,

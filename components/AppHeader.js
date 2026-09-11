@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationRouteContext } from '@react-navigation/native';
 import Colors from '../theme/colors';
 import { useLang } from '../i18n/LanguageContext';
 import { hasKey } from '../i18n/translations';
+import { LOGO_MARK } from '../theme/brand';
 import { useNotifications } from '../notifications/NotificationContext';
 
 /*
@@ -78,9 +79,12 @@ export default function AppHeader({
       </View>
 
       <View style={styles.centerBlock}>
-        <Text style={[styles.title, { color: isBrand ? Colors.secondary : Colors.navy }]} numberOfLines={1}>
-          {displayTitle}
-        </Text>
+        <View style={styles.titleRow}>
+          {isBrand ? <Image source={LOGO_MARK} style={styles.mark} resizeMode="contain" /> : null}
+          <Text style={[styles.title, { color: isBrand ? Colors.secondary : Colors.navy }]} numberOfLines={1}>
+            {displayTitle}
+          </Text>
+        </View>
         <Text style={styles.sub} numberOfLines={1}>{displaySub}</Text>
       </View>
 
@@ -136,6 +140,8 @@ const styles = StyleSheet.create({
   sideSlot: { width: 44, alignItems: 'flex-start' },
   sideSlotRight: { width: 88, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 },
   centerBlock: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mark: { width: 26, height: 26 },
   title: { fontSize: 18, fontWeight: '800', letterSpacing: 1 },
   sub: { fontSize: 11.5, fontWeight: '600', color: Colors.navy, marginTop: 2, textAlign: 'center' },
   iconBtn: {

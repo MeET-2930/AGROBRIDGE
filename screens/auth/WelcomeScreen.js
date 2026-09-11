@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
+import { LOGO_FULL } from '../../theme/brand';
 
 export default function WelcomeScreen({ navigation }) {
   const { tr, setPickerOpen } = useLang();
@@ -10,8 +11,7 @@ export default function WelcomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.logo}>🌾</Text>
-        <Text style={styles.brand}>AgroBridge</Text>
+        <Image source={LOGO_FULL} style={styles.logo} resizeMode="contain" />
         <Text style={styles.brandSub}>{tr('brandSub')}</Text>
         <Text style={styles.headline}>{tr('welcome_headline')}</Text>
         <Text style={styles.headlineSub}>{tr('welcome_sub')}</Text>
@@ -44,8 +44,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
-  logo: { fontSize: 64, marginBottom: 8 },
-  brand: { fontSize: 32, fontWeight: '900', color: Colors.secondary, letterSpacing: 2 },
+  logo: { width: 260, height: 260, marginBottom: -10 },
   brandSub: { fontSize: 13, fontWeight: '700', color: Colors.navy, marginTop: 6, textAlign: 'center' },
   headline: { fontSize: 22, fontWeight: '800', color: Colors.navy, marginTop: 28, textAlign: 'center' },
   headlineSub: { fontSize: 16, fontWeight: '700', color: Colors.primary, marginTop: 6, textAlign: 'center' },

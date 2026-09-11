@@ -503,7 +503,7 @@ export default function TokenDetailScreen({ navigation, route }) {
                     ) : null}
                     <PrimaryButton
                       title={tr('td_reject')}
-                      variant="outline"
+                      variant="danger"
                       onPress={rejectBids}
                       style={{ height: 42, paddingHorizontal: 12 }}
                     />
@@ -663,7 +663,7 @@ export default function TokenDetailScreen({ navigation, route }) {
         {token.status === STATUS.BOOKED ? (
           <PrimaryButton
             title={tr('td_cancelBooking')}
-            variant="outline"
+            variant="danger"
             loading={cancelling}
             onPress={confirmCancel}
             style={{ marginTop: 4 }}

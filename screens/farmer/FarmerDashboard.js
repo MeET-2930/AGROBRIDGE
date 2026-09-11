@@ -312,7 +312,7 @@ export default function FarmerDashboard({ navigation }) {
               <Ionicons
                 name="log-out-outline"
                 size={20}
-                color={Colors.error}
+                color={Colors.white}
               />
               <Text style={styles.logoutText}>
                 {tr('logout')}
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  greet: { fontSize: 12, color: Colors.subText, fontWeight: '600' },
+  greet: { fontSize: 20, color: Colors.secondary, fontWeight: '800' },
   name: { fontSize: 18, fontWeight: '800', color: Colors.navy },
   phone: { fontSize: 11, color: Colors.subText, marginTop: 2 },
 
@@ -417,10 +417,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoutBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.error, borderRadius: 12, paddingVertical: 12, marginTop: 6,
   },
-  logoutText: { color: Colors.error, fontWeight: '800', fontSize: 16 },
+  logoutText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });
