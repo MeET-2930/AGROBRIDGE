@@ -21,6 +21,7 @@
  *   real action (the stage change already happened).
  * ---------------------------------------------------------------
  */
+import { Platform } from 'react-native';
 import {
   doc,
   getDoc,
@@ -111,15 +112,29 @@ async function pushToUsers(userDocs, item) {
   if (!messages.length) return;
   try {
     for (let i = 0; i < messages.length; i += 90) {
-      await fetch(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(messages.slice(i, i + 90)),
-      });
+      await postToExpoPush(messages.slice(i, i + 90));
     }
   } catch (e) {
     console.log('push send skipped:', e?.message);
   }
+}
+
+/**
+ * Expo's push endpoint sends NO CORS headers, so a browser (the web app) blocks a
+ * normal JSON POST before it leaves the page. A "simple request" (text/plain body,
+ * mode no-cors) is always sent; the server parses the JSON inside it just fine.
+ * On Android/iOS there is no CORS, so the same call works and we can read the reply.
+ */
+export async function postToExpoPush(payload) {
+  const opts = {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload),
+  };
+  if (Platform.OS === 'web') opts.mode = 'no-cors';
+  const res = await fetch(EXPO_PUSH_URL, opts);
+  if (Platform.OS === 'web') return null;                 // opaque response on web
+  return res.json().catch(() => null);
 }
 
 async function pushToUid(uid, item) {
@@ -134,7 +149,7 @@ async function pushToCentre(centreId, role, item, duties) {
     const snap = await getDocs(query(collection(db, 'users'), where('centreId', '==', centreId), where('role', '==', role)));
     let users = snap.docs.map((d) => d.data());
     if (role === 'officer' && duties && !duties.includes('*')) {
-      users = users.filter((u) => u.officerDuty === 'admin' || duties.includes(u.officerDuty));
+      users = users.filter((u) => u.officerDuty === 'admin' || duties.includes(u.officerDuty || 'gate'));
     }
     await pushToUsers(users, item);
   } catch (e) { /* ignore */ }

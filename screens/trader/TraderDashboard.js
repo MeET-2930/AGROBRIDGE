@@ -153,6 +153,14 @@ export default function TraderDashboard({ navigation }) {
               <Text style={styles.profileLinkText}>{tr('tr_mandiProfile')}</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => { setProfileOpen(false); navigation.navigate('Notifications'); }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={Colors.secondary} />
+              <Text style={styles.profileLinkText}>{tr('nt_title')}</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
               <Ionicons name="log-out-outline" size={20} color={Colors.white} />
               <Text style={styles.logoutText}>{tr('logout')}</Text>

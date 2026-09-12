@@ -29,7 +29,7 @@ import {
   fixPrice,
   STATUS,
 } from '../../services/bookings';
-import { CROP_LIST, cropLabel, gradeLabel } from '../../services/centres';
+import { CROP_LIST, cropLabel, gradeLabel, centreLabel } from '../../services/centres';
 import { useLang } from '../../i18n/LanguageContext';
 import {
   subscribeToAuction,
@@ -400,7 +400,7 @@ export default function TokenDetailScreen({ navigation, route }) {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{tr('td_bookingDetails')}</Text>
 
-          <Row label={tr('mandi')} value={token.centreName} />
+          <Row label={tr('mandi')} value={centreLabel(token.centreName, lang)} />
           <Row label={tr('address')} value={token.centreAddress} />
           <Row label={tr('date')} value={token.date} />
           <Row label={tr('time')} value={token.slotWindow} />
@@ -526,7 +526,7 @@ export default function TokenDetailScreen({ navigation, route }) {
               label={tr('td_mode')}
               value={token.priceMode === 'auction' ? tr('td_auction') : 'MSP'}
             />
-            <Row label={tr('td_buyer')} value={token.buyerName || tr('td_govBuyer')} />
+            <Row label={tr('td_buyer')} value={token.priceMode === 'msp' || !token.buyerName || /\(MSP\)/.test(token.buyerName) ? tr('td_govBuyer') : token.buyerName} />
           </View>
         ) : null}
 

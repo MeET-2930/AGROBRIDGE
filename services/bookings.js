@@ -444,7 +444,7 @@ export async function createBooking({
   });
 
   // install28: tell the farmer and the gate staff (fire-and-forget).
-  const bp = { token: booking.tokenNumber, mandi: booking.centreName, date: booking.date, time: booking.slotWindow, crop: booking.cropName, qty: booking.approxQuantityQuintals, farmer: booking.farmerName || booking.farmerPhone };
+  const bp = { token: booking.tokenNumber, mandi: booking.centreName, date: booking.date, time: booking.slotWindow, crop: booking.crop || booking.cropName, qty: booking.approxQuantityQuintals, farmer: booking.farmerName || booking.farmerPhone };
   notifyUser(booking.farmerId, makeItem('nt_booked_t', 'nt_booked_b', bp, routes.farmerToken(booking.tokenId)));
   notifyCentreOfficers(booking.centreId, ['gate'], makeItem('nt_off_newToken_t', 'nt_off_newToken_b', bp, routes.officerStage('gate')));
 
@@ -779,7 +779,7 @@ async function advanceStage(tokenId, patch, { entering = false } = {}) {
 async function afterStageNotify(b, patch) {
   const p = {
     token: b.tokenNumber, mandi: b.centreName, farmer: b.farmerName || b.farmerPhone || '',
-    crop: b.cropName, grade: b.grade || 'FAQ', rate: b.ratePerQuintal || '', qty: b.actualQuantity || b.approxQuantityQuintals || '',
+    crop: b.crop || b.cropName, grade: b.grade || 'FAQ', rate: b.ratePerQuintal || '', qty: b.actualQuantity || b.approxQuantityQuintals || '',
     lane: b.laneAssigned || '', amount: b.netPayable || '', buyer: typeof b.buyerName === 'string' ? b.buyerName : '',
   };
   const farmer = (t, body, route) => notifyUser(b.farmerId, makeItem(t, body, p, route || routes.farmerToken(b.tokenId)));

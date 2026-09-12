@@ -47,17 +47,23 @@ export function parseLocalDate(dateStr) {
   return new Date(y, m - 1, d);
 }
 
-/** Friendly label: आज / कल / 5 सित. */
-export function friendlyDateLabel(dateStr) {
-  if (dateStr === todayLocal()) return 'आज';
-  if (dateStr === dateOffsetLocal(1)) return 'कल';
-
+/** Friendly label in the user's language: Today / Tomorrow / 5 Sep. */
+const WORDS = {
+  hi: { today: 'आज', tomorrow: 'कल', locale: 'hi-IN' },
+  en: { today: 'Today', tomorrow: 'Tomorrow', locale: 'en-IN' },
+  pa: { today: 'ਅੱਜ', tomorrow: 'ਕੱਲ੍ਹ', locale: 'pa-IN' },
+  mr: { today: 'आज', tomorrow: 'उद्या', locale: 'mr-IN' },
+};
+export function friendlyDateLabel(dateStr, lang = 'hi') {
+  const w = WORDS[lang] || WORDS.hi;
+  if (dateStr === todayLocal()) return w.today;
+  if (dateStr === dateOffsetLocal(1)) return w.tomorrow;
   const d = parseLocalDate(dateStr);
-
-  return d.toLocaleDateString('hi-IN', {
-    day: 'numeric',
-    month: 'short',
-  });
+  try {
+    return d.toLocaleDateString(w.locale, { day: 'numeric', month: 'short' });
+  } catch (e) {
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  }
 }
 
 /** Current local time as HH:MM (24h), used to hide past slots. */

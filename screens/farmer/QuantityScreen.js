@@ -102,7 +102,7 @@ export default function QuantityScreen({ navigation, route }) {
           <Text style={styles.summaryTitle}>{tr('qty_summary')}</Text>
           <Row label={tr('crop')} value={crop?.nameKey ? tr(crop.nameKey) : crop?.name || '-'} />
           <Row label={tr('mandi')} value={centreLabel(centre, lang) || '-'} />
-          <Row label={tr('date')} value={date ? `${friendlyDateLabel(date)}  ${date.slice(8)}/${date.slice(5, 7)}` : '-'} />
+          <Row label={tr('date')} value={date ? `${friendlyDateLabel(date, lang)}  ${date.slice(8)}/${date.slice(5, 7)}` : '-'} />
           <Row label={tr('time')} value={slot?.windowLabel || '-'} last />
         </View>
 

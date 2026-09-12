@@ -128,7 +128,7 @@ export async function openAuction(booking, minutes = DEFAULT_AUCTION_MINUTES) {
 
   // install28: every trader of this mandi sees the new lot.
   notifyCentreTraders(lot.centreId, makeItem('nt_tr_newLot_t', 'nt_tr_newLot_b',
-    { token: lot.tokenNumber, crop: lot.cropName, qty: lot.approxQuantityQuintals, grade: lot.grade, msp: msp, minutes },
+    { token: lot.tokenNumber, crop: lot.crop || lot.cropName, qty: lot.approxQuantityQuintals, grade: lot.grade, msp: msp, minutes },
     routes.traderLot(lot.tokenId)));
   return lot;
 }
@@ -186,7 +186,7 @@ export async function placeBid(tokenId, { traderId, traderName, amount }) {
   }).then((res) => {
     // install28: previous highest bidder is outbid; farmer sees the new top bid.
     const prevBidder = res.bids?.[1]?.traderId;
-    const p = { token: res.tokenNumber, crop: res.cropName, bid, bidder: traderName || '' };
+    const p = { token: res.tokenNumber, crop: res.crop || res.cropName, bid, bidder: traderName || '' };
     if (prevBidder && prevBidder !== traderId) {
       notifyUser(prevBidder, makeItem('nt_tr_outbid_t', 'nt_tr_outbid_b', p, routes.traderLot(tokenId)));
     }
@@ -231,7 +231,7 @@ export async function acceptHighestBid(tokenId, farmerId) {
     return { ...lot, status: AUCTION_STATUS.ACCEPTED };
   }).then((res) => {
     // install28: winner + everyone else who bid.
-    const p = { token: res.tokenNumber, crop: res.cropName, bid: res.highestBid, qty: res.approxQuantityQuintals };
+    const p = { token: res.tokenNumber, crop: res.crop || res.cropName, bid: res.highestBid, qty: res.approxQuantityQuintals };
     notifyUser(res.highestBidderId, makeItem('nt_tr_won_t', 'nt_tr_won_b', p, routes.traderWins()));
     const losers = new Set((res.bids || []).map((x) => x.traderId).filter((id) => id && id !== res.highestBidderId));
     losers.forEach((id) => notifyUser(id, makeItem('nt_tr_lost_t', 'nt_tr_lost_b', p, routes.traderBoard())));

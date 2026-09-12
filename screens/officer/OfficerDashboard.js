@@ -362,6 +362,14 @@ export default function OfficerDashboard({ navigation }) {
               </Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => { setOpen(false); navigation.navigate('Notifications'); }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={Colors.secondary} />
+              <Text style={styles.profileLinkText}>{tr('nt_title')}</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.logout} onPress={logout}>
               <Ionicons
                 name="log-out-outline"

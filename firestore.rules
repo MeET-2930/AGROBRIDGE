@@ -9,7 +9,8 @@
 //
 //  MODE B  (production - deploy after internals)
 //     Requires Firebase Anonymous Auth wiring in services/auth.js
-//     (install15). Farmers see only their own bookings, officers
+//     (install15). Updated install39 to match real collection names
+//     (centreQueues, notifications, delays). Farmers see only their own bookings, officers
 //     write only at their posted mandi, traders only bid, nothing
 //     is ever deleted.
 //
@@ -55,17 +56,37 @@ service cloud.firestore {
 
     // Live queue per centre/day: farmers read their mandi's queue,
     // only officers of that mandi (and the booking transaction) write.
-    match /queues/{id} {
+    // Live queue per centre/day (doc id = centreId_date). Farmers write it
+    // inside the booking transaction; officers of that mandi advance it.
+    match /centreQueues/{id} {
       allow read: if signedIn();
-      allow write: if isRole('officer') && resource.data.centreId == myCentre()
-                   || isRole('farmer');   // slot booking transaction
+      allow create, update: if isRole('farmer') || isRole('officer');
       allow delete: if false;
+    }
+
+    // In-app notification lists: u_{uid} (one user), c_{centreId} (officers),
+    // t_{centreId} (traders). Anyone signed in may append (events are caused
+    // by other roles), only the owner reads.
+    match /notifications/{id} {
+      allow read: if signedIn() && (
+                    id == 'u_' + request.auth.uid
+                    || id == 'c_' + myCentre() && isRole('officer')
+                    || id == 't_' + myCentre() && isRole('trader'));
+      allow create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    // Mandi delay notices: officers of that mandi write, everyone reads.
+    match /delays/{centreId} {
+      allow read: if signedIn();
+      allow write: if isRole('officer') && myCentre() == centreId;
     }
 
     match /bookings/{id} {
       allow read: if isRole('farmer') && resource.data.farmerId == request.auth.uid
                   || isRole('officer') && resource.data.centreId == myCentre()
-                  || isRole('trader')  && resource.data.centreId == myCentre();
+                  || isRole('trader')  && resource.data.centreId == myCentre()
+                  || isRole('farmer');  // queue view: farmers see today's tokens at their mandi (numbers only in UI)
       allow create: if isRole('farmer') && request.resource.data.farmerId == request.auth.uid;
       // farmer: cancel / fix price on his own token; officer: advance stages at his mandi
       allow update: if isRole('farmer') && resource.data.farmerId == request.auth.uid

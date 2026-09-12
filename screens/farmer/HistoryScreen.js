@@ -9,7 +9,7 @@ import ScreenTitle from '../../components/ScreenTitle';
 import StatusBadge from '../../components/StatusBadge';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
-import { cropLabel } from '../../services/centres';
+import { cropLabel, centreLabel } from '../../services/centres';
 
 import { fetchMyBookings } from '../../services/bookings';
 import { getCurrentUserSession } from '../../services/auth';
@@ -69,7 +69,7 @@ export default function HistoryScreen({ navigation }) {
                 <Text style={styles.token}>{item.tokenNumber}</Text>
                 <StatusBadge status={item.status} />
               </View>
-              <Text style={styles.centre}>{item.centreName}</Text>
+              <Text style={styles.centre}>{centreLabel(item.centreName, lang)}</Text>
               <Text style={styles.crop}>{tr('crop')}: {cropLabel(item, lang)}</Text>
               <Text style={styles.sub}>{item.date} • {item.slotWindow}</Text>
               {item.vehicleNumber ? (

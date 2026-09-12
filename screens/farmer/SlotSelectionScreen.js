@@ -124,7 +124,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
         <Text style={styles.sectionTitle}>
           {tr('ss_pickDate')}{'  '}
           <Text style={styles.sectionHint}>
-            {tr('ss_selected', { label: friendlyDateLabel(date), date })}
+            {tr('ss_selected', { label: friendlyDateLabel(date, lang), date })}
           </Text>
         </Text>
 
@@ -142,7 +142,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
                 <Text
                   style={[styles.dateText, isSelected && styles.dateTextOn]}
                 >
-                  {friendlyDateLabel(dateString)}
+                  {friendlyDateLabel(dateString, lang)}
                 </Text>
 
                 <Text

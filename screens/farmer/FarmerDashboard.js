@@ -23,7 +23,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
-import { cropLabel } from '../../services/centres';
+import { cropLabel, centreLabel } from '../../services/centres';
 import { requestCallback, warmUpIvr } from '../../services/ivr';
 import { IVR_BASE_URL } from '../../services/config';
 
@@ -209,7 +209,7 @@ export default function FarmerDashboard({ navigation }) {
                 {tr('activeBooking')}
               </Text>
 
-              <Text style={styles.bookingCentre}>{booking.centreName}</Text>
+              <Text style={styles.bookingCentre}>{centreLabel(booking.centreName, lang)}</Text>
 
               <Text style={styles.bookingMeta}>
                 {booking.slotWindow} • {booking.date}
@@ -243,7 +243,7 @@ export default function FarmerDashboard({ navigation }) {
                     <View style={styles.otherToken}><Text style={styles.otherTokenText}>{b.tokenNumber}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.otherMain} numberOfLines={1}>{cropLabel(b, lang)} • {b.approxQuantityQuintals} {tr('quintal')}</Text>
-                      <Text style={styles.otherSub} numberOfLines={1}>{b.centreName}</Text>
+                      <Text style={styles.otherSub} numberOfLines={1}>{centreLabel(b.centreName, lang)}</Text>
                       <Text style={styles.otherSub}>{b.slotWindow} • {b.date}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
@@ -330,6 +330,14 @@ export default function FarmerDashboard({ navigation }) {
             <Text style={styles.profilePhone}>
               +91 {session?.phone || ''}
             </Text>
+
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => { setProfileOpen(false); navigation.navigate('Notifications'); }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={Colors.secondary} />
+              <Text style={styles.profileLinkText}>{tr('nt_title')}</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
               <Ionicons
@@ -450,6 +458,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 20,
   },
+  profileLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, marginBottom: 6,
+  },
+  profileLinkText: { color: Colors.secondary, fontWeight: '700', fontSize: 15 },
   logoutBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
     backgroundColor: Colors.error, borderRadius: 12, paddingVertical: 12, marginTop: 6,

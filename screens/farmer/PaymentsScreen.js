@@ -8,7 +8,7 @@ import AppHeader from '../../components/AppHeader';
 import ScreenTitle from '../../components/ScreenTitle';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
-import { gradeLabel } from '../../services/centres';
+import { gradeLabel, centreLabel } from '../../services/centres';
 
 import { fetchMyBookings } from '../../services/bookings';
 import { getCurrentUserSession } from '../../services/auth';
@@ -63,7 +63,7 @@ export default function PaymentsScreen({ navigation }) {
               onPress={() => navigation.navigate('TokenDetail', { tokenId: payment.tokenId })}
             >
               <Text style={styles.id}>{payment.receiptId}</Text>
-              <Text style={styles.centre}>{payment.centreName}</Text>
+              <Text style={styles.centre}>{centreLabel(payment.centreName, lang)}</Text>
               <Text style={styles.row}>{tr('token')}: {payment.tokenNumber}</Text>
               <Text style={styles.row}>{tr('quantity')}: {payment.actualQuantity} {tr('quintal')}</Text>
               <Text style={styles.row}>

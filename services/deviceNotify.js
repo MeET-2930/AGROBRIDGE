@@ -162,11 +162,12 @@ export async function cancelScheduled(ids = []) {
  * install34: Expo push token for THIS phone, so other devices can wake it
  * when the app is closed. null on web / Expo Go / when permission denied.
  */
-export let pushError = '';   // last reason a push token could not be obtained (shown on Notifications screen)
+let pushError = '';   // last reason a push token could not be obtained (shown on Notifications screen)
+export function getPushError() { return pushError; }
 
 export async function getPushToken() {
   const N = loadModule();
-  if (Platform.OS === 'web') { pushError = 'web'; return null; }
+  if (Platform.OS === 'web') { pushError = 'Website: browser notifications only while this tab is open. Use the Android app for closed-app alerts.'; return null; }
   if (!N) { pushError = 'expo-notifications not in this build (Expo Go / old APK)'; return null; }
   if (!permitted) { pushError = 'notification permission not granted'; return null; }
   try {

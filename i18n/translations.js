@@ -32,7 +32,7 @@ export const t = {
   /* Brand / common                                                */
   /* ------------------------------------------------------------ */
   brand: r('AgroBridge', 'AgroBridge', 'AgroBridge', 'AgroBridge'),
-  brandSub: r('किसानसेतु - डिजिटल मंडी खरीद', 'KisanSetu - Smart Procurement', 'ਕਿਸਾਨਸੇਤੁ - ਸਮਾਰਟ ਮੰਡੀ ਖਰੀਦ', 'किसानसेतु - स्मार्ट खरेदी'),
+  brandSub: r('स्मार्ट मंडी खरीद', 'Smart Procurement', 'ਸਮਾਰਟ ਮੰਡੀ ਖਰੀਦ', 'स्मार्ट खरेदी'),
   appLoading: r('ऐप तैयार हो रहा है...', 'Getting the app ready...', 'ਐਪ ਤਿਆਰ ਹੋ ਰਹੀ ਹੈ...', 'अ‍ॅप तयार होत आहे...'),
   listen: r('सुनें', 'Listen', 'ਸੁਣੋ', 'ऐका'),
   selectLanguage: r('भाषा बदलें', 'Select Language', 'ਭਾਸ਼ਾ ਬਦਲੋ', 'भाषा बदला'),
@@ -909,10 +909,10 @@ export const t = {
   faq_t3_a: r('लॉट तौल पर जाता है, फिर कैशियर रसीद बनाता है। "मेरी खरीद" में तौला हुआ वजन और कुल राशि दिखेगी।', 'The lot goes to weighing, then the cashier issues the receipt. "My purchases" shows the weighed quantity and total.', 'ਲਾਟ ਤੋਲ ਉੱਤੇ ਜਾਂਦਾ ਹੈ, ਫਿਰ ਕੈਸ਼ੀਅਰ ਰਸੀਦ ਬਣਾਉਂਦਾ ਹੈ। "ਮੇਰੀ ਖਰੀਦ" ਵਿੱਚ ਤੋਲਿਆ ਹੋਇਆ ਵਜ਼ਨ ਅਤੇ ਕੁੱਲ ਰਕਮ ਦਿਖੇਗੀ।', 'लॉट वजनासाठी जातो, मग कॅशियर पावती देतो. "माझी खरेदी" मध्ये वजन केलेले प्रमाण आणि एकूण रक्कम दिसेल.'),
 
   audio_welcome: r(
-    'एग्रोब्रिज किसान सेतु में आपका स्वागत है। यह ऐप किसानों को मंडी गेट स्लॉट बुक करने और घंटों के इंतजार से बचाने के लिए बनाया गया है। आगे बढ़ने के लिए नीचे दिए गए बटन पर टैप करें।',
-    'Welcome to Agrobridge KisanSetu. This app helps farmers book mandi gate slots and avoid long waits. Tap Get Started to continue.',
-    'ਐਗਰੋਬ੍ਰਿਜ ਕਿਸਾਨ ਸੇਤੁ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ। ਇਹ ਐਪ ਕਿਸਾਨਾਂ ਨੂੰ ਮੰਡੀ ਗੇਟ ਸਲਾਟ ਬੁੱਕ ਕਰਨ ਅਤੇ ਘੰਟਿਆਂ ਦੀ ਉਡੀਕ ਤੋਂ ਬਚਾਉਣ ਲਈ ਹੈ। ਅੱਗੇ ਵਧਣ ਲਈ ਹੇਠਾਂ ਬਟਨ ਦਬਾਓ।',
-    'अ‍ॅग्रोब्रिज किसान सेतु मध्ये स्वागत आहे. हे अ‍ॅप शेतकऱ्यांना मंडी गेट स्लॉट बुक करण्यास आणि तासन्‌तास प्रतीक्षा टाळण्यास मदत करते. पुढे जाण्यासाठी खालील बटण दाबा.'
+    'एग्रोब्रिज में आपका स्वागत है। यह ऐप किसानों को मंडी गेट स्लॉट बुक करने और घंटों के इंतजार से बचाने के लिए बनाया गया है। आगे बढ़ने के लिए नीचे दिए गए बटन पर टैप करें।',
+    'Welcome to AgroBridge. This app helps farmers book mandi gate slots and avoid long waits. Tap Get Started to continue.',
+    'ਐਗਰੋਬ੍ਰਿਜ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ। ਇਹ ਐਪ ਕਿਸਾਨਾਂ ਨੂੰ ਮੰਡੀ ਗੇਟ ਸਲਾਟ ਬੁੱਕ ਕਰਨ ਅਤੇ ਘੰਟਿਆਂ ਦੀ ਉਡੀਕ ਤੋਂ ਬਚਾਉਣ ਲਈ ਹੈ। ਅੱਗੇ ਵਧਣ ਲਈ ਹੇਠਾਂ ਬਟਨ ਦਬਾਓ।',
+    'अ‍ॅग्रोब्रिज मध्ये स्वागत आहे. हे अ‍ॅप शेतकऱ्यांना मंडी गेट स्लॉट बुक करण्यास आणि तासन्‌तास प्रतीक्षा टाळण्यास मदत करते. पुढे जाण्यासाठी खालील बटण दाबा.'
   ),
   audio_role: r(
     'अपनी भूमिका चुनें। यदि आप फसल बेचने वाले किसान हैं, तो किसान चुनें। यदि आप मंडी में गेट, जांच, तौल या खाता संभालते हैं, तो मंडी अधिकारी चुनें। यदि आप फसल खरीदने वाले व्यापारी हैं, तो व्यापारी चुनें।',
@@ -1107,6 +1107,14 @@ export const t = {
 /* ------------------------------------------------------------------ */
 
 function fill(text, params, lang) {
+  // Params that are IDs (crop, grade) are shown in the reader's language.
+  if (params && typeof params === 'object') {
+    const p = { ...params };
+    if (p.crop != null && t[`crop_${p.crop}`]) p.crop = (t[`crop_${p.crop}`][lang] || t[`crop_${p.crop}`].hi);
+    if (p.grade != null && t[`grade_${p.grade}`]) p.grade = (t[`grade_${p.grade}`][lang] || t[`grade_${p.grade}`].hi);
+    if (p.mandi != null && lang === 'en') { const mm = /\(([^)]+)\)/.exec(String(p.mandi)); if (mm) p.mandi = mm[1]; }
+    params = p;
+  }
   if (!params) return text;
   return String(text).replace(/\{(\w+)\}/g, (m, k) => {
     const v = params[k];

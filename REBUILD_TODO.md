@@ -1,3 +1,9 @@
+# REBUILD — triggered by install32 (phone notifications)
+
+Run once: `bash install32.sh` then `eas build --profile preview --platform android`.
+Bundled in this build: expo-notifications, new icon/splash, version 1.2.0.
+Still pending for a later build: expo-av neural voice.
+
 # Things that need ONE APK rebuild (`eas build --profile preview`)
 
 Do all of these together, once, so testers reinstall the APK only one time.
@@ -25,8 +31,11 @@ After the new APK is installed, `eas update` keeps working as before.
 2. Book a token on phone A (farmer) while phone B (gate officer) is locked → B's status bar shows "New token".
 3. Slot reminders are scheduled on the farmer's phone when the dashboard opens (19:00 the evening before, and 60 min before the slot).
 
-## install29 brand assets (do at the rebuild)
-In app.json set  "icon": "./assets/brand/icon_1024.png",
-                 "splash": { "image": "./assets/brand/splash.png", "resizeMode": "contain", "backgroundColor": "#ffffff" },
-                 "android": { "adaptiveIcon": { "foregroundImage": "./assets/brand/icon_1024.png", "backgroundColor": "#ffffff" } }
-then `eas build --profile preview --platform android`.
+- [ ] install37: push status box removed from Notifications screen (JS-only; phone shows it until next build)
+- [ ] install38: translation fixes + KisanSetu removed (JS-only; web has it, APK after next build)
+- [ ] Consider `eas update:configure` so JS-only changes reach installed APKs without reinstall
+- [ ] Welcome screen: "Smart Procurement" line removed under logo (done in workspace, goes out with next installer)
+
+## install39 (1.3.0) – batched into this build
+- [x] status box removed, translations, welcome subtitle, KisanSetu, expo-updates enabled.
+- After this build: JS-only fixes ship with `eas update --branch preview`; rebuild only when an installer says REBUILD APK REQUIRED.

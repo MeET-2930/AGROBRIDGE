@@ -23,9 +23,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useLang } from '../i18n/LanguageContext';
 import { getCurrentUserSession } from '../services/auth';
-import { subscribeUser, subscribeCentreOfficers, subscribeCentreTraders, registerPushToken } from '../services/notifications';
+import { subscribeUser, subscribeCentreOfficers, subscribeCentreTraders, registerPushToken, postToExpoPush } from '../services/notifications';
 import {
-  initDeviceNotifications, showNow, onNotificationTap, scheduleAt, cancelScheduled, askWebPermission, capability, getPushToken, pushError,
+  initDeviceNotifications, showNow, onNotificationTap, scheduleAt, cancelScheduled, askWebPermission, capability, getPushToken, getPushError,
 } from '../services/deviceNotify';
 import { fetchActiveFarmerBooking, STATUS } from '../services/bookings';
 
@@ -86,7 +86,7 @@ export function NotificationProvider({ children, navigationRef, routeName }) {
       const token = await getPushToken();
       if (!alive) return;
       hasPushRef.current = !!token;
-      setPushStatus({ token: token || '', error: token ? '' : pushError });
+      setPushStatus({ token: token || '', error: token ? '' : getPushError() });
       if (token) registerPushToken(session.uid, token, lang);
     })();
     return () => { alive = false; };
@@ -176,13 +176,13 @@ export function NotificationProvider({ children, navigationRef, routeName }) {
   const sendTestPush = useCallback(async () => {
     if (!pushStatus.token) return false;
     try {
-      const r = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ to: pushStatus.token, title: 'AgroBridge', body: tr('nt_testBody'), channelId: 'agrobridge', priority: 'high', sound: 'default' }),
-      });
-      const j = await r.json().catch(() => ({}));
-      const st = j?.data?.status || j?.data?.[0]?.status;
-      if (st !== 'ok') { setPushStatus((p) => ({ ...p, error: JSON.stringify(j?.data?.details || j?.data?.message || j?.errors || j).slice(0, 200) })); return false; }
+      const j = await postToExpoPush({ to: pushStatus.token, title: 'AgroBridge', body: tr('nt_testBody'), channelId: 'agrobridge', priority: 'high', sound: 'default' });
+      const d = Array.isArray(j?.data) ? j.data[0] : j?.data;
+      if (d?.status !== 'ok') {
+        const why = d?.details?.error || d?.message || (j?.errors && j.errors[0]?.message) || 'no reply from Expo';
+        setPushStatus((p) => ({ ...p, error: String(why).slice(0, 220) }));
+        return false;
+      }
       return true;
     } catch (e) { setPushStatus((p) => ({ ...p, error: String(e?.message || e) })); return false; }
   }, [pushStatus.token, tr]);

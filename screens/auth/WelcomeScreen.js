@@ -12,7 +12,6 @@ export default function WelcomeScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Image source={LOGO_FULL} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.brandSub}>{tr('brandSub')}</Text>
         <Text style={styles.headline}>{tr('welcome_headline')}</Text>
         <Text style={styles.headlineSub}>{tr('welcome_sub')}</Text>
 
