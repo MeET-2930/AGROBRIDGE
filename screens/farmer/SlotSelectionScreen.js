@@ -31,7 +31,7 @@ import {
  * false = slots whose hour has already passed are hidden.
  * Flip this to false before the real demo.
  */
-const TESTING_MODE = true;
+import { TESTING_MODE } from '../../services/config';
 
 import { useLang } from '../../i18n/LanguageContext';
 import { centreLabel } from '../../services/centres';

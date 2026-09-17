@@ -5,8 +5,9 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useRef,
 } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert, Linking, Platform, AppState } from 'react-native';
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { translate, LANGUAGES, DEFAULT_LANG } from './translations';
@@ -142,6 +143,15 @@ export function LanguageProvider({ children }) {
   // Stop talking if the language changes mid-sentence.
   useEffect(() => { Speech.stop(); setSpeaking(false); }, [lang]);
 
+  // install40: stop talking when the app goes to the background. (Screen
+  // changes are handled by <StopSpeechOnNavigate/> inside the navigator.)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st !== 'active') { Speech.stop(); setSpeaking(false); }
+    });
+    return () => sub?.remove?.();
+  }, []);
+
   const value = useMemo(
     () => ({
       lang,
@@ -165,4 +175,19 @@ export function useLang() {
   const ctx = useContext(LanguageContext);
   if (!ctx) throw new Error('useLang must be used within LanguageProvider');
   return ctx;
+}
+
+/**
+ * install40: put this inside NavigationContainer. Whenever the screen changes
+ * (any button that navigates), the voice help stops - a farmer who understood
+ * quickly should not have to listen to the rest.
+ */
+export function StopSpeechOnNavigate({ routeName }) {
+  const { stopSpeak } = useLang();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    stopSpeak();
+  }, [routeName, stopSpeak]);
+  return null;
 }

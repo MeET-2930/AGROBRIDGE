@@ -31,3 +31,11 @@ export const MANDI_ADMIN_CODE = 'AGB-ADMIN-2026';
  */
 export const IVR_BASE_URL = 'https://agrobridge-ivr.onrender.com';
 export const IVR_APP_KEY = 'agb-demo-2026';   // must equal APP_SHARED_KEY on the server
+
+/**
+ * TESTING_MODE (install39)
+ *  true  = officer queues/scans show tokens of EVERY date (today first), and the
+ *          farmer can book any of today's windows at any hour. Use while testing.
+ *  false = real mandi behaviour: officers see only today's tokens, past windows hidden.
+ */
+export const TESTING_MODE = true;

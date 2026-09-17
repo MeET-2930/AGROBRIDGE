@@ -40,6 +40,7 @@ import { fetchCentreById } from './centres';
 import { todayLocal, parseLocalDate } from './dates';
 import { tErr } from './i18nError';
 import { requireOfficerDuty, DUTY_FOR_STAGE } from './auth';
+import { TESTING_MODE } from './config';
 import { notifyNextFarmer } from './ivr';
 import {
   notifyUser, notifyCentreOfficers, notifyCentreTraders, notifyFarmersAtCentre, makeItem, routes,
@@ -1205,26 +1206,44 @@ export async function fetchTokenDetail(tokenId) {
   }
 }
 
+/**
+ * TESTING_MODE: officers see tokens of every date (so a token booked for
+ * tomorrow, or one that crossed midnight, can still be processed). An explicit
+ * dateStr (reports) always wins. Production: today's tokens only.
+ */
+function officerQueueQuery(centreId, date, explicitDate) {
+  if (TESTING_MODE && !explicitDate) {
+    return query(collection(db, 'bookings'), where('centreId', '==', centreId));
+  }
+  return query(
+    collection(db, 'bookings'),
+    where('centreId', '==', centreId),
+    where('date', '==', date)
+  );
+}
+
+function sortQueueRows(rows, today) {
+  return rows.sort((a, b) => {
+    if (TESTING_MODE) {
+      // today's first, then upcoming dates, then past; within a date by position
+      const rank = (d) => (d === today ? 0 : d > today ? 1 : 2);
+      const r = rank(a.date) - rank(b.date);
+      if (r) return r;
+      if (a.date !== b.date) return String(a.date).localeCompare(String(b.date));
+    }
+    return (a.positionAssigned || 0) - (b.positionAssigned || 0);
+  });
+}
+
 export async function fetchTodaysQueue(centreId, dateStr = null) {
   if (!centreId) return [];
 
   try {
     const date = dateStr || todayString();
 
-    const snapshot = await getDocs(
-      query(
-        collection(db, 'bookings'),
-        where('centreId', '==', centreId),
-        where('date', '==', date)
-      )
-    );
+    const snapshot = await getDocs(officerQueueQuery(centreId, date, dateStr));
 
-    return snapshot.docs
-      .map((item) => item.data())
-      .sort(
-        (a, b) =>
-          (a.positionAssigned || 0) - (b.positionAssigned || 0)
-      );
+    return sortQueueRows(snapshot.docs.map((item) => item.data()), date);
   } catch (error) {
     console.error('Error fetching queue:', error);
     return [];
@@ -1240,20 +1259,9 @@ export function subscribeToTodaysQueue(centreId, dateStr, callback) {
   const date = dateStr || todayString();
 
   return onSnapshot(
-    query(
-      collection(db, 'bookings'),
-      where('centreId', '==', centreId),
-      where('date', '==', date)
-    ),
+    officerQueueQuery(centreId, date, dateStr),
     (snap) => {
-      const rows = snap.docs
-        .map((item) => item.data())
-        .sort(
-          (a, b) =>
-            (a.positionAssigned || 0) - (b.positionAssigned || 0)
-        );
-
-      callback(rows);
+      callback(sortQueueRows(snap.docs.map((item) => item.data()), date));
     },
     (error) => {
       console.error('Officer queue subscription error:', error);

@@ -28,7 +28,7 @@ export const navigationRef = createNavigationContainerRef();
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { LanguageProvider, useLang } from './i18n/LanguageContext';
+import { LanguageProvider, useLang, StopSpeechOnNavigate } from './i18n/LanguageContext';
 import Colors from './theme/colors';
 import { LOGO_FULL } from './theme/brand';
 import { restoreUserSession } from './services/auth';
@@ -147,6 +147,7 @@ function RootApp({ initialRoute }) {
       <View style={{ flex: 1 }}>
         <NavigationContainer ref={navigationRef} onReady={syncRoute} onStateChange={syncRoute}>
           <StatusBar style="dark" />
+          <StopSpeechOnNavigate routeName={routeName} />
           <NotificationProvider navigationRef={navigationRef} routeName={routeName}>
             <Root.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
               <Root.Screen name="Auth" component={AuthStack} />

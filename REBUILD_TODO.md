@@ -39,3 +39,7 @@ After the new APK is installed, `eas update` keeps working as before.
 ## install39 (1.3.0) – batched into this build
 - [x] status box removed, translations, welcome subtitle, KisanSetu, expo-updates enabled.
 - After this build: JS-only fixes ship with `eas update --branch preview`; rebuild only when an installer says REBUILD APK REQUIRED.
+
+## Still pending a build (batch together, no rush)
+- [ ] expo-updates (OTA) so future JS fixes skip reinstall
+- [ ] status box removal + translations + welcome subtitle on the PHONE (web already has them via install40)
