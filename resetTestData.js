@@ -1,15 +1,20 @@
 /*
  * resetTestData.js - wipe test data, KEEP users and centres.
- * Deletes: bookings, centreQueues (slot counts), auctions, delays, notifications, feedback.
- * Run from the AGROBRIDGE folder:   node resetTestData.js
+ * Run from the AGROBRIDGE folder: node resetTestData.js
  */
-const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, getDocs, writeBatch, doc, updateDoc, deleteField } = require('firebase/firestore');
 
-// ===========================================================
+require('dotenv').config();
+
+const { initializeApp } = require('firebase/app');
+const {
+  getFirestore,
+  collection,
+  getDocs,
+  writeBatch,
+} = require('firebase/firestore');
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyA2wEZjWel4hl-DTQnvdYfn_w5cWsl-Jkg',
+  apiKey: process.env.FIREBASE_API_KEY,
   authDomain: 'agrobridge-sih26.firebaseapp.com',
   projectId: 'agrobridge-sih26',
   storageBucket: 'agrobridge-sih26.firebasestorage.app',
@@ -18,26 +23,43 @@ const firebaseConfig = {
   measurementId: 'G-8SV41RMRNY',
 };
 
-// ===========================================================
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const WIPE = ['bookings', 'centreQueues', 'auctions', 'delays', 'notifications', 'feedback'];
+
+const WIPE = [
+  'bookings',
+  'centreQueues',
+  'auctions',
+  'delays',
+  'notifications',
+  'feedback',
+];
 
 async function wipe(name) {
   const snap = await getDocs(collection(db, name));
   let n = 0;
+
   for (let i = 0; i < snap.docs.length; i += 400) {
     const batch = writeBatch(db);
-    snap.docs.slice(i, i + 400).forEach((d) => { batch.delete(d.ref); n += 1; });
+
+    snap.docs.slice(i, i + 400).forEach((d) => {
+      batch.delete(d.ref);
+      n++;
+    });
+
     await batch.commit();
   }
+
   console.log(`  ${name}: deleted ${n}`);
 }
 
 (async () => {
   for (const c of WIPE) await wipe(c);
+
   console.log('  users and centres untouched.');
   console.log('Reset done. Log out and back in on every device/tab before testing.');
   process.exit(0);
-})().catch((e) => { console.error('Reset failed:', e.message); process.exit(1); });
+})().catch((e) => {
+  console.error('Reset failed:', e.message);
+  process.exit(1);
+});
