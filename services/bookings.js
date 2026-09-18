@@ -40,7 +40,7 @@ import {
 import { db } from './firebase';
 import { fetchCentreById, normalizePlate, cropClassOf } from './centres';
 import {
-  centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour,
+  CAPACITY_DEFAULTS, centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour,
 } from '../engine/capacity';
 import { correctionRatio, trainCorrection } from '../engine/models/correction';
 import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
