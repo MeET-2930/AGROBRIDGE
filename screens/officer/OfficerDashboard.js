@@ -311,6 +311,17 @@ export default function OfficerDashboard({ navigation }) {
         {isAdmin ? (
           <TouchableOpacity
             style={styles.toolRow}
+            onPress={() => navigation.navigate('Engine')}
+          >
+            <Ionicons name="speedometer-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('en_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
+          <TouchableOpacity
+            style={styles.toolRow}
             onPress={() => navigation.navigate('DelayReport')}
           >
             <Ionicons

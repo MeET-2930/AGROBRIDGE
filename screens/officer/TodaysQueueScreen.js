@@ -26,6 +26,8 @@ import {
   dutyOwnsStage,
   STATUS,
   CLOSED_STATUSES,
+  yardRef,
+  passLabel,
 } from '../../services/bookings';
 
 import { getCurrentUserSession } from '../../services/auth';
@@ -144,7 +146,7 @@ export default function TodaysQueueScreen({ navigation }) {
         <View style={styles.nowBar}>
           <Text style={styles.nowLabel}>{tr('tq_nowInside')}</Text>
           <Text style={styles.nowToken}>
-            {nowServing ? nowServing.tokenNumber : '—'}
+            {nowServing ? `#${yardRef(nowServing)}` : '—'}
           </Text>
           <Text style={styles.nowCount}>
             {tr('tq_inQueue', { n: active.length })}
@@ -157,7 +159,7 @@ export default function TodaysQueueScreen({ navigation }) {
           active.map((token) => (
             <View key={token.tokenId} style={styles.card}>
               <View style={styles.top}>
-                <Text style={styles.token}>{token.tokenNumber}</Text>
+                <Text style={styles.token}>#{yardRef(token)}</Text>
                 <StatusBadge status={token.status} />
               </View>
 
@@ -169,7 +171,7 @@ export default function TodaysQueueScreen({ navigation }) {
               </Text>
 
               <Text style={styles.sub}>
-                {tr('tq_timeLine', { slot: token.slotWindow, eta: token.estimatedTurnTime })}
+                {tr('tq_timeLine', { slot: passLabel(token), eta: token.arriveAt || token.estimatedTurnTime })}
               </Text>
 
               <Text style={styles.sub}>
@@ -237,7 +239,7 @@ export default function TodaysQueueScreen({ navigation }) {
             </Text>
 
             <Text style={styles.sheetSub}>
-              {tr('tokenAndName', { t: selected?.tokenNumber || '', n: selected?.farmerName || '' })}
+              {tr('tokenAndName', { t: selected ? `#${yardRef(selected)}` : '', n: selected?.farmerName || '' })}
             </Text>
 
             <TextInput

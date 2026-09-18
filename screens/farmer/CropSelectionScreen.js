@@ -23,7 +23,7 @@ export default function CropSelectionScreen({ navigation }) {
             <TouchableOpacity key={crop.id} style={[styles.card, on && styles.cardOn]} onPress={() => setSelected(crop)}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.name, on && { color: Colors.primary }]}>{tr(crop.nameKey)}</Text>
-                <Text style={styles.msp}>MSP ₹{crop.msp} {tr('perQuintal')}</Text>
+                <Text style={styles.msp}>{crop.msp ? `MSP ₹${crop.msp} ${tr('perQuintal')}` : tr('cs_auctionOnly')}</Text>
               </View>
               {on ? <Ionicons name="checkmark-circle" size={22} color={Colors.primary} /> : null}
             </TouchableOpacity>

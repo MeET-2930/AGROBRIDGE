@@ -191,7 +191,7 @@ export default function CentreSelectionScreen({ navigation, route }) {
         <PrimaryButton
           title={tr('continue')}
           disabled={!selected || loading}
-          onPress={() => navigation.navigate('SlotSelection', { crop, centre: selected })}
+          onPress={() => navigation.navigate('Quantity', { crop, centre: selected })}
         />
       </View>
     </SafeAreaView>

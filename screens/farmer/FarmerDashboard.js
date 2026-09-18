@@ -31,7 +31,11 @@ import {
   fetchActiveFarmerBookings,
   subscribeToBooking,
   subscribeToQueue,
+  subscribeToTodaysQueue,
   buildQueueView,
+  laneAhead,
+  passLabel,
+  STATUS,
 } from '../../services/bookings';
 
 import {
@@ -46,6 +50,8 @@ export default function FarmerDashboard({ navigation }) {
   const [booking, setBooking] = useState(null);     // nearest slot: gets the live queue light
   const [others, setOthers] = useState([]);         // install33: the farmer's other active tokens
   const [queue, setQueue] = useState(null);
+  const [yardRows, setYardRows] = useState([]);     // install42: lane order once inside
+  const unsubYard = useRef(null);
   const [refreshing, setRefreshing] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -57,6 +63,10 @@ export default function FarmerDashboard({ navigation }) {
     if (unsubBooking.current) {
       unsubBooking.current();
       unsubBooking.current = null;
+    }
+    if (unsubYard.current) {
+      unsubYard.current();
+      unsubYard.current = null;
     }
 
     if (unsubQueue.current) {
@@ -104,6 +114,7 @@ export default function FarmerDashboard({ navigation }) {
       if (fresh) setBooking(fresh);
     });
 
+    unsubYard.current = subscribeToTodaysQueue(active.centreId, active.date, setYardRows);
     unsubQueue.current = subscribeToQueue(
       active.centreId,
       active.date,
@@ -157,6 +168,7 @@ export default function FarmerDashboard({ navigation }) {
   };
 
   const queueView = booking ? buildQueueView(booking, queue) : null;
+  const laneInfo = booking && booking.status === STATUS.IN_GATE ? laneAhead(booking, queue, yardRows) : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -196,7 +208,7 @@ export default function FarmerDashboard({ navigation }) {
             {/* The live traffic light */}
             <QueueStatusCard
               view={queueView}
-              token={booking.tokenNumber}
+              lane={laneInfo}
               onPress={() =>
                 navigation.navigate('TokenDetail', {
                   tokenId: booking.tokenId,
@@ -212,7 +224,7 @@ export default function FarmerDashboard({ navigation }) {
               <Text style={styles.bookingCentre}>{centreLabel(booking.centreName, lang)}</Text>
 
               <Text style={styles.bookingMeta}>
-                {booking.slotWindow} • {booking.date}
+                {passLabel(booking)} • {booking.date}
               </Text>
 
               <Text style={styles.bookingMeta}>
@@ -240,7 +252,7 @@ export default function FarmerDashboard({ navigation }) {
                     style={styles.otherRow}
                     onPress={() => navigation.navigate('TokenDetail', { tokenId: b.tokenId })}
                   >
-                    <View style={styles.otherToken}><Text style={styles.otherTokenText}>{b.tokenNumber}</Text></View>
+                    <View style={styles.otherToken}><Text style={styles.otherTokenText}>{String(b.slotTime || '').slice(0, 5)}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.otherMain} numberOfLines={1}>{cropLabel(b, lang)} • {b.approxQuantityQuintals} {tr('quintal')}</Text>
                       <Text style={styles.otherSub} numberOfLines={1}>{centreLabel(b.centreName, lang)}</Text>

@@ -1,3 +1,15 @@
+/*
+ * screens/farmer/SlotSelectionScreen.js  (install41)
+ * ---------------------------------------------------------------
+ * Step 4 of booking: pick the hour to arrive.
+ *
+ * Capacity is quintals per hour (see CAPACITY MODEL in
+ * services/bookings.js). Every hour row is evaluated FOR THIS
+ * FARMER'S LOAD: "room for your 25 q" or "no room for 25 q".
+ * A big load that needs more than one hour is shown as one
+ * continuous run ("9 AM - 12 PM, 3 hours") and booked as ONE token.
+ * Booking happens here, inside a Firestore transaction.
+ */
 import React, { useEffect, useState } from 'react';
 
 import {
@@ -16,7 +28,8 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
-import { fetchCentreSlots } from '../../services/bookings';
+import { fetchCentreSlots, createBooking } from '../../services/bookings';
+import { getCurrentUserSession } from '../../services/auth';
 import {
   todayLocal,
   dateOffsetLocal,
@@ -38,15 +51,17 @@ import { centreLabel } from '../../services/centres';
 
 export default function SlotSelectionScreen({ navigation, route }) {
   const { tr, lang, trError } = useLang();
-  const { crop, centre } = route.params || {};
+  const { crop, centre, quantity = 10 } = route.params || {};
 
   // Local date, never UTC. See services/dates.js for why.
   const today = todayLocal();
 
   const [date, setDate] = useState(today);
   const [slots, setSlots] = useState([]);
+  const [tooBig, setTooBig] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const loadSlots = async () => {
     if (!centre?.id) {
@@ -59,7 +74,9 @@ export default function SlotSelectionScreen({ navigation, route }) {
     setLoading(true);
 
     try {
-      const result = await fetchCentreSlots(centre.id, date);
+      // install44: pass the farmer so the engine can use HIS history (Model A/C)
+      const me = await getCurrentUserSession().catch(() => null);
+      const result = await fetchCentreSlots(centre.id, date, { crop: crop?.id, quintals: quantity, farmerId: me?.uid || null });
       const all = result?.slots || [];
 
       let usable = all;
@@ -71,7 +88,8 @@ export default function SlotSelectionScreen({ navigation, route }) {
       }
 
       setSlots(usable);
-      setSelected(usable.find((s) => !s.isFull) || usable[0] || null);
+      setTooBig(Boolean(result?.tooBig));
+      setSelected(usable.find((s) => s.fits) || null);
     } catch (error) {
       console.error('Slot loading error:', error);
       setSlots([]);
@@ -85,23 +103,50 @@ export default function SlotSelectionScreen({ navigation, route }) {
 
   useEffect(() => {
     loadSlots();
-  }, [date, centre?.id]);
+  }, [date, centre?.id, quantity]);
 
   const confirm = async () => {
-    if (!selected) {
+    if (!selected || !selected.fits) {
       Alert.alert(tr('ss_pickSlot'), tr('ss_pickOne'));
       return;
     }
 
-    if (selected.isFull) {
-      Alert.alert(tr('ss_isFull'), tr('ss_isFullSub'));
+    const session = await getCurrentUserSession();
+    if (!session?.uid) {
+      Alert.alert(tr('loginRequired'), tr('loginAgain'));
       return;
     }
 
-    // Quantity is asked on its own screen (install27) so the farmer cannot
-    // miss it under a long list of slots.
-    navigation.navigate('Quantity', { crop, centre, date, slot: selected });
+    setSubmitting(true);
+    try {
+      const booking = await createBooking({
+        farmerId: session.uid,
+        farmerName: session.name,
+        farmerPhone: session.phone,
+        centreId: centre.id,
+        crop: crop.id,
+        cropName: crop.name,
+        approxQuantityQuintals: Number(quantity),
+        date,
+        slotTime: selected.slotTime,
+        slotWindow: selected.runLabel || selected.windowLabel,
+      });
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'TokenConfirmation', params: { booking } }],
+      });
+    } catch (error) {
+      console.error('Booking error:', error);
+      Alert.alert(tr('ss_bookFail'), trError(error, 'ss_bookFailSub'));
+      // Room may have gone while the farmer was deciding: reload ticks.
+      loadSlots();
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const firstFit = slots.find((s) => s.fits) || null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,7 +155,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
           title={tr('selectSlot')}
-          subtitle={centreLabel(centre, lang) || tr('mandi')}
+          subtitle={`${centreLabel(centre, lang) || tr('mandi')} • ${quantity} ${tr('quintal')}`}
         />
 
         {TESTING_MODE ? (
@@ -172,50 +217,85 @@ export default function SlotSelectionScreen({ navigation, route }) {
             </Text>
           </View>
         ) : (
-          slots.map((slot) => {
-            const isSelected = selected?.slotTime === slot.slotTime;
+          <>
+            {tooBig ? (
+              <View style={styles.notice}>
+                <Text style={styles.noticeText}>{tr('ss_tooBig', { q: quantity })}</Text>
+              </View>
+            ) : !firstFit ? (
+              <View style={styles.notice}>
+                <Text style={styles.noticeText}>{tr('ss_noRoomDay', { q: quantity })}</Text>
+              </View>
+            ) : firstFit.needed > 1 ? (
+              <View style={styles.noticeInfo}>
+                <Text style={styles.noticeInfoText}>{tr('ss_bigLoad', { q: quantity, h: firstFit.needed })}</Text>
+              </View>
+            ) : null}
 
-            return (
-              <TouchableOpacity
-                key={slot.slotTime}
-                style={[
-                  styles.slot,
-                  isSelected && styles.slotOn,
-                  slot.isFull && styles.slotFull,
-                ]}
-                onPress={() => setSelected(slot)}
-                disabled={slot.isFull}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.slotTitle}>{slot.windowLabel}</Text>
+            {slots.map((slot) => {
+              const isSelected = selected?.slotTime === slot.slotTime;
 
-                  <Text
-                    style={[
-                      styles.slotSub,
-                      slot.isFull && { color: Colors.error },
-                    ]}
-                  >
-                    {slot.isFull
-                      ? tr('ss_full')
-                      : tr('ss_available', { a: slot.availableCapacity, b: slot.totalCapacity })}
+              return (
+                <TouchableOpacity
+                  key={slot.slotTime}
+                  style={[
+                    styles.slot,
+                    isSelected && styles.slotOn,
+                    !slot.fits && styles.slotFull,
+                  ]}
+                  onPress={() => setSelected(slot)}
+                  disabled={!slot.fits}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.slotTitle}>
+                      {slot.fits && slot.needed > 1 ? slot.runLabel : slot.windowLabel}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.slotSub,
+                        !slot.fits && { color: Colors.error },
+                        slot.fits && { color: '#2E7D32' },
+                      ]}
+                    >
+                      {slot.fits
+                        ? slot.needed > 1
+                          ? tr('ss_roomRun', { q: quantity, h: slot.needed })
+                          : tr('ss_room', { q: quantity })
+                        : slot.reason === 'vehicles'
+                        ? tr('ss_noVehicle')
+                        : slot.reason === 'tooLate'
+                        ? tr('ss_tooLate')
+                        : slot.reason === 'closed'
+                        ? tr('ss_closed')
+                        : slot.reason === 'horizon'
+                        ? tr('ss_horizon', { d: slot.horizon })
+                        : tr('ss_noRoom', { q: quantity })}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.mark, slot.fits ? styles.markOk : styles.markNo]}>
+                    {slot.fits ? (isSelected ? '✓' : '○') : '✕'}
                   </Text>
-                </View>
-
-                {isSelected && !slot.isFull ? (
-                  <Text style={styles.selectedText}>✓</Text>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })
+                </TouchableOpacity>
+              );
+            })}
+          </>
         )}
 
       </ScrollView>
 
       <View style={styles.footer}>
+        {selected?.fits ? (
+          <Text style={styles.footerHint}>
+            {tr('ss_arriveHint', { t: selected.arriveLabel })}
+          </Text>
+        ) : null}
         <PrimaryButton
-          title={tr('ss_next')}
+          title={tr('confirmToken')}
           onPress={confirm}
-          disabled={!selected || selected?.isFull || loading}
+          loading={submitting}
+          disabled={!selected || !selected?.fits || loading || submitting}
         />
       </View>
     </SafeAreaView>
@@ -245,6 +325,25 @@ const styles = StyleSheet.create({
   },
   testBannerText: { color: '#7A5200', fontWeight: '700', fontSize: 13 },
 
+  notice: {
+    backgroundColor: '#FDECEA',
+    borderColor: '#F5B5AE',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  noticeText: { color: '#8A1C10', fontWeight: '700', fontSize: 13, lineHeight: 18 },
+  noticeInfo: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#90CAF9',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  noticeInfoText: { color: '#0D47A1', fontWeight: '700', fontSize: 13, lineHeight: 18 },
+
   dates: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   dateChip: {
     flex: 1,
@@ -273,13 +372,10 @@ const styles = StyleSheet.create({
   slotOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   slotFull: { opacity: 0.55 },
   slotTitle: { fontWeight: '800', color: Colors.navy, fontSize: 15 },
-  slotSub: { color: Colors.subText, marginTop: 4, fontSize: 13 },
-  selectedText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: Colors.primary,
-    marginLeft: 10,
-  },
+  slotSub: { color: Colors.subText, marginTop: 4, fontSize: 13, fontWeight: '700' },
+  mark: { fontSize: 22, fontWeight: '900', marginLeft: 10 },
+  markOk: { color: '#2E7D32' },
+  markNo: { color: Colors.error },
 
   empty: {
     backgroundColor: Colors.white,
@@ -300,4 +396,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
+  footerHint: { textAlign: 'center', color: Colors.subText, fontWeight: '700', fontSize: 13, marginBottom: 10 },
 });

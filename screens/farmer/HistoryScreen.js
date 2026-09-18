@@ -66,7 +66,7 @@ export default function HistoryScreen({ navigation }) {
               onPress={() => navigation.navigate('TokenDetail', { tokenId: item.tokenId })}
             >
               <View style={styles.top}>
-                <Text style={styles.token}>{item.tokenNumber}</Text>
+                <Text style={styles.token}>{item.slotWindow}</Text>
                 <StatusBadge status={item.status} />
               </View>
               <Text style={styles.centre}>{centreLabel(item.centreName, lang)}</Text>

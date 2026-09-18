@@ -16,7 +16,7 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
 import { QUALITY_GRADES, cropLabel } from '../../services/centres';
-import { recordAssay } from '../../services/bookings';
+import { recordAssay, yardRef } from '../../services/bookings';
 
 import { useLang } from '../../i18n/LanguageContext';
 /*
@@ -86,7 +86,7 @@ export default function AssayScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenTitle
           title={tr('as_title')}
-          subtitle={tr('tokenAndName', { t: token?.tokenNumber || '', n: token?.farmerName || '' })}
+          subtitle={tr('tokenAndName', { t: token ? `#${yardRef(token)}` : '', n: token?.farmerName || '' })}
         />
 
         <View style={styles.info}>

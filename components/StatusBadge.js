@@ -19,6 +19,7 @@ const COLORS = {
   'paid': { bg: '#E8F5E9', color: '#2E7D32' },
   'rejected': { bg: '#FFEBEE', color: '#C62828' },
   'no-show': { bg: '#FFEBEE', color: '#C62828' },
+  'missed': { bg: '#FFF3E0', color: '#E65100' },
   'cancelled': { bg: '#FAFAFA', color: '#757575' },
   'waitlisted': { bg: '#EDE7F6', color: '#5E35B1' },
   'appeared': { bg: '#E3F2FD', color: '#1565C0' },

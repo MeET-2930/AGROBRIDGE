@@ -30,8 +30,8 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
-import { QUALITY_GRADES, fetchCentreById, CROP_LIST } from '../../services/centres';
-import { markPaid } from '../../services/bookings';
+import { QUALITY_GRADES, fetchCentreById, CROP_LIST, gradedMsp } from '../../services/centres';
+import { markPaid, yardRef } from '../../services/bookings';
 import { getCurrentUserSession } from '../../services/auth';
 import { useLang } from '../../i18n/LanguageContext';
 
@@ -67,8 +67,10 @@ export default function MarkPaidScreen({ navigation, route }) {
       : '40'
   );
 
+  // install43: default rate = grade-wise MSP (advertised − grade deduction)
   const defaultRate =
     token?.ratePerQuintal ||
+    gradedMsp(token?.crop, token?.grade || 'FAQ', token || {}).rate ||
     CROP_LIST.find((c) => c.id === token?.crop)?.msp ||
     2275;
   const rateLocked = Boolean(token?.ratePerQuintal);
@@ -176,7 +178,7 @@ export default function MarkPaidScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle
           title={tr('mp_title')}
-          subtitle={tr('tokenAndName', { t: token?.tokenNumber || '', n: token?.farmerName || '' })}
+          subtitle={tr('tokenAndName', { t: token ? `#${yardRef(token)}` : '', n: token?.farmerName || '' })}
         />
 
         {centreLoading ? (

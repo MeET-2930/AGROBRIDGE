@@ -41,6 +41,9 @@ export default function OtpScreen({ navigation, route }) {
           licenseNumber: p.licenseNumber,
           businessName: p.businessName,
           adminCode: p.adminCode,
+          govIdType: p.govIdType,
+          govIdNumber: p.govIdNumber,
+          govIdVerifiedAt: p.govIdVerifiedAt,
         });
       } else {
         session = await loginWithPhone(p.phone, p.role);

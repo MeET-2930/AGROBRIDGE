@@ -21,7 +21,7 @@ export default function GatePassCard({ token, compact = false }) {
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.headText}>{tr('gp_title')}</Text>
-        <Text style={styles.headToken}>{token.tokenNumber}</Text>
+        <Text style={styles.headToken}>{token.date}</Text>
       </View>
 
       <View style={styles.body}>
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headText: { color: Colors.white, fontWeight: '900', fontSize: 14 },
-  headToken: { color: Colors.white, fontWeight: '900', fontSize: 20 },
+  headToken: { color: Colors.white, fontWeight: '900', fontSize: 15 },
   body: { flexDirection: 'row', padding: 14, gap: 14 },
   qrBox: {
     padding: 8,

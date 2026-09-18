@@ -23,13 +23,16 @@ import Colors from '../../theme/colors';
 
 import {
   subscribeToBooking,
+  subscribeToTodaysQueue,
+  laneAhead,
+  passLabel,
   subscribeToQueue,
   buildQueueView,
   cancelBooking,
   fixPrice,
   STATUS,
 } from '../../services/bookings';
-import { CROP_LIST, cropLabel, gradeLabel, centreLabel } from '../../services/centres';
+import { CROP_LIST, cropLabel, gradeLabel, centreLabel, gradedMsp } from '../../services/centres';
 import { useLang } from '../../i18n/LanguageContext';
 import {
   subscribeToAuction,
@@ -100,6 +103,8 @@ export default function TokenDetailScreen({ navigation, route }) {
   }, [tick, auction?.status]);
 
   const unsubQueue = useRef(null);
+  const unsubYard = useRef(null);
+  const [yardRows, setYardRows] = useState([]);
 
   useEffect(() => {
     if (!tokenId) {
@@ -118,6 +123,7 @@ export default function TokenDetailScreen({ navigation, route }) {
           fresh.date,
           setQueue
         );
+        unsubYard.current = subscribeToTodaysQueue(fresh.centreId, fresh.date, setYardRows);
       }
     });
 
@@ -127,6 +133,10 @@ export default function TokenDetailScreen({ navigation, route }) {
       if (unsubQueue.current) {
         unsubQueue.current();
         unsubQueue.current = null;
+      }
+      if (unsubYard.current) {
+        unsubYard.current();
+        unsubYard.current = null;
       }
     };
   }, [tokenId]);
@@ -180,7 +190,11 @@ export default function TokenDetailScreen({ navigation, route }) {
   const view = buildQueueView(token, queue);
   const currentIndex = STAGE_ORDER.indexOf(token.status);
 
-  const msp = CROP_LIST.find((c) => c.id === token?.crop)?.msp || 0;
+  // install43: MSP depends on grade. `priced` = { advertised, deduction, rate, reasonKey, factors }
+  const priced = gradedMsp(token?.crop, token?.grade || 'FAQ', token || {});
+  const msp = priced.rate;
+  const advertisedMsp = priced.advertised;
+  const [showTrucks, setShowTrucks] = useState(false);
 
   const acceptMsp = () => {
     Alert.alert(
@@ -193,7 +207,11 @@ export default function TokenDetailScreen({ navigation, route }) {
           onPress: async () => {
             setFixing(true);
             try {
-              await fixPrice(tokenId, { mode: 'msp', ratePerQuintal: msp });
+              await fixPrice(tokenId, {
+                mode: 'msp',
+                ratePerQuintal: msp,
+                pricing: { advertised: priced.advertised, deduction: priced.deduction, grade: token?.grade || 'FAQ', reasonKey: priced.reasonKey, factors: priced.factors },
+              });
             } catch (error) {
               Alert.alert(tr('error'), trError(error, 'td_priceFail'));
             } finally {
@@ -314,14 +332,15 @@ export default function TokenDetailScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.tokenHeader}>
           <View>
-            <Text style={styles.tokenLabel}>{tr('td_yourToken')}</Text>
-            <Text style={styles.tokenNumber}>{token.tokenNumber}</Text>
+            <Text style={styles.tokenLabel}>{tr('td_yourPass')}</Text>
+            <Text style={styles.tokenNumber}>{passLabel(token)}</Text>
+            <Text style={styles.tokenLabel}>{token.date}</Text>
           </View>
 
           <StatusBadge status={token.status} />
         </View>
 
-        <QueueStatusCard view={view} token={token.tokenNumber} />
+        <QueueStatusCard view={view} lane={token.status === STATUS.IN_GATE ? laneAhead(token, queue, yardRows) : null} />
 
         {/* Gate pass: only useful until the vehicle is inside */}
         {token.status === STATUS.BOOKED ? (
@@ -403,13 +422,13 @@ export default function TokenDetailScreen({ navigation, route }) {
           <Row label={tr('mandi')} value={centreLabel(token.centreName, lang)} />
           <Row label={tr('address')} value={token.centreAddress} />
           <Row label={tr('date')} value={token.date} />
-          <Row label={tr('time')} value={token.slotWindow} />
+          <Row label={tr('time')} value={passLabel(token)} />
           <Row label={tr('crop')} value={cropLabel(token, lang)} />
           <Row
             label={tr('approxQuantity')}
             value={`${token.approxQuantityQuintals} ${tr('quintal')}`}
           />
-          <Row label={tr('vehicle')} value={token.vehicleNumber || tr('td_atGate')} />
+          <Row label={tr('vehicle')} value={Array.isArray(token.vehicles) && token.vehicles.length > 1 ? token.vehicles.map((v) => v.plate).join(', ') : (token.vehicleNumber || tr('td_atGate'))} />
         </View>
 
         {/* Price decision: after assay, before weighing */}
@@ -420,11 +439,23 @@ export default function TokenDetailScreen({ navigation, route }) {
               {tr('td_fixPriceHint', { grade: gradeLabel(token.grade, lang) })}
             </Text>
 
+            {advertisedMsp > 0 ? (
             <View style={styles.priceOption}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.priceTitle}>{tr('td_mspTitle')}</Text>
                 <Text style={styles.priceBig}>₹{msp} {tr('perQuintal')}</Text>
-                <Text style={styles.priceSub}>{tr('td_mspSub')}</Text>
+                {priced.deduction > 0 ? (
+                  <View style={styles.deductBox}>
+                    <Text style={styles.deductLine}>{tr('msp_advertised', { a: advertisedMsp })}</Text>
+                    <Text style={[styles.deductLine, { color: Colors.error }]}>{tr('msp_deduction', { d: priced.deduction, g: gradeLabel(token.grade, lang) })}</Text>
+                    <Text style={styles.deductWhy}>{tr(priced.reasonKey)}</Text>
+                    {priced.factors.map((f) => (
+                      <Text key={f.key} style={styles.deductWhy}>• {tr(f.key, f.params)}</Text>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.priceSub}>{tr('msp_fullFaq')}</Text>
+                )}
               </View>
               <PrimaryButton
                 title={tr('td_sellMsp')}
@@ -433,6 +464,9 @@ export default function TokenDetailScreen({ navigation, route }) {
                 style={{ height: 44, paddingHorizontal: 14 }}
               />
             </View>
+            ) : (
+              <Text style={styles.priceHint}>{tr('td_noMsp')}</Text>
+            )}
 
             {/* ---- e-Auction ---- */}
             {!auction || auction.status === AUCTION_STATUS.REJECTED ? (
@@ -527,6 +561,16 @@ export default function TokenDetailScreen({ navigation, route }) {
               value={token.priceMode === 'auction' ? tr('td_auction') : 'MSP'}
             />
             <Row label={tr('td_buyer')} value={token.priceMode === 'msp' || !token.buyerName || /\(MSP\)/.test(token.buyerName) ? tr('td_govBuyer') : token.buyerName} />
+            {token.pricing && token.pricing.deduction > 0 ? (
+              <View style={styles.deductBox}>
+                <Text style={styles.deductLine}>{tr('msp_advertised', { a: token.pricing.advertised })}</Text>
+                <Text style={[styles.deductLine, { color: Colors.error }]}>{tr('msp_deduction', { d: token.pricing.deduction, g: gradeLabel(token.pricing.grade, lang) })}</Text>
+                <Text style={styles.deductWhy}>{tr(token.pricing.reasonKey)}</Text>
+                {(token.pricing.factors || []).map((f) => (
+                  <Text key={f.key} style={styles.deductWhy}>• {tr(f.key, f.params)}</Text>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -563,6 +607,36 @@ export default function TokenDetailScreen({ navigation, route }) {
               value={`${token.actualQuantity} ${tr('quintal')}`}
               bold
             />
+            <Row
+              label={tr('td_declared')}
+              value={`${token.declaredQuintals || token.approxQuantityQuintals} ${tr('quintal')}`}
+            />
+            {token.quantityVariancePercent != null ? (
+              <Row
+                label={tr('td_difference')}
+                value={`${token.quantityVariancePercent > 0 ? '+' : ''}${token.quantityVariancePercent}%`}
+              />
+            ) : null}
+            {Array.isArray(token.vehicles) && token.vehicles.length > 0 ? (
+              <View>
+                <TouchableOpacity onPress={() => setShowTrucks((v) => !v)} style={styles.trucksToggle}>
+                  <Text style={styles.trucksToggleText}>
+                    {showTrucks ? tr('td_hideTrucks') : tr('td_showTrucks', { n: token.vehicles.length })}
+                  </Text>
+                  <Ionicons name={showTrucks ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.primary} />
+                </TouchableOpacity>
+                {showTrucks ? token.vehicles.map((v) => {
+                  const perDeclared = Math.round(((token.declaredQuintals || token.approxQuantityQuintals || 0) / token.vehicles.length) * 10) / 10;
+                  return (
+                    <View key={v.serial} style={styles.truckRow}>
+                      <Text style={styles.truckTitle}>{tr('gs_vehicleN', { n: v.serial })} • {v.plate || '—'}</Text>
+                      <Text style={styles.truckLine}>{tr('td_gross')}: {v.grossWeightQuintals} • {tr('td_tare')}: {v.tareWeightQuintals}</Text>
+                      <Text style={styles.truckLine}>{tr('td_net')}: <Text style={{ fontWeight: '900' }}>{v.netQuintals} {tr('quintalShort')}</Text>  •  {tr('td_declaredShare', { q: perDeclared })}</Text>
+                    </View>
+                  );
+                }) : null}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -730,7 +804,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   tokenLabel: { fontSize: 12, color: Colors.subText, fontWeight: '700' },
-  tokenNumber: { fontSize: 32, fontWeight: '900', color: Colors.navy },
+  tokenNumber: { fontSize: 24, fontWeight: '900', color: Colors.navy },
 
   card: {
     backgroundColor: Colors.white,
@@ -743,6 +817,14 @@ const styles = StyleSheet.create({
   receiptCard: { borderColor: Colors.secondary, borderWidth: 2 },
   priceCard: { borderColor: '#F59E0B', borderWidth: 2 },
   priceHint: { color: Colors.subText, fontSize: 13, marginBottom: 12 },
+  deductBox: { marginTop: 6, backgroundColor: '#FFF7ED', borderRadius: 8, padding: 8 },
+  deductLine: { fontSize: 12, fontWeight: '800', color: Colors.navy },
+  deductWhy: { fontSize: 12, color: Colors.subText, marginTop: 2, lineHeight: 16 },
+  trucksToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  trucksToggleText: { color: Colors.primary, fontWeight: '800', fontSize: 13 },
+  truckRow: { backgroundColor: Colors.background, borderRadius: 8, padding: 10, marginBottom: 8 },
+  truckTitle: { fontWeight: '900', color: Colors.navy, fontSize: 13 },
+  truckLine: { color: Colors.subText, fontSize: 12, marginTop: 2 },
   priceOption: {
     flexDirection: 'row',
     alignItems: 'center',

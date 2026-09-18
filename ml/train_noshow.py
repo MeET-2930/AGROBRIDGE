@@ -1,0 +1,116 @@
+"""
+ml/train_noshow.py   (install44)   MODEL C training
+------------------------------------------------------------------
+Trains a LOGISTIC REGRESSION (scikit-learn) that predicts whether a
+booking will show up, from facts known at booking time. Also fits the
+Model A shrinkage prior (crop ratio + k) and reports Model B (EWMA
+throughput) on the same data. Writes everything the app needs into
+engine/models/params.js - the app only multiplies these numbers.
+
+  python ml/make_dataset.py      # synthetic season (or export real data)
+  python ml/train_noshow.py      # -> engine/models/params.js
+"""
+import csv, json, math, os, sys
+from collections import defaultdict
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.join(HERE, 'data', 'bookings.csv')
+OUT = os.path.join(HERE, '..', 'engine', 'models', 'params.js')
+
+try:
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import roc_auc_score, accuracy_score
+except ImportError:
+    sys.exit('pip install scikit-learn numpy   (then run again)')
+
+rows = list(csv.DictReader(open(DATA)))
+print(f'{len(rows)} rows from {DATA}')
+
+FEATURES = ['pastNoShowRate', 'pastBookingsLog', 'leadDays', 'hour', 'quintalsLog', 'bookedViaGate', 'isSmall']
+
+def feats(r):
+    pb = float(r['pastBookings']); q = float(r['declared'])
+    return [
+        (float(r['pastNoShows']) / pb) if pb else 0.0,
+        math.log1p(pb),
+        min(14.0, float(r['leadDays'])),
+        float(r['hour']),
+        math.log1p(q),
+        1.0 if r['bookedVia'] == 'gate' else 0.0,
+        1.0 if q <= 15 else 0.0,
+    ]
+
+X = np.array([feats(r) for r in rows]); y = np.array([int(r['showed']) for r in rows])
+mean = X.mean(axis=0); std = X.std(axis=0); std[std == 0] = 1
+Xs = (X - mean) / std
+Xtr, Xte, ytr, yte = train_test_split(Xs, y, test_size=0.25, random_state=7, stratify=y)
+clf = LogisticRegression(C=1.0, max_iter=1000).fit(Xtr, ytr)
+p = clf.predict_proba(Xte)[:, 1]
+auc = roc_auc_score(yte, p); acc = accuracy_score(yte, p >= 0.5)
+print(f'Model C  logistic regression: AUC={auc:.3f}  accuracy={acc:.3f}  show-rate={y.mean():.3f}')
+for f, w in zip(FEATURES, clf.coef_[0]):
+    print(f'   {f:16s} weight {w:+.3f}')
+
+# ---- Model A: shrinkage prior per crop + k by sequential error -----
+by_crop = defaultdict(list); by_farmer = defaultdict(list)
+for r in rows:
+    if r['actual']:
+        d, a = float(r['declared']), float(r['actual'])
+        by_crop[r['crop']].append(a / d); by_farmer[r['farmerId']].append((r['crop'], d, a))
+all_ratios = [x for v in by_crop.values() for x in v]
+crop_prior = {'default': round(sum(all_ratios) / len(all_ratios), 3)}
+for c, v in by_crop.items():
+    if len(v) >= 5: crop_prior[c] = round(sum(v) / len(v), 3)
+best_k, best_err = 3, 1e9
+for k in [0.5, 1, 2, 3, 5, 8, 12]:
+    err = cnt = 0
+    for visits in by_farmer.values():
+        for i in range(1, len(visits)):
+            hist = visits[:i]
+            favg = sum(a / d for _, d, a in hist) / len(hist)
+            crop, d, a = visits[i]
+            prior = crop_prior.get(crop, crop_prior['default'])
+            ratio = (len(hist) * favg + k * prior) / (len(hist) + k)
+            ratio = min(1.30, max(0.85, ratio))
+            err += abs(d * ratio - a) / a; cnt += 1
+    if cnt and err / cnt < best_err: best_k, best_err = k, err / cnt
+print(f'Model A  shrinkage: cropPrior={crop_prior}  k={best_k}  MAPE={best_err:.3f}')
+
+# ---- Model B: EWMA throughput per hour (report only; app learns live) ----
+by_day_hour = defaultdict(float)
+for r in rows:
+    if r['weighedAt']:
+        by_day_hour[(r['date'], int(r['hour']))] += float(r['actual'])
+per_hour = defaultdict(list)
+for (d, h), q in sorted(by_day_hour.items()):
+    per_hour[h].append(q)
+ewma = {}
+for h, series in per_hour.items():
+    est = None
+    for v in series:
+        est = v if est is None else 0.3 * v + 0.7 * est
+    ewma[h] = round(est)
+print(f'Model B  EWMA throughput per hour (synthetic): {dict(sorted(ewma.items()))}')
+
+params = {
+    'version': 1,
+    'trainedOn': os.environ.get('AGB_DATA_SOURCE', 'synthetic-season-v1'),   # AGB_DATA_SOURCE=real-export python ml/train_noshow.py
+    'samples': len(rows),
+    'noshow': {
+        'weights': {f: round(float(w), 4) for f, w in zip(FEATURES, clf.coef_[0])},
+        'bias': round(float(clf.intercept_[0]), 4),
+        'mean': {f: round(float(m), 4) for f, m in zip(FEATURES, mean)},
+        'std': {f: round(float(s), 4) for f, s in zip(FEATURES, std)},
+        'auc': round(float(auc), 3), 'accuracy': round(float(acc), 3), 'showRate': round(float(y.mean()), 3),
+        'trainedBy': 'sklearn-logistic-regression',
+    },
+    'correction': {'cropPrior': crop_prior, 'k': best_k, 'mape': round(best_err, 3)},
+    'throughputHint': {'perHour': ewma, 'note': 'synthetic; the app learns the real value from its own weighings'},
+}
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+with open(OUT, 'w') as fh:
+    fh.write('/* GENERATED by ml/train_noshow.py - do not edit by hand. Re-run the script to retrain. */\n')
+    fh.write('export default ' + json.dumps(params, indent=2) + ';\n')
+print(f'wrote {os.path.abspath(OUT)}')

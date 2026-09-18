@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
-import { findByGatePass, markGateEntry, STATUS } from '../../services/bookings';
+import { findByGatePass, markGateEntry, STATUS, slotState, passLabel, yardRef } from '../../services/bookings';
+import { TESTING_MODE } from '../../services/config';
+import { normalizePlate } from '../../services/centres';
 
 import { useLang } from '../../i18n/LanguageContext';
 import { cropLabel } from '../../services/centres';
@@ -35,6 +38,8 @@ export default function GateScanScreen({ navigation, route }) {
   const [typed, setTyped] = useState('');
   const [match, setMatch] = useState(null);
   const [vehicle, setVehicle] = useState('');
+  // install43: one token, N vehicles - each card = serial + plate
+  const [vehicles, setVehicles] = useState([{ serial: 1, plate: '' }]);
   const [busy, setBusy] = useState(false);
   const [how, setHow] = useState('manual');
   const locked = useRef(false);
@@ -53,7 +58,22 @@ export default function GateScanScreen({ navigation, route }) {
     }
 
     if (hit.status !== STATUS.BOOKED) {
-      Alert.alert(tr('gs_already'), tr('gs_alreadySub', { t: hit.tokenNumber }));
+      Alert.alert(tr('gs_already'), tr('gs_alreadySub', { t: yardRef(hit) }));
+      locked.current = false;
+      return;
+    }
+
+    // install42: a pass is valid for its hour. Passed -> rebook, not admit.
+    const st = TESTING_MODE ? 'open' : slotState(hit);
+    if (st === 'passed') {
+      Alert.alert(tr('gs_slotPassed'), tr('gs_slotPassedSub', { t: passLabel(hit) }), [
+        { text: tr('cancel'), style: 'cancel', onPress: () => { locked.current = false; } },
+        { text: tr('gs_rebook'), onPress: () => { locked.current = false; navigation.navigate('GateRebook', { previous: hit }); } },
+      ]);
+      return;
+    }
+    if (st === 'before') {
+      Alert.alert(tr('gs_slotNotOpen'), tr('gs_slotNotOpenSub', { t: passLabel(hit) }));
       locked.current = false;
       return;
     }
@@ -61,10 +81,10 @@ export default function GateScanScreen({ navigation, route }) {
     if (expected && hit.tokenId !== expected.tokenId) {
       Alert.alert(
         tr('gs_otherToken'),
-        tr('gs_otherTokenSub', { a: hit.tokenNumber, b: expected.tokenNumber }),
+        tr('gs_otherTokenSub', { a: hit.farmerName || yardRef(hit), b: expected.farmerName || yardRef(expected) }),
         [
           { text: tr('no'), style: 'cancel', onPress: () => { locked.current = false; } },
-          { text: tr('yes'), onPress: () => { setMatch(hit); setVehicle(hit.vehicleNumber || ''); setHow(source); } },
+          { text: tr('yes'), onPress: () => { setMatch(hit); setVehicle(hit.vehicleNumber || ''); setVehicles([{ serial: 1, plate: hit.vehicleNumber || '' }]); setHow(source); } },
         ]
       );
       return;
@@ -72,6 +92,7 @@ export default function GateScanScreen({ navigation, route }) {
 
     setMatch(hit);
     setVehicle(hit.vehicleNumber || '');
+    setVehicles(hit.vehicles?.length ? hit.vehicles.map((v, i) => ({ serial: i + 1, plate: v.plate || '' })) : [{ serial: 1, plate: hit.vehicleNumber || '' }]);
     setHow(source);
   };
 
@@ -81,17 +102,44 @@ export default function GateScanScreen({ navigation, route }) {
     resolve(data, 'qr');
   };
 
+  const setCount = (n) => {
+    const count = Math.max(1, Math.min(12, n));
+    setVehicles((list) => {
+      const next = list.slice(0, count);
+      while (next.length < count) next.push({ serial: next.length + 1, plate: '' });
+      return next.map((v, i) => ({ ...v, serial: i + 1 }));
+    });
+  };
+  const setPlate = (i, text) => setVehicles((list) => list.map((v, k) => (k === i ? { ...v, plate: text.toUpperCase() } : v)));
+  const removeVehicle = (i) => setVehicles((list) => (list.length <= 1 ? list : list.filter((_, k) => k !== i).map((v, k) => ({ ...v, serial: k + 1 }))));
+
+  const plateProblem = (i) => {
+    const raw = vehicles[i]?.plate || '';
+    if (!raw.trim()) return null;
+    const clean = normalizePlate(raw);
+    if (!clean) return tr('gs_badPlate');
+    const dup = vehicles.some((v, k) => k !== i && normalizePlate(v.plate) === clean);
+    return dup ? tr('gs_dupPlate') : null;
+  };
+
   const confirm = async () => {
     if (!match) return;
-    if (!String(vehicle).trim()) {
-      Alert.alert(tr('vehicleNumber'), tr('gs_enterVehicle'));
-      return;
+    for (let i = 0; i < vehicles.length; i++) {
+      if (!String(vehicles[i].plate).trim()) {
+        Alert.alert(tr('vehicleNumber'), tr('gs_enterVehicleN', { n: i + 1 }));
+        return;
+      }
+      const problem = plateProblem(i);
+      if (problem) {
+        Alert.alert(tr('gs_vehicleN', { n: i + 1 }), problem);
+        return;
+      }
     }
     setBusy(true);
     try {
-      const done = await markGateEntry(match.tokenId, vehicle, how);
+      const done = await markGateEntry(match.tokenId, vehicles[0].plate, how, vehicles);
       const laneLine = done?.laneAssigned ? `\n\n${tr('gs_sendToLane', { lane: done.laneAssigned })}` : '';
-      Alert.alert(tr('gs_admitted'), `${match.tokenNumber} • ${match.farmerName}${laneLine}`, [
+      Alert.alert(tr('gs_admitted'), `${match.farmerName} • #${yardRef(match)} • ${tr('gs_nVehicles', { n: vehicles.length })}${laneLine}`, [
         { text: tr('gs_nextScan'), onPress: reset },
         { text: tr('back'), onPress: () => navigation.goBack() },
       ]);
@@ -106,6 +154,7 @@ export default function GateScanScreen({ navigation, route }) {
     setMatch(null);
     setTyped('');
     setVehicle('');
+    setVehicles([{ serial: 1, plate: '' }]);
     locked.current = false;
   };
 
@@ -118,7 +167,7 @@ export default function GateScanScreen({ navigation, route }) {
           {expected ? (
             <View style={styles.expectBar}>
               <Text style={styles.expectLabel}>{tr('gs_expected')}</Text>
-              <Text style={styles.expectToken}>{expected.tokenNumber}</Text>
+              <Text style={styles.expectToken}>{passLabel(expected)}</Text>
               <Text style={styles.expectName}>{expected.farmerName}</Text>
               <Text style={styles.expectHint}>
                 {tr('gs_expectHint')}
@@ -174,13 +223,20 @@ export default function GateScanScreen({ navigation, route }) {
             <Text style={styles.hint}>
               {tr('gs_waitingCount', { n: rows.filter((r) => r.status === STATUS.BOOKED).length })}
             </Text>
+
+            <TouchableOpacity style={styles.walkIn} onPress={() => navigation.navigate('GateRebook', {})}>
+              <Ionicons name="person-add-outline" size={20} color={Colors.navy} />
+              <Text style={styles.walkInText}>{tr('gs_walkIn')}</Text>
+              <Ionicons name="arrow-forward" size={16} color={Colors.navy} />
+            </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <View style={styles.result}>
+        <ScrollView contentContainerStyle={styles.result} keyboardShouldPersistTaps="handled">
           <View style={styles.verifiedTop}>
             <Text style={styles.verifiedLabel}>{tr('gs_verified')}</Text>
-            <Text style={styles.verifiedToken}>{match.tokenNumber}</Text>
+            <Text style={styles.verifiedToken}>#{yardRef(match)}</Text>
+            <Text style={styles.verifiedLabel}>{passLabel(match)}</Text>
           </View>
 
           <View style={styles.okBadge}>
@@ -193,18 +249,47 @@ export default function GateScanScreen({ navigation, route }) {
           <Text style={styles.name}>{match.farmerName}</Text>
           <Text style={styles.sub}>+91 {match.farmerPhone}</Text>
           <Text style={styles.sub}>
-            {cropLabel(match, lang)} • {match.approxQuantityQuintals} {tr('quintalShort')} • {match.slotWindow}
+            {cropLabel(match, lang)} • {match.approxQuantityQuintals} {tr('quintalShort')} • {passLabel(match)}
           </Text>
 
-          <Text style={styles.label}>{tr('vehicleNumber')}</Text>
-          <TextInput
-            style={styles.inputBig}
-            value={vehicle}
-            onChangeText={setVehicle}
-            placeholder="HR 26 AB 1234"
-            placeholderTextColor="#999"
-            autoCapitalize="characters"
-          />
+          <View style={styles.countRow}>
+            <Text style={styles.label}>{tr('gs_howMany')}</Text>
+            <View style={styles.stepper}>
+              <TouchableOpacity style={styles.stepBtn} onPress={() => setCount(vehicles.length - 1)}>
+                <Text style={styles.stepText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.stepValue}>{vehicles.length}</Text>
+              <TouchableOpacity style={styles.stepBtn} onPress={() => setCount(vehicles.length + 1)}>
+                <Text style={styles.stepText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {vehicles.map((v, i) => {
+            const problem = plateProblem(i);
+            return (
+              <View key={v.serial} style={[styles.vehicleCard, problem && styles.vehicleCardBad]}>
+                <View style={styles.vehicleHead}>
+                  <Text style={styles.vehicleSerial}>{tr('gs_vehicleN', { n: v.serial })}</Text>
+                  {vehicles.length > 1 ? (
+                    <TouchableOpacity onPress={() => removeVehicle(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="close-circle" size={22} color={Colors.error} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                <TextInput
+                  style={styles.plateInput}
+                  value={v.plate}
+                  onChangeText={(t) => setPlate(i, t)}
+                  placeholder="HR 26 AB 1234"
+                  placeholderTextColor="#999"
+                  autoCapitalize="characters"
+                />
+                {problem ? <Text style={styles.plateError}>{problem}</Text> : null}
+              </View>
+            );
+          })}
+          <Text style={styles.plateHint}>{tr('gs_plateHint')}</Text>
 
           <PrimaryButton
             title={tr('gs_admit')}
@@ -212,10 +297,10 @@ export default function GateScanScreen({ navigation, route }) {
             onPress={confirm}
             style={{ marginTop: 16 }}
           />
-          <TouchableOpacity onPress={reset} style={{ marginTop: 14 }}>
+          <TouchableOpacity onPress={reset} style={{ marginTop: 14, marginBottom: 30 }}>
             <Text style={styles.cancel}>{tr('gs_rescan')}</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -230,7 +315,7 @@ const styles = StyleSheet.create({
   },
   expectBarPlain: { backgroundColor: Colors.navy, padding: 10, alignItems: 'center' },
   expectLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700' },
-  expectToken: { color: Colors.white, fontSize: 34, fontWeight: '900' },
+  expectToken: { color: Colors.white, fontSize: 24, fontWeight: '900' },
   expectName: { color: Colors.white, fontWeight: '700' },
   expectHint: { color: '#FFD54F', fontSize: 12, marginTop: 4, textAlign: 'center', fontWeight: '700' },
 
@@ -242,7 +327,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   verifiedLabel: { color: Colors.white, fontWeight: '800', fontSize: 13 },
-  verifiedToken: { color: Colors.white, fontWeight: '900', fontSize: 48 },
+  verifiedToken: { color: Colors.white, fontWeight: '900', fontSize: 40 },
 
   cameraBox: {
     height: 260,
@@ -287,6 +372,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hint: { color: Colors.subText, fontSize: 13, marginTop: 10 },
+  walkIn: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.navy,
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: Colors.white,
+  },
+  walkInText: { flex: 1, color: Colors.navy, fontWeight: '900', fontSize: 14 },
 
   result: { padding: 18 },
   okBadge: {
@@ -317,4 +414,16 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   cancel: { textAlign: 'center', color: Colors.error, fontWeight: '800' },
+  countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14 },
+  stepBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
+  stepText: { fontSize: 24, fontWeight: '800', color: Colors.navy, lineHeight: 28 },
+  stepValue: { fontSize: 24, fontWeight: '900', color: Colors.navy, minWidth: 30, textAlign: 'center' },
+  vehicleCard: { backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12, padding: 12, marginTop: 10 },
+  vehicleCardBad: { borderColor: Colors.error },
+  vehicleHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  vehicleSerial: { fontWeight: '900', color: Colors.navy, fontSize: 13 },
+  plateInput: { marginTop: 8, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, height: 48, paddingHorizontal: 12, fontSize: 20, fontWeight: '800', letterSpacing: 1, color: Colors.navy },
+  plateError: { color: Colors.error, fontWeight: '700', fontSize: 12, marginTop: 6 },
+  plateHint: { color: Colors.subText, fontSize: 12, marginTop: 8 },
 });

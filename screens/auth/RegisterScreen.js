@@ -12,6 +12,7 @@ import { useLang } from '../../i18n/LanguageContext';
 
 import { OFFICER_DUTIES } from '../../services/auth';
 import { fetchCentres, centreLabel } from '../../services/centres';
+import { isValidAadhaar, formatAadhaar, sendAadhaarOtp, verifyAadhaarOtp, DEMO_AADHAAR } from '../../services/aadhaar';
 
 export default function RegisterScreen({ navigation, route }) {
   const { tr, lang } = useLang();
@@ -24,6 +25,26 @@ export default function RegisterScreen({ navigation, route }) {
   const [adminCode, setAdminCode] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [businessName, setBusinessName] = useState('');
+  // install45: Aadhaar e-KYC (mock) - required for every role
+  const [aadhaar, setAadhaar] = useState('');
+  const [aadTxn, setAadTxn] = useState(null);
+  const [aadOtp, setAadOtp] = useState('');
+  const [aadVerified, setAadVerified] = useState(null);   // { govIdNumber, verifiedAt }
+  const [aadBusy, setAadBusy] = useState(false);
+  const [aadError, setAadError] = useState('');
+
+  const aadhaarSend = async () => {
+    setAadError(''); setAadBusy(true);
+    try { setAadTxn(await sendAadhaarOtp(aadhaar)); }
+    catch (e) { setAadError(tr('aad_invalid')); }
+    finally { setAadBusy(false); }
+  };
+  const aadhaarVerify = async () => {
+    setAadError(''); setAadBusy(true);
+    try { setAadVerified(await verifyAadhaarOtp(aadhaar, aadOtp, aadTxn?.txnId)); }
+    catch (e) { setAadError(tr('aad_wrongOtp')); }
+    finally { setAadBusy(false); }
+  };
 
   const [centres, setCentres] = useState([]);
   const [centreId, setCentreId] = useState('');
@@ -49,6 +70,7 @@ export default function RegisterScreen({ navigation, route }) {
   const canContinue =
     name.trim().length > 0 &&
     phone.length === 10 &&
+    Boolean(aadVerified) &&
     (role !== 'officer' ||
       (employeeId.trim().length > 0 && centreId.length > 0 &&
         (officerDuty !== 'admin' || adminCode.trim().length > 0))) &&
@@ -101,6 +123,51 @@ export default function RegisterScreen({ navigation, route }) {
           onChangeText={(text) => setPhone(text.replace(/\D/g, ''))}
           keyboardType="number-pad" maxLength={10}
           placeholder={tr('reg_tenDigits')} placeholderTextColor="#999" />
+
+        {/* install45: Aadhaar e-KYC (mock) */}
+        <Text style={styles.label}>{tr('aad_title')}</Text>
+        <Text style={styles.help}>{tr('aad_help')}</Text>
+        {aadVerified ? (
+          <View style={styles.aadOk}>
+            <Ionicons name="shield-checkmark" size={20} color="#16A34A" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.aadOkText}>{tr('aad_verified')}</Text>
+              <Text style={styles.aadOkSub}>{aadVerified.govIdNumber} • {tr('aad_mockTag')}</Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <TextInput
+              style={styles.input} value={formatAadhaar(aadhaar)}
+              onChangeText={(v) => { setAadhaar(v); setAadTxn(null); setAadError(''); }}
+              keyboardType="numeric" maxLength={14} placeholder="XXXX XXXX XXXX" placeholderTextColor="#999"
+              editable={!aadTxn}
+            />
+            {!aadTxn ? (
+              <PrimaryButton
+                title={aadBusy ? '…' : tr('aad_sendOtp')} disabled={!isValidAadhaar(aadhaar) || aadBusy}
+                style={{ marginTop: 10 }} onPress={aadhaarSend}
+              />
+            ) : (
+              <>
+                <Text style={styles.help}>{tr('aad_otpSent', { m: aadTxn.maskedMobile })}</Text>
+                <TextInput
+                  style={styles.input} value={aadOtp} onChangeText={setAadOtp}
+                  keyboardType="numeric" maxLength={6} placeholder={tr('aad_otpPh')} placeholderTextColor="#999"
+                />
+                <PrimaryButton
+                  title={aadBusy ? '…' : tr('aad_verify')} disabled={aadOtp.length < 4 || aadBusy}
+                  style={{ marginTop: 10 }} onPress={aadhaarVerify}
+                />
+                <TouchableOpacity onPress={() => { setAadTxn(null); setAadOtp(''); }} style={{ marginTop: 8 }}>
+                  <Text style={styles.link}>{tr('aad_changeNumber')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {aadError ? <Text style={styles.aadErr}>{aadError}</Text> : null}
+            <Text style={styles.help}>{tr('aad_demoHint', { n: DEMO_AADHAAR.join(' · ') })}</Text>
+          </>
+        )}
 
         {role === 'officer' && (
           <>
@@ -162,6 +229,7 @@ export default function RegisterScreen({ navigation, route }) {
             navigation.navigate('Otp', {
               role, phone, name, employeeId, officerDuty, centreId, centreName,
               licenseNumber, businessName, adminCode, isNewRegistration: true,
+              govIdType: aadVerified?.govIdType, govIdNumber: aadVerified?.govIdNumber, govIdVerifiedAt: aadVerified?.verifiedAt,
             })
           }
         />
@@ -194,4 +262,9 @@ const styles = StyleSheet.create({
   chipOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   chipText: { fontWeight: '700', color: Colors.navy, fontSize: 14 },
   chipDesc: { color: Colors.subText, fontSize: 12, marginTop: 3 },
+  aadOk: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#DCFCE7', borderRadius: 12, padding: 12 },
+  aadOkText: { color: '#166534', fontWeight: '800', fontSize: 14 },
+  aadOkSub: { color: '#166534', fontSize: 12, marginTop: 2 },
+  aadErr: { color: Colors.error, fontSize: 12, marginTop: 6, fontWeight: '700' },
+  link: { color: Colors.primary, fontWeight: '700', fontSize: 13 },
 });

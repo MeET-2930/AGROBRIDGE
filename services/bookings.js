@@ -14,7 +14,8 @@
  *       This is what farmers subscribe to. It holds:
  *         - which token is being served right now
  *         - how many tokens have been issued
- *         - per-slot booked counts (capacity control)
+ *         - per-window labour minutes + vehicle counts (capacity;
+ *           see CAPACITY MODEL below, install41)
  *       Because it is a single document, a farmer needs exactly
  *       one realtime listener, and no farmer can see any other
  *       farmer's private data.
@@ -32,11 +33,19 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  deleteField,
   where,
 } from 'firebase/firestore';
 
 import { db } from './firebase';
-import { fetchCentreById } from './centres';
+import { fetchCentreById, normalizePlate, cropClassOf } from './centres';
+import {
+  centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour,
+} from '../engine/capacity';
+import { correctionRatio, trainCorrection } from '../engine/models/correction';
+import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
+import { effectiveThroughput, learnThroughput } from '../engine/models/throughput';
+import ENGINE_PARAMS from '../engine/models/params';
 import { todayLocal, parseLocalDate } from './dates';
 import { tErr } from './i18nError';
 import { requireOfficerDuty, DUTY_FOR_STAGE } from './auth';
@@ -60,6 +69,7 @@ export const STATUS = {
   PAID: 'paid',
   REJECTED: 'rejected',
   NO_SHOW: 'no-show',
+  MISSED: 'missed',      // install42: slot hour passed without entry; room released
   CANCELLED: 'cancelled',
 };
 
@@ -83,6 +93,7 @@ export const CLOSED_STATUSES = [
   STATUS.PAID,
   STATUS.REJECTED,
   STATUS.NO_SHOW,
+  STATUS.MISSED,
   STATUS.CANCELLED,
 ];
 
@@ -106,11 +117,6 @@ function queueRef(centreId, dateStr) {
   return doc(db, 'centreQueues', queueDocId(centreId, dateStr));
 }
 
-function formatHour(hour) {
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${hour12}:00 ${ampm}`;
-}
 
 function clockTime() {
   return new Date().toLocaleTimeString([], {
@@ -120,14 +126,186 @@ function clockTime() {
   });
 }
 
-/**
- * How many vehicles a centre can process in one 60-minute window.
- */
-export function capacityPerWindow(centre) {
-  const perEntry = Number(centre?.avgMinutesPerEntry) || 15;
-  const lanes = Number(centre?.parallelLanes) || 1;
+/* ===============================================================
+ * CAPACITY MODEL  -  install44: moved to engine/capacity.js
+ * ---------------------------------------------------------------
+ * The maths is now PURE code in /engine (no Firebase in it) so the very
+ * same files run in the browser today and on the AgroBridge server
+ * later. This file is the "local adapter": it reads Firestore, asks the
+ * engine for a decision, and writes the result. Old names are re-
+ * exported so no screen had to change.
+ * =============================================================== */
+export {
+  CAPACITY_DEFAULTS,
+  capacityPerWindow,
+  throughputFor,
+  centreCapacity,
+  loadMinutesFor,
+  windowList,
+  windowLabelFor,
+  planLoad,
+} from '../engine/capacity';
 
-  return Math.max(1, Math.floor((60 / perEntry) * lanes));
+/* ===============================================================
+ * ENGINE INPUTS (install44)  -  what the ML models need
+ * ---------------------------------------------------------------
+ *  Model A  correctionRatio(crop, farmerHistory)  -> reserve expected q
+ *  Model B  learnThroughput(weighings)            -> real q/h per hour
+ *  Model C  showProbability(features)             -> P(farmer turns up)
+ * All three are switchable per centre (centre.engine.{...}) and from the
+ * admin's Engine screen. Defaults = ON for A and C, 'set' for B, so a
+ * mandi that never touches the screen still benefits.
+ * =============================================================== */
+export const ENGINE_DEFAULTS = { useCorrection: true, useNoShow: true, throughputMode: 'set' };
+
+export function engineSettings(centre) {
+  return { ...ENGINE_DEFAULTS, ...(centre?.engine || {}) };
+}
+
+/** Farmer's past declared-vs-actual pairs and show record (for A and C). */
+export async function fetchFarmerHistory(farmerId) {
+  const empty = { pairs: [], pastBookings: 0, pastNoShows: 0 };
+  if (!farmerId) return empty;
+  try {
+    const snap = await getDocs(query(collection(db, 'bookings'), where('farmerId', '==', farmerId)));
+    const rows = snap.docs.map((d) => d.data()).filter((b) => CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID);
+    const pairs = rows
+      .filter((b) => Number(b.actualQuantity) > 0 && Number(b.declaredQuintals || b.approxQuantityQuintals) > 0)
+      .sort((a, b) => String(b.weighedAt || '').localeCompare(String(a.weighedAt || '')))
+      .map((b) => ({ declared: Number(b.declaredQuintals || b.approxQuantityQuintals), actual: Number(b.actualQuantity) }));
+    const pastNoShows = rows.filter((b) => b.status === STATUS.NO_SHOW || b.status === STATUS.MISSED).length;
+    return { pairs, pastBookings: rows.length, pastNoShows };
+  } catch (e) {
+    return empty;
+  }
+}
+
+/** Model B input: this centre's weighings (last `days` days). */
+export async function fetchWeighings(centreId, days = 30) {
+  if (!centreId) return [];
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  try {
+    const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId)));
+    return snap.docs.map((d) => d.data()).filter((b) => b.weighedAt && b.weighedAt >= since && Number(b.actualQuantity) > 0);
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Centre + crop capacity with Model B applied when the admin chose
+ * "use learned". learned = centre.engine.learnedThroughput (saved by
+ * the Engine screen), so the booking path needs no extra reads.
+ */
+export function effectiveCapacity(centre, crop, slotTime) {
+  const cap = centreCapacity(centre, crop);
+  const st = engineSettings(centre);
+  const eff = effectiveThroughput(cap.throughput, st.learnedThroughput, slotTime, st.throughputMode);
+  return { ...cap, throughput: eff.value, throughputSource: eff.source, setThroughput: cap.throughput };
+}
+
+/** Model inputs for one farmer/booking -> planLoad opts + audit record. */
+export async function engineInputs({ centre, farmerId, crop, quintals, date, slotTime, bookedVia = 'app', nowMs = Date.now() }) {
+  const st = engineSettings(centre);
+  const hist = await fetchFarmerHistory(farmerId);
+  const lp = st.localParams || {};
+  const corrParams = lp.correction && lp.correction.samples >= 30 ? lp.correction : undefined;
+  const nsParams = lp.noshow && lp.noshow.samples >= 100 ? lp.noshow : undefined;
+  const corr = st.useCorrection ? correctionRatio(crop, hist.pairs, corrParams) : { ratio: 1, n: hist.pairs.length, source: 'off' };
+  const show = st.useNoShow
+    ? showProbability({ pastBookings: hist.pastBookings, pastNoShows: hist.pastNoShows, leadDays: leadDaysBetween(nowMs, date), hour: Number(String(slotTime || '9').split(':')[0]), quintals, bookedVia }, nsParams)
+    : { pShow: 1, features: null, contrib: null };
+  const leadDays = leadDaysBetween(nowMs, date);
+  return {
+    opts: { ratio: corr.ratio, pShow: show.pShow, cropClass: cropClassOf(crop), leadDays },
+    audit: {
+      cropClass: cropClassOf(crop), leadDays,
+      ratio: corr.ratio, ratioSource: corr.source, farmerVisits: corr.n,
+      pShow: show.pShow, pastBookings: hist.pastBookings, pastNoShows: hist.pastNoShows,
+      useCorrection: st.useCorrection, useNoShow: st.useNoShow, throughputMode: st.throughputMode,
+      modelVersion: ENGINE_PARAMS.version, trainedOn: nsParams || corrParams ? 'this-mandi' : ENGINE_PARAMS.trainedOn,
+    },
+  };
+}
+
+/* ===============================================================
+ * SLOT WINDOW STATE (install42)
+ * ---------------------------------------------------------------
+ * Outside the gate there is NO queue order. A pass is for an HOUR:
+ * be there in that hour and you enter in order of arrival.
+ *   before  -> not yet (grey)      open -> go to the gate (green)
+ *   passed  -> hour over (orange): pass expires, room released,
+ *              farmer is REBOOKED at the gate into the next hour
+ *              with room for his load (same as a walk-in).
+ * =============================================================== */
+export const EARLY_GRACE_MIN = 10;   // gate may admit this many minutes early
+
+export function slotBounds(booking) {
+  if (!booking?.date || !booking?.slotTime) return null;
+  const [h, m] = String(booking.slotTime).split(':').map(Number);
+  const start = parseLocalDate(booking.date);
+  start.setHours(h, m || 0, 0, 0);
+  const hours = Array.isArray(booking.windows) && booking.windows.length ? booking.windows.length : 1;
+  const end = new Date(start.getTime() + hours * 60 * 60000);
+  return { start, end, hours };
+}
+
+/** 'before' | 'open' | 'passed' for a pass, at `now`. */
+export function slotState(booking, now = new Date()) {
+  const b = slotBounds(booking);
+  if (!b) return 'open';
+  if (now.getTime() < b.start.getTime() - EARLY_GRACE_MIN * 60000) return 'before';
+  // The FIRST hour is the arrival hour; arriving after it is late even
+  // if a multi-hour load is still "in progress" on paper.
+  const arrivalEnd = new Date(b.start.getTime() + 60 * 60000);
+  if (now.getTime() >= arrivalEnd.getTime()) return 'passed';
+  return 'open';
+}
+
+/** Minutes until the arrival hour opens (0 if open/passed). */
+export function minutesUntilSlot(booking, now = new Date()) {
+  const b = slotBounds(booking);
+  if (!b) return 0;
+  return Math.max(0, Math.round((b.start.getTime() - now.getTime()) / 60000));
+}
+
+/** What the farmer calls his pass: the hour (and day), never a number. */
+export function passLabel(booking) {
+  if (!booking) return '';
+  return booking.slotWindow || windowLabelFor(booking.slotTime || '08:00', (booking.windows || []).length || 1);
+}
+
+/** Short reference officers call out inside the yard: last 4 of the gate code. */
+export function yardRef(booking) {
+  return gatePassCodeOf(booking).slice(-4);
+}
+
+function emptyQueue(centre, centreId, date) {
+  const cap = centreCapacity(centre);
+  return {
+    centreId,
+    date,
+    centreName: centre.name,
+    avgMinutesPerEntry: Number(centre.avgMinutesPerEntry) || 15,
+    parallelLanes: Number(centre.parallelLanes) || 1,
+    throughputPerHour: centre.throughputPerHour || CAPACITY_DEFAULTS.throughputPerHour,
+    bufferPercent: cap.bufferPercent,
+    maxSharePercent: cap.maxSharePercent,
+    declaredTolerancePercent: cap.declaredTolerancePercent,
+    nowServingPosition: null,
+    nowServingToken: null,
+    nowServingStatus: null,
+    lastIssuedPosition: 0,
+    totalBooked: 0,
+    completedCount: 0,
+    openPositions: [],
+    insidePositions: [],
+    slotCounts: {},        // vehicles per arrival window
+    slotLoadMinutes: {},   // labour minutes booked per window
+    slotQuintals: {},      // declared quintals per window
+    slotActualQuintals: {},// weighbridge quintals per window
+    loadByPosition: {},    // position -> { m: minutes, q: quintals }
+  };
 }
 
 /**
@@ -148,52 +326,51 @@ function tokenLabel(position) {
  * =============================================================== */
 
 /**
- * Build the list of bookable windows for a centre on a date.
- * Booked counts come from the queue document, which is the same
- * thing the booking transaction enforces, so what the farmer sees
- * is exactly what the transaction will check.
+ * Build the list of windows for a centre on a date, evaluated FOR THIS
+ * FARMER'S LOAD. Each row says whether his quantity fits starting at
+ * that hour (and how many windows it spans). Data comes from the same
+ * queue document the transaction checks.
  */
-export async function fetchCentreSlots(centreId, dateStr) {
+export async function fetchCentreSlots(centreId, dateStr, { crop = '', quintals = 10, farmerId = null } = {}) {
   const centre = await fetchCentreById(centreId);
 
   if (!centre) {
     throw tErr('err.mandiNotFound');
   }
 
-  const capacity = capacityPerWindow(centre);
-
   const queueSnap = await getDoc(queueRef(centreId, dateStr));
+  const queue = queueSnap.exists() ? queueSnap.data() : {};
 
-  const slotCounts = queueSnap.exists()
-    ? queueSnap.data().slotCounts || {}
-    : {};
-
-  const [startHour] = String(centre.operatingStartTime || '08:00')
-    .split(':')
-    .map(Number);
-
-  const [endHour] = String(centre.operatingEndTime || '18:00')
-    .split(':')
-    .map(Number);
-
-  const slots = [];
-
-  for (let hour = startHour; hour < endHour; hour++) {
-    const slotTime = `${String(hour).padStart(2, '0')}:00`;
-    const bookedCount = Number(slotCounts[slotTime]) || 0;
-    const availableCapacity = Math.max(0, capacity - bookedCount);
-
-    slots.push({
+  // install44: ask the engine with the ML inputs for THIS farmer
+  const { opts, audit } = await engineInputs({ centre, farmerId, crop, quintals, date: dateStr, slotTime: null });
+  const list = windowList(centre);
+  const slots = list.map((slotTime, idx) => {
+    const cap = effectiveCapacity(centre, crop, slotTime);
+    const plan = planLoad(cap, list, queue, idx, quintals, opts);
+    const hour = Number(slotTime.split(':')[0]);
+    return {
       slotTime,
-      windowLabel: `${formatHour(hour)} - ${formatHour(hour + 1)}`,
-      totalCapacity: capacity,
-      bookedCount,
-      availableCapacity,
-      isFull: availableCapacity === 0,
-    });
-  }
+      windowLabel: windowLabelFor(slotTime, 1),
+      runLabel: plan.ok ? windowLabelFor(slotTime, plan.needed) : null,
+      needed: plan.needed || 1,
+      fits: plan.ok,
+      reason: plan.reason,
+      isFull: !plan.ok,
+      closed: Boolean(queue.closedSlots?.[slotTime]),
+      horizon: plan.horizon || null,
+      windows: plan.ok ? plan.windows : [],
+      arriveLabel: formatHour(hour),
+      // legacy fields still read by older code paths
+      totalCapacity: cap.vehicleCap,
+      bookedCount: Number(queue.slotCounts?.[slotTime]) || 0,
+      availableCapacity: Math.max(0, cap.vehicleCap - (Number(queue.slotCounts?.[slotTime]) || 0)),
+    };
+  });
 
-  return { centre, date: dateStr, slots };
+  const tooBig = slots.length > 0 && slots.every((s) => s.reason === 'tooBig');
+  const firstFit = slots.find((s) => s.fits) || null;
+
+  return { centre, date: dateStr, slots, firstFit, tooBig, capacity: effectiveCapacity(centre, crop, list[0]), engine: audit };
 }
 
 /* ===============================================================
@@ -273,11 +450,14 @@ export async function createBooking({
   date,
   slotTime,
   slotWindow,
+  bookedVia = 'app', // 'app' | 'ivr' | 'gate'
 }) {
   if (!farmerId) throw new Error('Farmer ID is required');
   if (!centreId) throw new Error('Mandi centre is required');
   if (!crop) throw new Error('Crop is required');
   if (!date || !slotTime) throw new Error('Date and slot are required');
+
+  const quintals = Math.max(1, parseFloat(approxQuantityQuintals) || 0);
 
   // Centre master data is static, so read it outside the transaction.
   const centre = await fetchCentreById(centreId);
@@ -286,7 +466,20 @@ export async function createBooking({
     throw tErr('err.mandiNotFound');
   }
 
-  const capacity = capacityPerWindow(centre);
+  // install41: at most 2 live tokens per farmer per mandi.
+  const active = await fetchActiveFarmerBookings(farmerId);
+  if (active.filter((b) => b.centreId === centreId).length >= MAX_ACTIVE_TOKENS_PER_CENTRE) {
+    throw tErr('err.maxTokens');
+  }
+
+  const cap = effectiveCapacity(centre, crop, slotTime);
+  const slots = windowList(centre);
+  const startIdx = slots.indexOf(slotTime);
+  if (startIdx < 0) throw tErr('err.slotFull');
+
+  // install44: ML inputs (Model A ratio, Model C P(show)) for this farmer.
+  const eng = await engineInputs({ centre, farmerId, crop, quintals, date, slotTime, bookedVia });
+
   const qRef = queueRef(centreId, date);
   const tokenId = `TKN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const bookingRef = doc(db, 'bookings', tokenId);
@@ -299,47 +492,29 @@ export async function createBooking({
 
   const booking = await runTransaction(db, async (tx) => {
     const qSnap = await tx.get(qRef);
+    const queue = qSnap.exists() ? { ...emptyQueue(centre, centreId, date), ...qSnap.data() } : emptyQueue(centre, centreId, date);
 
-    const queue = qSnap.exists()
-      ? qSnap.data()
-      : {
-          centreId,
-          date,
-          centreName: centre.name,
-          avgMinutesPerEntry: Number(centre.avgMinutesPerEntry) || 15,
-          parallelLanes: Number(centre.parallelLanes) || 1,
-          nowServingPosition: null,
-          nowServingToken: null,
-          nowServingStatus: null,
-          lastIssuedPosition: 0,
-          totalBooked: 0,
-          completedCount: 0,
-          openPositions: [],
-          insidePositions: [],
-          slotCounts: {},
-        };
-
-    const slotCounts = { ...(queue.slotCounts || {}) };
-    const usedInSlot = Number(slotCounts[slotTime]) || 0;
-
-    if (usedInSlot >= capacity) {
-      throw tErr('err.slotFull');
+    // Re-plan against the LIVE queue inside the transaction. If another
+    // farmer took the room a second ago, this throws and the slot screen
+    // reloads with fresh ticks.
+    const plan = planLoad(cap, slots, queue, startIdx, quintals, eng.opts);
+    if (!plan.ok) {
+      throw tErr(plan.reason === 'tooBig' ? 'err.tooBig' : plan.reason === 'closed' ? 'err.slotClosed' : plan.reason === 'horizon' ? 'err.horizon' : 'err.slotFull');
     }
+
+    const counters = applyPlan(queue, plan, quintals);
+    const loadByPosition = { ...(queue.loadByPosition || {}) };
 
     const position = (Number(queue.lastIssuedPosition) || 0) + 1;
     const tokenNumber = tokenLabel(position);
+    loadByPosition[position] = { m: plan.loadMinutes, q: quintals };
 
-    slotCounts[slotTime] = usedInSlot + 1;
-
-    // Estimated turn: start of the window plus the queue ahead,
-    // divided across the centre's parallel lanes.
+    // Arrival = start of first window + work already booked before him.
     const [slotHour, slotMinute] = slotTime.split(':').map(Number);
-    const lanes = Number(centre.parallelLanes) || 1;
-    const perEntry = Number(centre.avgMinutesPerEntry) || 15;
-    const offsetMinutes = Math.round(((usedInSlot) * perEntry) / lanes);
-
     const turn = parseLocalDate(date);
-    turn.setHours(slotHour, (slotMinute || 0) + offsetMinutes, 0, 0);
+    turn.setHours(slotHour, (slotMinute || 0) + plan.offsetMinutes, 0, 0);
+    const finish = new Date(turn.getTime() + Math.ceil(plan.loadMinutes) * 60000);
+    const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const record = {
       tokenId,
@@ -354,7 +529,8 @@ export async function createBooking({
         ? String(vehicleNumber).toUpperCase().trim()
         : '',
 
-      approxQuantityQuintals: parseFloat(approxQuantityQuintals) || 0,
+      approxQuantityQuintals: quintals,
+      declaredQuintals: quintals,
 
       centreId,
       centreName: centre.name,
@@ -365,7 +541,22 @@ export async function createBooking({
 
       date,
       slotTime,
-      slotWindow: slotWindow || `${slotTime} Window`,
+      slotWindow: slotWindow || windowLabelFor(slotTime, plan.needed),
+      windows: plan.windows,
+      windowLoads: plan.windowLoads,
+      loadMinutes: plan.loadMinutes,
+      throughputUsed: cap.throughput,
+      // install44: what the engine assumed for this booking (audit trail)
+      engine: {
+        ...eng.audit,
+        reservedQuintals: plan.reservedQuintals,
+        windowExpected: plan.windowExpected,
+        throughputSource: cap.throughputSource,
+        setThroughput: cap.setThroughput,
+      },
+      arriveAt: fmt(turn),
+      expectedFinishAt: fmt(finish),
+      bookedVia,
 
       status: STATUS.BOOKED,
 
@@ -374,11 +565,7 @@ export async function createBooking({
       gatePassQr: buildGatePassQr(tokenId, gatePassCode),
       gatePassVerifiedBy: null,
 
-      estimatedTurnTime: turn.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      }),
+      estimatedTurnTime: fmt(turn),
 
       // Stage timestamps, filled in by the officer as it progresses
       gateEntryAt: null,
@@ -396,6 +583,8 @@ export async function createBooking({
       grossWeightQuintals: null,
       tareWeightQuintals: null,
       actualQuantity: null,
+      quantityVariancePercent: null,
+      overDeclaredTolerance: false,
 
       // Pricing (decided after assay, before weighing)
       priceMode: null, // 'msp' | 'auction'
@@ -426,16 +615,12 @@ export async function createBooking({
       qRef,
       {
         ...queue,
-        centreId,
-        date,
-        centreName: centre.name,
-        avgMinutesPerEntry: Number(centre.avgMinutesPerEntry) || 15,
-        parallelLanes: lanes,
         lastIssuedPosition: position,
         totalBooked: (Number(queue.totalBooked) || 0) + 1,
         openPositions: [...(queue.openPositions || []), position],
         insidePositions: queue.insidePositions || [],
-        slotCounts,
+        ...counters,
+        loadByPosition,
         updatedAt: serverTimestamp(),
       },
       { merge: true }
@@ -445,12 +630,14 @@ export async function createBooking({
   });
 
   // install28: tell the farmer and the gate staff (fire-and-forget).
-  const bp = { token: booking.tokenNumber, mandi: booking.centreName, date: booking.date, time: booking.slotWindow, crop: booking.crop || booking.cropName, qty: booking.approxQuantityQuintals, farmer: booking.farmerName || booking.farmerPhone };
+  const bp = { token: booking.tokenNumber, mandi: booking.centreName, date: booking.date, time: booking.arriveAt || booking.slotWindow, crop: booking.crop || booking.cropName, qty: booking.approxQuantityQuintals, farmer: booking.farmerName || booking.farmerPhone };
   notifyUser(booking.farmerId, makeItem('nt_booked_t', 'nt_booked_b', bp, routes.farmerToken(booking.tokenId)));
   notifyCentreOfficers(booking.centreId, ['gate'], makeItem('nt_off_newToken_t', 'nt_off_newToken_b', bp, routes.officerStage('gate')));
 
   return booking;
 }
+
+export const MAX_ACTIVE_TOKENS_PER_CENTRE = 2;
 
 /* ===============================================================
  * LIVE QUEUE  (what the farmer subscribes to)
@@ -549,8 +736,9 @@ export function buildQueueView(booking, queue) {
     return {
       level: 'inside',
       tokensAhead: 0,
-      nowServingToken: queue?.nowServingToken || booking?.tokenNumber,
+      nowServingToken: null,
       etaMinutes: 0,
+      lane: booking?.laneAssigned || null,
       headline,
       detail,
     };
@@ -567,86 +755,73 @@ export function buildQueueView(booking, queue) {
           ? msg('qv_paid_h')
           : status === STATUS.NO_SHOW
           ? msg('qv_noShow_h')
+          : status === STATUS.MISSED
+          ? msg('qv_missed_h')
           : msg('qv_closed_h'),
       detail: '',
     };
   }
 
-  const openPositions = Array.isArray(queue?.openPositions)
-    ? queue.openPositions
-    : [];
-
-  const insidePositions = Array.isArray(queue?.insidePositions)
-    ? queue.insidePositions
-    : [];
-
-  const nowServingToken = queue?.nowServingToken || null;
-  const insideCount = insidePositions.length;
-  const lanes = Math.max(1, Number(queue?.parallelLanes) || 1);
-  const perEntry = Number(queue?.avgMinutesPerEntry) || 15;
-
   /*
-   * How many farmers are genuinely ahead of me: those still open,
-   * positioned before me, and not already inside the mandi.
+   * install42: OUTSIDE the gate the farmer only needs to know whether
+   * his hour is open. No position, no "ahead of you" - order outside
+   * is arrival order within the hour, decided at the gate.
    */
-  const waitingAhead = openPositions.filter(
-    (p) => p < myPosition && !insidePositions.includes(p)
-  ).length;
+  const state = slotState(booking);
+  const label = passLabel(booking);
+  const arrive = booking?.arriveAt || label;
 
-  const freeLanes = Math.max(0, lanes - insideCount);
-
-  // Each lane clears roughly one vehicle per avgMinutesPerEntry.
-  const etaMinutes = Math.round((waitingAhead * perEntry) / lanes);
-
-  // Nothing has started at this centre today.
-  if (openPositions.length === 0 && !nowServingToken) {
+  if (state === 'before') {
+    const mins = minutesUntilSlot(booking);
     return {
       level: 'waiting',
-      tokensAhead: Math.max(0, myPosition - 1),
+      slotState: state,
+      tokensAhead: 0,
       nowServingToken: null,
-      etaMinutes: Math.round(
-        (Math.max(0, myPosition - 1) * perEntry) / lanes
-      ),
-      headline: msg('qv_notStarted_h'),
-      detail: msg('qv_notStarted_d', { token: booking?.tokenNumber || '' }),
+      etaMinutes: mins,
+      headline: msg('qv_slotBefore_h', { t: label }),
+      detail: mins <= 90 ? msg('qv_slotBefore_soon_d', { m: mins }) : msg('qv_slotBefore_d', { t: arrive }),
     };
   }
 
-  // A lane is free and nobody is ahead of me in the waiting line.
-  if (waitingAhead < freeLanes) {
-    return {
-      level: 'go',
-      tokensAhead: waitingAhead,
-      nowServingToken,
-      etaMinutes: 0,
-      headline: msg('qv_go_h'),
-      detail: nowServingToken
-        ? msg('qv_go_d', { token: nowServingToken, n: insideCount })
-        : msg('qv_go_empty'),
-    };
-  }
-
-  const aheadLine = msg('qv_aheadLine', { n: waitingAhead, inside: insideCount });
-
-  if (waitingAhead <= 2) {
+  if (state === 'passed') {
     return {
       level: 'ready',
-      tokensAhead: waitingAhead,
-      nowServingToken,
-      etaMinutes,
-      headline: msg('qv_ready_h'),
-      detail: aheadLine,
+      slotState: state,
+      tokensAhead: 0,
+      nowServingToken: null,
+      etaMinutes: 0,
+      headline: msg('qv_slotPassed_h', { t: label }),
+      detail: msg('qv_slotPassed_d'),
     };
   }
 
   return {
-    level: 'waiting',
-    tokensAhead: waitingAhead,
-    nowServingToken,
-    etaMinutes,
-    headline: msg('qv_wait_h'),
-    detail: aheadLine,
+    level: 'go',
+    slotState: state,
+    tokensAhead: 0,
+    nowServingToken: null,
+    etaMinutes: 0,
+    headline: msg('qv_slotOpen_h', { t: label }),
+    detail: msg('qv_slotOpen_d'),
   };
+}
+
+/**
+ * install42: INSIDE the yard the order is real - vehicles in MY LANE
+ * that entered before me. Returns { ahead, etaMinutes } or null.
+ */
+export function laneAhead(booking, queue, rows) {
+  if (!booking || booking.status !== STATUS.IN_GATE) return null;
+  const lane = Number(booking.laneAssigned) || 0;
+  const perEntry = Number(queue?.avgMinutesPerEntry) || 15;
+  const list = Array.isArray(rows) ? rows : [];
+  const mine = new Date(booking.gateEntryAt || 0).getTime();
+  const ahead = list.filter(
+    (r) => r.tokenId !== booking.tokenId && INSIDE_STATUSES.includes(r.status) && Number(r.laneAssigned) === lane && new Date(r.gateEntryAt || 0).getTime() < mine
+  );
+  const minutes = ahead.reduce((sum, r) => sum + (Number(r.loadMinutes) || perEntry), 0);
+  return { ahead: ahead.length, etaMinutes: Math.round(minutes), lane };
 }
 
 /* ===============================================================
@@ -678,6 +853,15 @@ async function assertOfficerFor(tokenId, duties) {
   if (!snap.exists()) throw tErr('err.tokenNotFound');
   await requireOfficerDuty(snap.data().centreId, duties);
   return snap.data();
+}
+
+/**
+ * install41: give a booking's labour minutes / vehicle place back to
+ * the windows it occupied (cancel, no-show). Mutates and returns a
+ * patch for the queue document.
+ */
+function releaseLoad(queueData, booking) {
+  return releasePlan(queueData, booking);
 }
 
 async function advanceStage(tokenId, patch, { entering = false } = {}) {
@@ -749,10 +933,25 @@ async function advanceStage(tokenId, patch, { entering = false } = {}) {
     insidePositions.sort((a, b) => a - b);
     openPositions.sort((a, b) => a - b);
 
+    // install41: a no-show frees its window room for others.
+    const released = (patch.status === STATUS.NO_SHOW || patch.status === STATUS.MISSED) ? releaseLoad(data, booking) : {};
+
+    // install41: weighbridge result goes into the window's actuals so the
+    // admin can compare declared vs actual per hour.
+    const actuals = {};
+    if (patch.actualQuantity != null && Number(patch.actualQuantity) > 0) {
+      const slotActualQuintals = { ...(data.slotActualQuintals || {}) };
+      const w = booking.slotTime;
+      slotActualQuintals[w] = round1((Number(slotActualQuintals[w]) || 0) + Number(patch.actualQuantity));
+      actuals.slotActualQuintals = slotActualQuintals;
+    }
+
     // Display value only: the lowest token currently inside.
     const lowestInside = insidePositions.length ? insidePositions[0] : null;
 
     tx.update(qRef, {
+      ...released,
+      ...actuals,
       openPositions,
       insidePositions,
       insideCount: insidePositions.length,
@@ -790,7 +989,6 @@ async function afterStageNotify(b, patch) {
     case STATUS.IN_GATE:
       await farmer('nt_gate_t', b.laneAssigned ? 'nt_gate_lane_b' : 'nt_gate_b');
       await officers(['assay'], 'nt_off_arrived_t', 'nt_off_arrived_b', 'assay');
-      await notifyNextInQueue(b);
       break;
     case STATUS.ASSAY:
       await farmer('nt_assay_t', 'nt_assay_b');
@@ -812,62 +1010,147 @@ async function afterStageNotify(b, patch) {
     case STATUS.NO_SHOW:
       await farmer('nt_noShow_t', 'nt_noShow_b', routes.farmerHome());
       break;
+    case STATUS.MISSED:
+      await farmer('nt_missed_t', 'nt_missed_b', routes.farmerHome());
+      break;
     default:
       break;
   }
 }
 
 /* "It is your turn" for the farmer whose token is next after a vehicle went in. */
-async function notifyNextInQueue(justEntered) {
-  try {
-    const qSnap = await getDoc(queueRef(justEntered.centreId, justEntered.date));
-    if (!qSnap.exists()) return;
-    const q = qSnap.data();
-    const inside = new Set(q.insidePositions || []);
-    const lanes = Math.max(1, Number(q.parallelLanes) || 1);
-    const free = Math.max(0, lanes - inside.size);
-    if (free <= 0) return;
-    const waiting = (q.openPositions || []).filter((pos) => !inside.has(pos)).sort((a, c) => a - c).slice(0, free);
-    if (!waiting.length) return;
-    const snap = await getDocs(
-      query(collection(db, 'bookings'), where('centreId', '==', justEntered.centreId), where('date', '==', justEntered.date), where('positionAssigned', 'in', waiting))
-    );
-    await Promise.all(snap.docs.map((d) => {
-      const nb = d.data();
-      if (nb.status !== STATUS.BOOKED || nb.turnNotifiedAt) return null;
-      updateDoc(d.ref, { turnNotifiedAt: new Date().toISOString() }).catch(() => {});
-      return notifyUser(nb.farmerId, makeItem('nt_yourTurn_t', 'nt_yourTurn_b', { token: nb.tokenNumber, mandi: nb.centreName, now: q.nowServingToken || '' }, routes.farmerToken(nb.tokenId)));
-    }));
-  } catch (e) {
-    console.log('turn notify skipped:', e?.message);
-  }
-}
-
-/**
- * Gate officer: let the vehicle in.
- * This is the action that frees a lane and moves the queue on.
- */
 export async function markGateEntry(
   tokenId,
   vehicleNumber = '',
-  verifiedBy = 'manual' // 'qr' | 'code' | 'manual'
+  verifiedBy = 'manual', // 'qr' | 'code' | 'manual'
+  vehicles = null        // install43: [{ serial: 1, plate: 'HR26AB1234' }, ...]
 ) {
-  await assertOfficerFor(tokenId, DUTY_FOR_STAGE.gate);
+  const booking = await assertOfficerFor(tokenId, DUTY_FOR_STAGE.gate);
+
+  // install42: a pass is valid for its hour only. Too early -> wait;
+  // hour over -> the pass is expired and the farmer must be REBOOKED
+  // (rebookAtGate) into the next hour with room. No queue-jumping.
+  if (booking.status === STATUS.BOOKED && !TESTING_MODE) {
+    const st = slotState(booking);
+    if (st === 'before') throw tErr('err.slotNotOpen');
+    if (st === 'passed') throw tErr('err.slotPassed');
+  }
+
+  /*
+   * install43: one token, N vehicles. Every plate must be a real Indian
+   * registration, no duplicates on this token, and no plate that is
+   * already inside the mandi today under another token.
+   */
+  let list = Array.isArray(vehicles) && vehicles.length
+    ? vehicles
+    : [{ serial: 1, plate: vehicleNumber }];
+  list = list.map((v, i) => ({ serial: i + 1, plate: normalizePlate(v.plate ?? v) }));
+  if (list.some((v) => !v.plate)) throw tErr('err.badPlate');
+  const plates = list.map((v) => v.plate);
+  if (new Set(plates).size !== plates.length) throw tErr('err.dupPlate');
+
+  const insideSnap = await getDocs(
+    query(collection(db, 'bookings'), where('centreId', '==', booking.centreId), where('status', 'in', INSIDE_STATUSES))
+  );
+  const insidePlates = new Set();
+  insideSnap.docs.forEach((d) => {
+    const b = d.data();
+    if (b.tokenId === tokenId) return;
+    (b.vehicles || []).forEach((v) => insidePlates.add(v.plate));
+    if (b.vehicleNumber) insidePlates.add(normalizePlate(b.vehicleNumber) || b.vehicleNumber);
+  });
+  const clash = plates.find((p) => insidePlates.has(p));
+  if (clash) throw tErr('err.plateInside', { plate: clash });
+
   const patch = {
     status: STATUS.IN_GATE,
     gateEntryAt: new Date().toISOString(),
     actualAppearedTime: clockTime(),
     gatePassVerifiedBy: verifiedBy,
+    vehicleNumber: plates[0],
+    vehicles: list.map((v) => ({ ...v, grossWeightQuintals: null, tareWeightQuintals: null, netQuintals: null })),
+    vehicleCount: list.length,
   };
-
-  if (String(vehicleNumber).trim()) {
-    patch.vehicleNumber = String(vehicleNumber).toUpperCase().trim();
-  }
 
   const result = await advanceStage(tokenId, patch, { entering: true });
   // A vehicle just went in -> phone the next farmer in the queue.
   notifyNextFarmer(result.centreId, result.date);
   return result;
+}
+
+
+/**
+ * install42: expire passes whose arrival hour has ended without entry.
+ * Called by the gate screen and by the farmer app on load - no server
+ * needed. Each expiry releases the hour's room for walk-ins / rebooking.
+ * Never runs in TESTING_MODE (old test tokens would all expire).
+ */
+export async function expireMissedPasses(rows) {
+  if (TESTING_MODE) return 0;
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r.status === STATUS.BOOKED && slotState(r) === 'passed');
+  let n = 0;
+  for (const r of list) {
+    try {
+      await advanceStage(r.tokenId, { status: STATUS.MISSED, missedAt: new Date().toISOString() });
+      n += 1;
+    } catch (e) { /* another device may have done it */ }
+  }
+  return n;
+}
+
+/**
+ * install42: BOOK AT GATE. One path for both the walk-in and the farmer
+ * whose hour has passed: find the earliest hour TODAY (from now) with
+ * room for his load and issue a fresh pass. Nobody already booked is
+ * moved. Returns { booking } or { booking: null, reason: 'noRoomToday' }.
+ *
+ * If `previousTokenId` is given (late farmer), that pass is closed as
+ * missed first so its room is freed - which may be exactly the room
+ * he now gets.
+ */
+export async function rebookAtGate({ centreId, farmerId, farmerName, farmerPhone, crop, cropName, quintals, previousTokenId = null }) {
+  await requireOfficerDuty(centreId, DUTY_FOR_STAGE.gate);
+  const centre = await fetchCentreById(centreId);
+  if (!centre) throw tErr('err.mandiNotFound');
+
+  if (previousTokenId) {
+    try {
+      const prev = await getDoc(doc(db, 'bookings', previousTokenId));
+      if (prev.exists() && prev.data().status === STATUS.BOOKED) {
+        await advanceStage(previousTokenId, { status: STATUS.MISSED, missedAt: new Date().toISOString(), rebookedAtGate: true });
+      }
+    } catch (e) { /* continue - a fresh pass is still the goal */ }
+  }
+
+  const date = todayString();
+  const slots = windowList(centre);
+  const nowH = new Date().getHours();
+  const q = Math.max(1, Number(quintals) || 1);
+  const qSnap = await getDoc(queueRef(centreId, date));
+  const queue = qSnap.exists() ? qSnap.data() : {};
+
+  // Current hour first (gate is idle right now?), then later hours.
+  let startIdx = slots.findIndex((t) => Number(t.split(':')[0]) >= nowH);
+  if (startIdx < 0) return { booking: null, reason: 'noRoomToday' };
+
+  for (let i = startIdx; i < slots.length; i++) {
+    const cap = effectiveCapacity(centre, crop, slots[i]);
+    const eng = await engineInputs({ centre, farmerId: farmerId || farmerPhone, crop, quintals: q, date, slotTime: slots[i], bookedVia: 'gate' });
+    const plan = planLoad(cap, slots, queue, i, q, eng.opts);
+    if (!plan.ok) continue;
+    try {
+      const booking = await createBooking({
+        farmerId: farmerId || farmerPhone, farmerName, farmerPhone, centreId, crop, cropName,
+        approxQuantityQuintals: q, date, slotTime: slots[i], slotWindow: windowLabelFor(slots[i], plan.needed), bookedVia: 'gate',
+      });
+      if (previousTokenId) updateDoc(doc(db, 'bookings', booking.tokenId), { rebookedFrom: previousTokenId }).catch(() => {});
+      return { booking, reason: null };
+    } catch (e) {
+      if (String(e?.message || '').includes('maxTokens')) throw e;
+      // room went in the meantime - try the next hour
+    }
+  }
+  return { booking: null, reason: 'noRoomToday' };
 }
 
 /** Backward-compatible alias for the old screen code. */
@@ -903,7 +1186,7 @@ export async function recordAssay(
  */
 export async function fixPrice(
   tokenId,
-  { mode = 'msp', ratePerQuintal, buyerId = null, buyerName = null }
+  { mode = 'msp', ratePerQuintal, buyerId = null, buyerName = null, pricing = null }
 ) {
   const rate = parseFloat(ratePerQuintal) || 0;
   if (rate <= 0) throw tErr('err.badRate');
@@ -925,6 +1208,8 @@ export async function fixPrice(
     buyerId: buyerId || null,
     buyerName:
       buyerName || (mode === 'msp' ? 'सरकारी खरीद एजेंसी (MSP)' : null),
+    // install43: why this rate (advertised MSP, grade deduction, reasons)
+    pricing: pricing || null,
   };
 
   return advanceStage(tokenId, patch);
@@ -936,21 +1221,51 @@ export async function fixPrice(
  */
 export async function recordWeighing(
   tokenId,
-  { grossWeightQuintals, tareWeightQuintals }
+  { grossWeightQuintals, tareWeightQuintals, vehicles = null }
 ) {
   await assertOfficerFor(tokenId, DUTY_FOR_STAGE.weighing);
-  const gross = parseFloat(grossWeightQuintals) || 0;
-  const tare = parseFloat(tareWeightQuintals) || 0;
-  const net = Math.round((gross - tare) * 100) / 100;
 
   const preSnap = await getDoc(doc(db, 'bookings', tokenId));
   if (preSnap.exists() && preSnap.data().status !== STATUS.PRICE_FIXED) {
     throw tErr('err.weighBeforePrice');
   }
+  const pre = preSnap.exists() ? preSnap.data() : {};
 
-  if (net <= 0) {
-    throw tErr('wg_netZero');
+  /*
+   * install43: a weighbridge takes ONE vehicle at a time, so each
+   * vehicle gets its own gross/tare; the token total is the sum.
+   * Old single-vehicle call still works (vehicles = null).
+   */
+  let weighed;
+  if (Array.isArray(vehicles) && vehicles.length) {
+    weighed = vehicles.map((v, i) => {
+      const g = parseFloat(v.grossWeightQuintals) || 0;
+      const t = parseFloat(v.tareWeightQuintals) || 0;
+      const n = Math.round((g - t) * 100) / 100;
+      if (n <= 0) throw tErr('wg_netZero');
+      return { serial: v.serial || i + 1, plate: v.plate || '', grossWeightQuintals: g, tareWeightQuintals: t, netQuintals: n };
+    });
+  } else {
+    const g = parseFloat(grossWeightQuintals) || 0;
+    const t = parseFloat(tareWeightQuintals) || 0;
+    const n = Math.round((g - t) * 100) / 100;
+    if (n <= 0) throw tErr('wg_netZero');
+    weighed = [{ serial: 1, plate: pre.vehicleNumber || '', grossWeightQuintals: g, tareWeightQuintals: t, netQuintals: n }];
   }
+  const gross = Math.round(weighed.reduce((s, v) => s + v.grossWeightQuintals, 0) * 100) / 100;
+  const tare = Math.round(weighed.reduce((s, v) => s + v.tareWeightQuintals, 0) * 100) / 100;
+  const net = Math.round(weighed.reduce((s, v) => s + v.netQuintals, 0) * 100) / 100;
+
+  // install41: declared vs actual. Never a penalty - a quiet note the
+  // admin report uses to tune throughput/buffer, and the app uses to
+  // suggest a better number to the farmer next time.
+  const declared = Number(pre.declaredQuintals || pre.approxQuantityQuintals) || 0;
+  const variance = declared > 0 ? Math.round(((net - declared) / declared) * 1000) / 10 : null;
+  let tolerance = CAPACITY_DEFAULTS.declaredTolerancePercent;
+  try {
+    const c = pre.centreId ? await fetchCentreById(pre.centreId) : null;
+    tolerance = centreCapacity(c || {}).declaredTolerancePercent;
+  } catch (e) { /* keep default */ }
 
   const patch = {
     status: STATUS.PAYMENT_PENDING,
@@ -958,6 +1273,15 @@ export async function recordWeighing(
     grossWeightQuintals: gross,
     tareWeightQuintals: tare,
     actualQuantity: net,
+    vehicles: weighed,
+    vehicleCount: weighed.length,
+    quantityVariancePercent: variance,
+    overDeclaredTolerance: variance != null && variance > tolerance,
+    // install44: how good was the engine's guess? (Model A accuracy trail)
+    engineExpectedQuintals: pre.engine?.reservedQuintals ?? null,
+    engineErrorPercent: pre.engine?.reservedQuintals && net > 0
+      ? Math.round(((pre.engine.reservedQuintals - net) / net) * 1000) / 10
+      : null,
   };
 
   return advanceStage(tokenId, patch);
@@ -1102,17 +1426,10 @@ export async function cancelBooking(tokenId) {
 
     if (qSnap.exists()) {
       const data = qSnap.data();
-      const slotCounts = { ...(data.slotCounts || {}) };
-
-      slotCounts[booking.slotTime] = Math.max(
-        0,
-        (Number(slotCounts[booking.slotTime]) || 1) - 1
-      );
-
       const position = Number(booking.positionAssigned) || 0;
 
       tx.update(qRef, {
-        slotCounts,
+        ...releaseLoad(data, booking),
         openPositions: (Array.isArray(data.openPositions)
           ? data.openPositions
           : []
@@ -1159,8 +1476,17 @@ export async function fetchActiveFarmerBookings(farmerId) {
     const snapshot = await getDocs(
       query(collection(db, 'bookings'), where('farmerId', '==', farmerId), where('status', 'in', ACTIVE_STATUSES))
     );
-    return snapshot.docs
-      .map((item) => item.data())
+    const list = snapshot.docs.map((item) => item.data());
+    // install42: a pass whose hour ended without entry is expired here too
+    // (farmer opened the app late) so the room is freed even if no officer
+    // has the gate screen open.
+    const stale = TESTING_MODE ? [] : list.filter((b) => b.status === STATUS.BOOKED && slotState(b) === 'passed');
+    if (stale.length) {
+      await expireMissedPasses(stale);
+      stale.forEach((b) => { b.status = STATUS.MISSED; });
+    }
+    return list
+      .filter((b) => ACTIVE_STATUSES.includes(b.status))
       .sort((a, b) => `${a.date} ${a.slotTime}`.localeCompare(`${b.date} ${b.slotTime}`));
   } catch (error) {
     console.error('Error fetching active bookings:', error);
@@ -1231,7 +1557,10 @@ function sortQueueRows(rows, today) {
       if (r) return r;
       if (a.date !== b.date) return String(a.date).localeCompare(String(b.date));
     }
-    return (a.positionAssigned || 0) - (b.positionAssigned || 0);
+    // install42: group by arrival hour, then booking order inside the hour.
+    const t = String(a.slotTime || '').localeCompare(String(b.slotTime || ''));
+    if (t) return t;
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
   });
 }
 
@@ -1347,6 +1676,168 @@ export async function fetchOfficerSummary(centreId, dateStr = null) {
     console.error('Error fetching officer summary:', error);
     return empty;
   }
+}
+
+/* ===============================================================
+ * ADMIN: ENGINE CONTROL + INSIGHTS  (install44)
+ * =============================================================== */
+
+/** Save engine switches / learned throughput on the centre document. */
+export async function saveEngineSettings(centreId, patch) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const cur = (await fetchCentreById(centreId))?.engine || {};
+  await updateDoc(doc(db, 'centres', centreId), { engine: { ...cur, ...patch, updatedAt: new Date().toISOString() } });
+  return { ...cur, ...patch };
+}
+
+/** Admin: forget everything this mandi learned (switches, learned throughput, local retrain). */
+export async function resetEngineLearning(centreId) {
+  await requireOfficerDuty(centreId, ['admin']);
+  await updateDoc(doc(db, 'centres', centreId), { engine: deleteField() });
+  return true;
+}
+
+/** Admin: share of every hour held for perishables (0-50 %). */
+export async function setPerishableReserve(centreId, percent) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const p = Math.max(0, Math.min(50, Math.round(Number(percent) || 0)));
+  await updateDoc(doc(db, 'centres', centreId), { perishableReservePercent: p });
+  return p;
+}
+
+/** Admin: change today's advertised throughput for a crop (q/h). */
+export async function setTodayThroughput(centreId, crop, value) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const centre = await fetchCentreById(centreId);
+  const table = { ...(centre?.throughputPerHour || {}) };
+  const key = String(crop || 'default').toLowerCase();
+  table[key] = Math.max(50, Math.round(Number(value) || 0));
+  await updateDoc(doc(db, 'centres', centreId), { throughputPerHour: table });
+  return table;
+}
+
+/** Admin: close / reopen one hour window for new bookings (existing passes stay valid). */
+export async function setSlotClosed(centreId, dateStr, slotTime, closed) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const ref = queueRef(centreId, dateStr);
+  const snap = await getDoc(ref);
+  const cur = snap.exists() ? snap.data().closedSlots || {} : {};
+  const next = { ...cur };
+  if (closed) next[slotTime] = true; else delete next[slotTime];
+  await setDoc(ref, { closedSlots: next, updatedAt: serverTimestamp() }, { merge: true });
+  return next;
+}
+
+/**
+ * Everything the Engine screen shows: per-hour board for today, learned
+ * throughput (Model B), Model A/C accuracy on this centre's own data,
+ * and the shipped model card.
+ */
+export async function fetchEngineInsights(centreId, dateStr = null, crop = '') {
+  const date = dateStr || todayString();
+  const centre = await fetchCentreById(centreId);
+  if (!centre) throw tErr('err.mandiNotFound');
+  const st = engineSettings(centre);
+  const slots = windowList(centre);
+  const qSnap = await getDoc(queueRef(centreId, date));
+  const queue = qSnap.exists() ? qSnap.data() : {};
+  const todays = await fetchTodaysQueue(centreId, date);
+  const weighings = await fetchWeighings(centreId, 30);
+  const learned = learnThroughput(weighings);
+
+  const hours = slots.map((slotTime) => {
+    const cap = effectiveCapacity(centre, crop, slotTime);
+    const rows = todays.filter((b) => b.slotTime === slotTime);
+    const nominal = Number(queue.slotLoadMinutes?.[slotTime]) || 0;
+    const expected = queue.slotExpectedMinutes?.[slotTime] != null ? Number(queue.slotExpectedMinutes[slotTime]) : nominal;
+    return {
+      slotTime,
+      label: windowLabelFor(slotTime, 1),
+      closed: Boolean(queue.closedSlots?.[slotTime]),
+      throughput: cap.throughput,
+      throughputSource: cap.throughputSource,
+      bookableMinutes: cap.bookableMinutes,
+      nominalMinutes: round1(nominal),
+      expectedMinutes: round1(expected),
+      usedPercent: Math.round((nominal / 60) * 100),
+      expectedPercent: Math.round((expected / 60) * 100),
+      declaredQuintals: round1(Number(queue.slotQuintals?.[slotTime]) || 0),
+      reservedQuintals: round1(Number(queue.slotReservedQuintals?.[slotTime]) || Number(queue.slotQuintals?.[slotTime]) || 0),
+      actualQuintals: round1(Number(queue.slotActualQuintals?.[slotTime]) || 0),
+      vehicles: Number(queue.slotCounts?.[slotTime]) || 0,
+      bookings: rows.length,
+      inside: rows.filter((b) => INSIDE_STATUSES.includes(b.status)).length,
+      paid: rows.filter((b) => b.status === STATUS.PAID).length,
+      missed: rows.filter((b) => b.status === STATUS.MISSED || b.status === STATUS.NO_SHOW).length,
+      rebooked: rows.filter((b) => b.bookedVia === 'gate').length,
+    };
+  });
+
+  // Model A accuracy on this centre: engine guess vs weighbridge
+  const graded = weighings.filter((b) => b.engineExpectedQuintals && b.actualQuantity);
+  const declaredErr = weighings.length
+    ? weighings.reduce((s, b) => s + Math.abs((Number(b.declaredQuintals || b.approxQuantityQuintals) || 0) - b.actualQuantity) / b.actualQuantity, 0) / weighings.length
+    : null;
+  const engineErr = graded.length
+    ? graded.reduce((s, b) => s + Math.abs(b.engineExpectedQuintals - b.actualQuantity) / b.actualQuantity, 0) / graded.length
+    : null;
+
+  // Model C: predicted show rate vs real, on closed bookings with an engine record
+  const closed = todays.concat([]).filter((b) => b.engine?.pShow != null && (CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID || INSIDE_STATUSES.includes(b.status)));
+  const predictedShow = closed.length ? closed.reduce((s, b) => s + b.engine.pShow, 0) / closed.length : null;
+  const actualShow = closed.length ? closed.filter((b) => !(b.status === STATUS.MISSED || b.status === STATUS.NO_SHOW)).length / closed.length : null;
+
+  return {
+    centre, date, settings: st, hours, learned,
+    setThroughput: centreCapacity(centre, crop).throughput,
+    perishableReservePercent: centreCapacity(centre, crop).perishableReservePercent,
+    accuracy: {
+      declaredErrorPercent: declaredErr != null ? Math.round(declaredErr * 1000) / 10 : null,
+      engineErrorPercent: engineErr != null ? Math.round(engineErr * 1000) / 10 : null,
+      gradedCount: graded.length, weighedCount: weighings.length,
+      predictedShowPercent: predictedShow != null ? Math.round(predictedShow * 100) : null,
+      actualShowPercent: actualShow != null ? Math.round(actualShow * 100) : null,
+      closedCount: closed.length,
+    },
+    model: ENGINE_PARAMS,
+  };
+}
+
+/**
+ * "Retrain from history" - runs Model A + C training IN THE BROWSER on
+ * this centre's real bookings and stores the result on the centre doc
+ * (centre.engine.localParams). The planner prefers localParams when
+ * they exist and have enough samples. Server later: nightly job.
+ */
+export async function retrainFromHistory(centreId) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId)));
+  const rows = snap.docs.map((d) => d.data());
+  const closedRows = rows.filter((b) => CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID);
+
+  const corr = trainCorrection(closedRows.map((b) => ({ farmerId: b.farmerId, crop: b.crop, declared: b.declaredQuintals || b.approxQuantityQuintals, actual: b.actualQuantity })));
+
+  const perFarmer = {};
+  const ns = closedRows
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+    .map((b) => {
+      const f = (perFarmer[b.farmerId] = perFarmer[b.farmerId] || { n: 0, miss: 0 });
+      const showed = !(b.status === STATUS.MISSED || b.status === STATUS.NO_SHOW);
+      const row = {
+        pastBookings: f.n, pastNoShows: f.miss,
+        leadDays: leadDaysBetween(new Date(b.createdAt || 0).getTime(), b.date),
+        hour: Number(String(b.slotTime || '9').split(':')[0]),
+        quintals: b.declaredQuintals || b.approxQuantityQuintals, bookedVia: b.bookedVia, showed,
+      };
+      f.n += 1; if (!showed) f.miss += 1;
+      return row;
+    });
+  const noshow = trainNoShow(ns);
+
+  const learned = learnThroughput(rows.filter((b) => b.weighedAt && Number(b.actualQuantity) > 0));
+  const local = { correction: corr, noshow, learnedThroughput: learned, trainedAt: new Date().toISOString(), samples: closedRows.length };
+  await saveEngineSettings(centreId, { localParams: local, learnedThroughput: learned });
+  return local;
 }
 
 /* ===============================================================

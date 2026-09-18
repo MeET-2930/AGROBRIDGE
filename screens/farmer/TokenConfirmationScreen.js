@@ -67,10 +67,14 @@ export default function TokenConfirmationScreen({ navigation, route }) {
           <Ionicons name="checkmark-circle" size={64} color="#16A34A" />
           <Text style={styles.successTitle}>{tr('tc_booked')}</Text>
           <Text style={styles.successSub}>{tr('tc_yourToken')}</Text>
-          <Text style={styles.tokenNumber}>{booking.tokenNumber}</Text>
+          <Text style={styles.tokenNumber}>{booking.slotWindow}</Text>
+          <Text style={styles.successSub}>{booking.date}</Text>
           <Text style={styles.eta}>
-            {tr('tc_eta', { t: booking.estimatedTurnTime || booking.slotWindow })}
+            {tr('tc_eta', { t: booking.arriveAt || booking.estimatedTurnTime || booking.slotWindow })}
           </Text>
+          {booking.expectedFinishAt ? (
+            <Text style={styles.eta}>{tr('tc_finish', { t: booking.expectedFinishAt })}</Text>
+          ) : null}
         </View>
 
         <GatePassCard token={booking} />
@@ -111,7 +115,7 @@ const styles = StyleSheet.create({
   success: { alignItems: 'center', marginBottom: 18, marginTop: 6 },
   successTitle: { fontSize: 20, fontWeight: '900', color: Colors.navy, marginTop: 8 },
   successSub: { fontSize: 13, color: Colors.subText, marginTop: 10, fontWeight: '700' },
-  tokenNumber: { fontSize: 44, fontWeight: '900', color: Colors.primary },
+  tokenNumber: { fontSize: 30, fontWeight: '900', color: Colors.primary, textAlign: 'center' },
   eta: { fontSize: 14, color: Colors.navy, fontWeight: '700', marginTop: 2 },
 
   tips: {

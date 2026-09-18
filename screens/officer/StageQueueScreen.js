@@ -22,6 +22,10 @@ import {
   getStageById,
   markNoShow,
   gatePassCodeOf,
+  passLabel,
+  yardRef,
+  slotState,
+  expireMissedPasses,
 } from '../../services/bookings';
 
 import { getCurrentUserSession } from '../../services/auth';
@@ -58,6 +62,9 @@ export default function StageQueueScreen({ navigation, route }) {
 
         unsub.current = subscribeToTodaysQueue(user.centreId, null, (list) => {
           if (alive) setRows(list);
+          // install42: passes whose hour ended without entry expire here
+          // (room goes back to the hour). No-op in TESTING_MODE.
+          if (stage?.action === 'gate') expireMissedPasses(list).catch(() => {});
         });
       };
 
@@ -143,6 +150,61 @@ export default function StageQueueScreen({ navigation, route }) {
             <Ionicons name="checkmark-circle" size={40} color="#2E7D32" />
             <Text style={styles.clearText}>{tr('sq_clear')}</Text>
           </View>
+        ) : stage.action === 'gate' ? (
+          /*
+           * install43: the gate list is three COLOUR BLOCKS, readable
+           * from a metre away: green = hour open (admit in arrival
+           * order), red = hour passed (rebook on arrival), grey = later.
+           */
+          [
+            { key: 'open', style: styles.blockOpen, title: tr('sq_blockOpen'), rows: list.filter((t) => slotState(t) === 'open') },
+            { key: 'passed', style: styles.blockPassed, title: tr('sq_blockPassed'), rows: list.filter((t) => slotState(t) === 'passed') },
+            { key: 'before', style: styles.blockLater, title: tr('sq_blockLater'), rows: list.filter((t) => slotState(t) === 'before') },
+          ].map((block) => (
+            <View key={block.key} style={[styles.block, block.style]}>
+              <View style={styles.blockHead}>
+                <Text style={styles.blockTitle}>{block.title}</Text>
+                <View style={styles.blockCount}><Text style={styles.blockCountText}>{block.rows.length}</Text></View>
+              </View>
+              {block.rows.length === 0 ? (
+                <Text style={styles.blockEmpty}>{tr('sq_blockEmpty')}</Text>
+              ) : (
+                block.rows.map((token) => (
+                  <View key={token.tokenId} style={styles.card}>
+                    <View style={styles.top}>
+                      <Text style={styles.token}>#{yardRef(token)}</Text>
+                      <Text style={styles.slot}>{passLabel(token)}</Text>
+                    </View>
+                    <Text style={styles.name}>{token.farmerName}</Text>
+                    <Text style={styles.sub}>+91 {token.farmerPhone}</Text>
+                    <Text style={styles.passCode}>{tr('sq_gatePass', { code: gatePassCodeOf(token) })}</Text>
+                    <View style={styles.metaRow}>
+                      <Text style={styles.meta}>{cropLabel(token, lang)}</Text>
+                      <Text style={styles.meta}>{token.approxQuantityQuintals} {tr('quintalShort')}</Text>
+                    </View>
+                    <View style={styles.actions}>
+                      {block.key === 'passed' ? (
+                        <TouchableOpacity style={styles.primary} onPress={() => navigation.navigate('GateRebook', { previous: token })}>
+                          <Text style={styles.primaryText}>{tr('gs_rebook')}</Text>
+                          <Ionicons name="arrow-forward" size={16} color={Colors.white} />
+                        </TouchableOpacity>
+                      ) : (
+                        <>
+                          <TouchableOpacity style={styles.outline} onPress={() => noShow(token.tokenId)}>
+                            <Text style={styles.outlineText}>{tr('markNoShow')}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={[styles.primary, block.key === 'before' && styles.primaryDim]} onPress={() => runAction(token)}>
+                            <Text style={styles.primaryText}>{tr('sq_scanShort')}</Text>
+                            <Ionicons name="arrow-forward" size={16} color={Colors.white} />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          ))
         ) : (
           list.map((token, index) => (
             <View
@@ -156,24 +218,19 @@ export default function StageQueueScreen({ navigation, route }) {
               ) : null}
 
               <View style={styles.top}>
-                <Text style={styles.token}>{token.tokenNumber}</Text>
-                <Text style={styles.slot}>{token.slotWindow}</Text>
+                <Text style={styles.token}>#{yardRef(token)}</Text>
+                <Text style={styles.slot}>{passLabel(token)}</Text>
               </View>
 
               <Text style={styles.name}>{token.farmerName}</Text>
               <Text style={styles.sub}>+91 {token.farmerPhone}</Text>
-              {stage.action === 'gate' ? (
-                <Text style={styles.passCode}>
-                  {tr('sq_gatePass', { code: gatePassCodeOf(token) })}
-                </Text>
-              ) : null}
 
               <View style={styles.metaRow}>
                 <Text style={styles.meta}>
                   {cropLabel(token, lang)}
                 </Text>
                 <Text style={styles.meta}>
-                  {token.vehicleNumber || tr('vehiclePending')}
+                  {token.vehicleCount > 1 ? tr('gs_nVehicles', { n: token.vehicleCount }) : (token.vehicleNumber || tr('vehiclePending'))}
                 </Text>
                 <Text style={styles.meta}>
                   {token.actualQuantity || token.approxQuantityQuintals} {tr('quintalShort')}
@@ -193,21 +250,12 @@ export default function StageQueueScreen({ navigation, route }) {
               ) : null}
 
               <View style={styles.actions}>
-                {stage.action === 'gate' ? (
-                  <TouchableOpacity
-                    style={styles.outline}
-                    onPress={() => noShow(token.tokenId)}
-                  >
-                    <Text style={styles.outlineText}>{tr('markNoShow')}</Text>
-                  </TouchableOpacity>
-                ) : null}
-
                 <TouchableOpacity
                   style={styles.primary}
                   onPress={() => runAction(token)}
                 >
                   <Text style={styles.primaryText}>
-                    {stage.action === 'gate' ? tr('sq_scanShort') : tr(stage.actionKey || stage.actionLabel)}
+                    {tr(stage.actionKey || stage.actionLabel)}
                   </Text>
                   <Ionicons
                     name="arrow-forward"
@@ -278,7 +326,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  token: { fontSize: 24, fontWeight: '900', color: Colors.navy },
+  token: { fontSize: 22, fontWeight: '900', color: Colors.navy },
+  block: { borderRadius: 16, padding: 12, marginBottom: 14, borderWidth: 2 },
+  blockOpen: { backgroundColor: '#DCFCE7', borderColor: '#16A34A' },
+  blockPassed: { backgroundColor: '#FEE2E2', borderColor: '#DC2626' },
+  blockLater: { backgroundColor: '#F1F5F9', borderColor: '#94A3B8' },
+  blockHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  blockTitle: { fontSize: 16, fontWeight: '900', color: Colors.navy, flex: 1 },
+  blockCount: { minWidth: 30, height: 30, borderRadius: 15, backgroundColor: Colors.navy, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  blockCountText: { color: Colors.white, fontWeight: '900' },
+  blockEmpty: { color: Colors.subText, fontWeight: '700', paddingVertical: 6 },
+  primaryDim: { backgroundColor: '#94A3B8' },
+  hourHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ECEFF1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  hourHeadOpen: { backgroundColor: '#E8F5E9' },
+  hourHeadPassed: { backgroundColor: '#FFF3E0' },
+  hourHeadText: { fontWeight: '900', color: Colors.navy, fontSize: 14 },
+  hourHeadState: { fontWeight: '800', color: Colors.subText, fontSize: 12 },
   slot: { fontSize: 12, color: Colors.subText, fontWeight: '700' },
 
   name: { marginTop: 8, fontWeight: '800', color: Colors.text, fontSize: 15 },

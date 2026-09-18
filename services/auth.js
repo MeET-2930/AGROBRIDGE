@@ -175,6 +175,9 @@ export async function registerUser({
   licenseNumber = '',
   businessName = '',
   adminCode = '',
+  govIdType = null,
+  govIdNumber = null,
+  govIdVerifiedAt = null,
 }) {
   try {
     const normalizedPhone = normalizePhone(phone);
@@ -229,8 +232,10 @@ export async function registerUser({
       centreName:
         role === 'officer' || role === 'trader' ? centreName || null : null,
 
-      govIdNumber: null,
-      govIdType: null,
+      // install45: Aadhaar e-KYC (mock) - masked number only
+      govIdNumber: govIdNumber || null,
+      govIdType: govIdType || null,
+      govIdVerifiedAt: govIdVerifiedAt || null,
 
       licenseNumber: role === 'trader' ? licenseNumber.trim() : null,
       businessName: role === 'trader' ? businessName.trim() : null,

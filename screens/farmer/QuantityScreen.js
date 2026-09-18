@@ -1,14 +1,12 @@
 /*
- * screens/farmer/QuantityScreen.js  (install27)
+ * screens/farmer/QuantityScreen.js  (install41)
  * ---------------------------------------------------------------
- * Step 4 of booking: "about how many quintals are you bringing?"
+ * Step 3 of booking: "about how many quintals are you bringing?"
  *
- * Why its own screen: on the slot screen the quantity box sat under
- * a long list of time slots, so farmers pressed "Confirm" without
- * ever seeing it (default 10 quintals went into the booking).
- * Here the number is the only thing on the page, in large type,
- * with a summary of what was chosen so far. The booking is created
- * from this screen (Firestore transaction in services/bookings.js).
+ * install41 moved this BEFORE the slot screen. The mandi's capacity
+ * is now measured in quintals per hour, so the slot list can only
+ * say "this hour has room for YOUR load" once the load is known.
+ * This screen no longer books anything; the slot screen does.
  */
 import React, { useState } from 'react';
 import {
@@ -25,69 +23,29 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
-import { createBooking } from '../../services/bookings';
-import { getCurrentUserSession } from '../../services/auth';
-import { friendlyDateLabel } from '../../services/dates';
 import { centreLabel } from '../../services/centres';
 import { useLang } from '../../i18n/LanguageContext';
 
-const QUICK = [5, 10, 20, 50];
+const QUICK = [5, 10, 20, 50, 100];
 
 export default function QuantityScreen({ navigation, route }) {
-  const { tr, lang, trError } = useLang();
-  const { crop, centre, date, slot } = route.params || {};
+  const { tr, lang } = useLang();
+  const { crop, centre } = route.params || {};
 
   const [quantity, setQuantity] = useState(10);
-  const [submitting, setSubmitting] = useState(false);
 
   const change = (delta) => setQuantity((q) => Math.max(1, Math.min(999, q + delta)));
 
-  const confirm = async () => {
-    if (!crop?.id || !centre?.id || !date || !slot?.slotTime) {
-      Alert.alert(tr('ss_pickSlot'), tr('ss_pickOne'));
+  const next = () => {
+    if (!crop?.id || !centre?.id) {
       navigation.goBack();
       return;
     }
-
-    const session = await getCurrentUserSession();
-    if (!session?.uid) {
-      Alert.alert(tr('loginRequired'), tr('loginAgain'));
-      return;
-    }
-
     if (!quantity || quantity <= 0) {
       Alert.alert(tr('quantity'), tr('ss_enterQty'));
       return;
     }
-
-    setSubmitting(true);
-    try {
-      const booking = await createBooking({
-        farmerId: session.uid,
-        farmerName: session.name,
-        farmerPhone: session.phone,
-        centreId: centre.id,
-        crop: crop.id,
-        cropName: crop.name,
-        approxQuantityQuintals: Number(quantity),
-        date,
-        slotTime: slot.slotTime,
-        slotWindow: slot.windowLabel,
-      });
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'TokenConfirmation', params: { booking } }],
-      });
-    } catch (error) {
-      console.error('Booking error:', error);
-      Alert.alert(tr('ss_bookFail'), trError(error, 'ss_bookFailSub'));
-      // The slot may have filled while the farmer was deciding: go back so
-      // the slot list reloads.
-      navigation.goBack();
-    } finally {
-      setSubmitting(false);
-    }
+    navigation.navigate('SlotSelection', { crop, centre, quantity: Number(quantity) });
   };
 
   return (
@@ -101,9 +59,7 @@ export default function QuantityScreen({ navigation, route }) {
         <View style={styles.summary}>
           <Text style={styles.summaryTitle}>{tr('qty_summary')}</Text>
           <Row label={tr('crop')} value={crop?.nameKey ? tr(crop.nameKey) : crop?.name || '-'} />
-          <Row label={tr('mandi')} value={centreLabel(centre, lang) || '-'} />
-          <Row label={tr('date')} value={date ? `${friendlyDateLabel(date, lang)}  ${date.slice(8)}/${date.slice(5, 7)}` : '-'} />
-          <Row label={tr('time')} value={slot?.windowLabel || '-'} last />
+          <Row label={tr('mandi')} value={centreLabel(centre, lang) || '-'} last />
         </View>
 
         {/* The big number */}
@@ -135,15 +91,11 @@ export default function QuantityScreen({ navigation, route }) {
         </View>
 
         <Text style={styles.hint}>{tr('qty_hint')}</Text>
+        <Text style={styles.hint}>{tr('qty_whyFirst')}</Text>
       </View>
 
       <View style={styles.footer}>
-        <PrimaryButton
-          loading={submitting}
-          title={tr('confirmToken')}
-          onPress={confirm}
-          disabled={submitting}
-        />
+        <PrimaryButton title={tr('ss_next')} onPress={next} />
       </View>
     </SafeAreaView>
   );
@@ -210,10 +162,10 @@ const styles = StyleSheet.create({
   },
   quantityUnit: { fontSize: 14, fontWeight: '700', color: Colors.subText, marginTop: 2 },
 
-  quickRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  quickRow: { flexDirection: 'row', gap: 8, marginTop: 18, flexWrap: 'wrap', justifyContent: 'center' },
   quick: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: Colors.border,

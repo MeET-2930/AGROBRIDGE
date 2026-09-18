@@ -111,7 +111,7 @@ export function buildReceiptHtml(token, lang = 'hi') {
       <table>
         ${row(T('name'), t.farmerName)}
         ${row(T('mobile'), t.farmerPhone)}
-        ${row(T('vehicle'), t.vehicleNumber)}
+        ${row(T('vehicle'), Array.isArray(t.vehicles) && t.vehicles.length > 1 ? t.vehicles.map((v) => v.plate).join(', ') : t.vehicleNumber)}
       </table>
     </div>
   </div>
@@ -130,13 +130,24 @@ export function buildReceiptHtml(token, lang = 'hi') {
 
   <h2>${T('td_weighing')}</h2>
   <table>
+    ${(Array.isArray(t.vehicles) && t.vehicles.length > 1)
+      ? t.vehicles.map((v) => row(`${T('gs_vehicleN', { n: v.serial })} ${v.plate || ''}`,
+          `${v.grossWeightQuintals ?? '—'} − ${v.tareWeightQuintals ?? '—'} = ${v.netQuintals ?? '—'} ${Q}`)).join('')
+      : ''}
     ${row(T('td_gross'), `${t.grossWeightQuintals ?? '—'} ${Q}`)}
     ${row(T('td_tare'), `${t.tareWeightQuintals ?? '—'} ${Q}`)}
     ${row(T('td_net'), `${t.actualQuantity ?? '—'} ${Q}`)}
+    ${row(T('td_declared'), `${t.declaredQuintals ?? t.approxQuantityQuintals ?? '—'} ${Q}`)}
   </table>
 
   <h2>${T('td_receipt')}</h2>
   <table>
+    ${(t.pricing && t.pricing.deduction > 0) ? (
+        row(T('msp_advertised', { a: t.pricing.advertised }), '') +
+        row(T('msp_deduction', { d: t.pricing.deduction, g: gradeLabel(t.pricing.grade, lang) }), '', 'ded') +
+        row(T(t.pricing.reasonKey), '') +
+        (t.pricing.factors || []).map((f) => row('• ' + T(f.key, f.params), '')).join('')
+      ) : ''}
     ${row(T('rate'), `${money(t.ratePerQuintal)} / ${Q}`)}
     ${row(T('td_total'), money(t.grossAmount))}
     ${row(T('td_mandiFee'), `− ${money(t.mandiFee)}`, 'ded')}

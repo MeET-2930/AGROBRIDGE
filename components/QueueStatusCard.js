@@ -1,12 +1,20 @@
 /*
- * components/QueueStatusCard.js
+ * components/QueueStatusCard.js  (install42)
  * ---------------------------------------------------------------
- * The farmer's live queue view (traffic light).
+ * The farmer's live status card.
+ *
+ * OUTSIDE the gate it is a TIME light, not a queue position:
+ *   grey   - your hour has not started ("reach by 8:50")
+ *   green  - your hour is open, go to the gate
+ *   orange - your hour has passed, go to the gate to be rebooked
+ * There is deliberately no "now serving" / "ahead of you" outside:
+ * order outside is arrival order within the hour, decided at the gate.
+ *
+ * INSIDE the yard the order is real: "Lane 2 - 3 vehicles ahead".
  *
  *   view    - object returned by buildQueueView() in services/bookings
- *             (headline / detail are {key, params} objects)
- *   token   - the farmer's own token number, e.g. "A-16"
- *   onPress - optional, opens the full token detail screen
+ *   lane    - optional { lane, ahead, etaMinutes } from laneAhead()
+ *   onPress - optional, opens the full detail screen
  * ---------------------------------------------------------------
  */
 
@@ -25,14 +33,10 @@ const LEVELS = {
   closed: { bg: '#FAFAFA', border: '#E0E0E0', dot: '#BDBDBD', text: '#616161', icon: 'flag-outline' },
 };
 
-export default function QueueStatusCard({ view, token, onPress }) {
+export default function QueueStatusCard({ view, lane, onPress }) {
   const { tr } = useLang();
   if (!view) return null;
 
-  /*
-   * Resolve a message object. Params may themselves be {key}
-   * objects (e.g. buyer = government agency) - translate those too.
-   */
   const msg = (m) => {
     if (!m) return '';
     if (typeof m === 'string') return m;
@@ -53,11 +57,8 @@ export default function QueueStatusCard({ view, token, onPress }) {
   };
 
   const theme = LEVELS[view.level] || LEVELS.waiting;
-  const eta = formatEta(view.etaMinutes);
-  const showNumbers =
-    view.level !== 'inside' && view.level !== 'closed' && view.level !== 'action';
-
   const Wrapper = onPress ? TouchableOpacity : View;
+  const showLane = view.level === 'inside' && lane && lane.lane;
 
   return (
     <Wrapper
@@ -71,39 +72,36 @@ export default function QueueStatusCard({ view, token, onPress }) {
         <Ionicons name={theme.icon} size={22} color={theme.dot} />
       </View>
 
-      {showNumbers ? (
+      <Text style={[styles.detail, { color: theme.text }]}>{msg(view.detail)}</Text>
+
+      {showLane ? (
         <View style={styles.numberRow}>
           <View style={styles.numberBox}>
-            <Text style={styles.numberLabel}>{tr('q_nowServing')}</Text>
-            <Text style={[styles.numberBig, { color: theme.text }]}>
-              {view.nowServingToken || '—'}
-            </Text>
+            <Text style={styles.numberLabel}>{tr('q_yourLane')}</Text>
+            <Text style={[styles.numberBig, { color: theme.text }]}>{lane.lane}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.numberBox}>
-            <Text style={styles.numberLabel}>{tr('q_yourToken')}</Text>
-            <Text style={[styles.numberBig, { color: theme.text }]}>{token || '—'}</Text>
+            <Text style={styles.numberLabel}>{tr('q_aheadInLane')}</Text>
+            <Text style={[styles.numberBig, { color: theme.text }]}>{lane.ahead}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.numberBox}>
-            <Text style={styles.numberLabel}>{tr('q_ahead')}</Text>
-            <Text style={[styles.numberBig, { color: theme.text }]}>{view.tokensAhead}</Text>
+            <Text style={styles.numberLabel}>{tr('q_wait')}</Text>
+            <Text style={[styles.numberBig, { color: theme.text }]}>{formatEta(lane.etaMinutes) || '—'}</Text>
           </View>
         </View>
-      ) : (
-        <Text style={[styles.detailOnly, { color: theme.text }]}>{msg(view.detail)}</Text>
-      )}
-
-      {showNumbers && eta ? (
-        <Text style={styles.eta}>
-          {tr('q_etaWait', { eta })}
-          <Text style={styles.etaNote}>  {tr('q_etaNote')}</Text>
-        </Text>
       ) : null}
 
       {view.level === 'go' ? (
         <View style={styles.callToAction}>
           <Text style={styles.callToActionText}>{tr('q_comeToGate')}</Text>
+        </View>
+      ) : null}
+
+      {view.level === 'ready' && view.slotState === 'passed' ? (
+        <View style={[styles.callToAction, { backgroundColor: '#E65100' }]}>
+          <Text style={styles.callToActionText}>{tr('q_goRebook')}</Text>
         </View>
       ) : null}
     </Wrapper>
@@ -115,14 +113,12 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 14, height: 14, borderRadius: 7 },
   headline: { flex: 1, fontSize: 16, fontWeight: '900' },
-  numberRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16 },
+  detail: { marginTop: 10, fontSize: 14, fontWeight: '700' },
+  numberRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
   numberBox: { flex: 1, alignItems: 'center' },
   numberLabel: { fontSize: 11, fontWeight: '700', color: Colors.subText, marginBottom: 4, textAlign: 'center' },
-  numberBig: { fontSize: 24, fontWeight: '900' },
+  numberBig: { fontSize: 22, fontWeight: '900' },
   divider: { width: 1, height: 34, backgroundColor: 'rgba(0,0,0,0.12)' },
-  detailOnly: { marginTop: 10, fontSize: 14, fontWeight: '700' },
-  eta: { marginTop: 14, fontSize: 13, fontWeight: '700', color: Colors.subText, textAlign: 'center' },
-  etaNote: { fontSize: 11, fontWeight: '600' },
   callToAction: { marginTop: 12, backgroundColor: '#2E7D32', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   callToActionText: { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
 });
