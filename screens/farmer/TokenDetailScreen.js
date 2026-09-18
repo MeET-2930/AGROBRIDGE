@@ -83,6 +83,7 @@ export default function TokenDetailScreen({ navigation, route }) {
   const [auction, setAuction] = useState(null);
   const [tick, setTick] = useState(0);
   const [auctionBusy, setAuctionBusy] = useState(false);
+  const [showTrucks, setShowTrucks] = useState(false);   // install43 per-truck toggle (must be above any early return)
 
   // Live auction doc for this token + 1s ticker for the countdown.
   useEffect(() => {
@@ -194,7 +195,6 @@ export default function TokenDetailScreen({ navigation, route }) {
   const priced = gradedMsp(token?.crop, token?.grade || 'FAQ', token || {});
   const msp = priced.rate;
   const advertisedMsp = priced.advertised;
-  const [showTrucks, setShowTrucks] = useState(false);
 
   const acceptMsp = () => {
     Alert.alert(
