@@ -22,6 +22,34 @@ import { sendChatMessage } from '../../services/chatbot';
 let counter = 0;
 const nextId = () => `m${Date.now()}-${(counter += 1)}`;
 
+const FAQ_QUESTIONS = [
+  'Mera token kya hai?',
+  'Meri queue position kya hai?',
+  'Mere se pehle kitne farmers hain?',
+  'Mera payment status kya hai?',
+  'Slot kaise book karu?',
+  'Mandi kab khulti hai?',
+];
+
+function renderRichText(body, baseStyle, boldStyle) {
+  const parts = String(body || '').split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    const m = /^\*\*([^*]+)\*\*$/.exec(part);
+    if (m) {
+      return (
+        <Text key={i} style={[baseStyle, boldStyle]}>
+          {m[1]}
+        </Text>
+      );
+    }
+    return (
+      <Text key={i} style={baseStyle}>
+        {part}
+      </Text>
+    );
+  });
+}
+
 const CHAT_GREETING = {
   hi: `नमस्ते 🙏 मैं AgroBridge सहायक हूँ। मैं इन सबमें आपकी मदद कर सकता हूँ:
 • स्लॉट बुकिंग
@@ -100,11 +128,10 @@ export default function ChatbotScreen({ navigation }) {
     });
   }, []);
 
-  const send = useCallback(async () => {
-    const text = String(input || '').trim();
+  const deliver = useCallback(async (rawText) => {
+    const text = String(rawText || '').trim();
     if (!text || sending) return;
 
-    setInput('');
     setError(null);
     setSending(true);
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text }]);
@@ -125,7 +152,19 @@ export default function ChatbotScreen({ navigation }) {
     } finally {
       setSending(false);
     }
-  }, [input, sending, messages]);
+  }, [sending, messages]);
+
+  const send = useCallback(() => {
+    const text = String(input || '').trim();
+    if (!text) return;
+    setInput('');
+    deliver(text);
+  }, [input, deliver]);
+
+  const sendPreset = useCallback((q) => {
+    setInput('');
+    deliver(q);
+  }, [deliver]);
 
   const data = sending
     ? [...messages, { id: 'typing', role: 'bot', typing: true }]
@@ -148,7 +187,9 @@ export default function ChatbotScreen({ navigation }) {
     return (
       <View style={[styles.row, isUser ? styles.rowUser : styles.rowBot]}>
         <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
-          <Text style={isUser ? styles.textUser : styles.textBot}>{body}</Text>
+          <Text style={isUser ? styles.textUser : styles.textBot}>
+            {isUser ? body : renderRichText(body, styles.textBot, styles.bold)}
+          </Text>
         </View>
       </View>
     );
@@ -175,6 +216,27 @@ export default function ChatbotScreen({ navigation }) {
           onLayout={scrollToEnd}
         />
 
+        {messages.length <= 1 && !sending ? (
+          <View style={styles.faqCard}>
+            <Text style={styles.faqTitle}>{tr('chat_faqTitle')}</Text>
+            <Text style={styles.faqHint}>{tr('chat_faqHint')}</Text>
+            <View style={styles.chipRow}>
+              {FAQ_QUESTIONS.map((q) => (
+                <TouchableOpacity
+                  key={q}
+                  style={styles.chip}
+                  onPress={() => sendPreset(q)}
+                  disabled={sending}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={14} color={Colors.primary} />
+                  <Text style={styles.chipText}>{q}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {error ? (
           <View style={styles.errorBar}>
             <Ionicons name="alert-circle-outline" size={16} color={Colors.error} />
@@ -194,6 +256,12 @@ export default function ChatbotScreen({ navigation }) {
             blurOnSubmit={false}
             returnKeyType="send"
             onSubmitEditing={send}
+            onKeyPress={(e) => {
+              if (e?.nativeEvent?.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                if (typeof e.preventDefault === 'function') e.preventDefault();
+                send();
+              }
+            }}
           />
           <TouchableOpacity
             style={[styles.sendBtn, sendDisabled && styles.sendOff]}
@@ -229,7 +297,24 @@ const styles = StyleSheet.create({
 
   textUser: { color: Colors.white, fontSize: 15, lineHeight: 21 },
   textBot: { color: Colors.text, fontSize: 15, lineHeight: 21 },
+  bold: { fontWeight: '700' },
   typing: { color: Colors.subText, fontSize: 18, fontWeight: '700', paddingHorizontal: 4 },
+
+  faqCard: {
+    backgroundColor: Colors.white,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12,
+  },
+  faqTitle: { color: Colors.text, fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  faqHint: { color: Colors.subText, fontSize: 13, marginBottom: 10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.background,
+    borderWidth: 1, borderColor: Colors.primary, borderRadius: 18,
+    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 2,
+  },
+  chipText: { color: Colors.text, fontSize: 13, fontWeight: '600', flexShrink: 1 },
 
   errorBar: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

@@ -22,6 +22,7 @@ import { fetchCentreById } from '../../services/centres';
 
 // Team helpline shown under "Ask on WhatsApp" - change to your number.
 const HELPLINE_WHATSAPP = '919999999999';
+const WHATSAPP_PREFILL = 'Namaste, mujhe AgroBridge booking ke baare mein madad chahiye.';
 
 const FAQ = {
   farmer: ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'],
@@ -102,7 +103,7 @@ export default function HelpScreen({ navigation, route }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.tool}
-            onPress={() => Linking.openURL(`https://wa.me/${HELPLINE_WHATSAPP}?text=AgroBridge%20help`)}
+            onPress={() => Linking.openURL(`https://wa.me/${HELPLINE_WHATSAPP}?text=${encodeURIComponent(WHATSAPP_PREFILL)}`)}
           >
             <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
             <Text style={styles.toolText}>{tr('hc_whatsapp')}</Text>
