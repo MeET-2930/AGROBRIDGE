@@ -32,6 +32,14 @@ export const MANDI_ADMIN_CODE = 'AGB-ADMIN-2026';
 export const IVR_BASE_URL = 'https://agrobridge-ivr.onrender.com';
 export const IVR_APP_KEY = 'agb-demo-2026';   // must equal APP_SHARED_KEY on the server
 
+/*
+ * Chatbot (AgroBridge Assistant) - same Render.com service as the IVR.
+ * The deployed web app and local dev both use this URL. No trailing slash.
+ * For offline local work, point it at 'http://localhost:3001'
+ * (ivr/chatbot-local.js) temporarily - do not commit that change.
+ */
+export const CHATBOT_BASE_URL = 'https://agrobridge-ivr.onrender.com';
+
 /**
  * TESTING_MODE (install39)
  *  true  = officer queues/scans show tokens of EVERY date (today first), and the

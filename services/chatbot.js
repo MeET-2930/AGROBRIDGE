@@ -2,7 +2,8 @@
  * services/chatbot.js
  * ---------------------------------------------------------------
  * Client for the AgroBridge Assistant (read-only Gemini chatbot).
- * Talks to ivr/chatbot-local.js  ->  POST http://localhost:3001/chat
+ * Talks to the Render backend  ->  POST ${CHATBOT_BASE_URL}/chat
+ * (services/config.js; production: https://agrobridge-ivr.onrender.com/chat)
  *
  *   in:  { message, history, phone }   out:  { reply }
  *
@@ -18,7 +19,9 @@
  * ---------------------------------------------------------------
  */
 
-const CHATBOT_URL = 'http://localhost:3001/chat';
+import { CHATBOT_BASE_URL } from './config';
+
+const CHATBOT_URL = `${CHATBOT_BASE_URL}/chat`;
 const MAX_HISTORY = 10;
 
 export class ChatError extends Error {

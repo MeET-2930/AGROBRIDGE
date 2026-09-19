@@ -17,6 +17,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const cors = require("cors");
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const path = require("path");
@@ -153,6 +154,17 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+
+// Production web app (Firebase Hosting) calls /chat (and /call-me)
+// from the browser. Allow only that origin; preflight OPTIONS is
+// handled automatically. IVR routes and behavior are unchanged.
+app.use(
+  cors({
+    origin: "https://agrobridge-sih26.web.app",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-agb-key"],
+  })
+);
 
 // ---------------------------------------------------------------
 // Home
