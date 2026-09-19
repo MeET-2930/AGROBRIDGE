@@ -212,6 +212,18 @@ export const t = {
   history: r('इतिहास', 'History', 'ਇਤਿਹਾਸ', 'इतिहास'),
   myCrops: r('मेरी फसलें', 'My Crops', 'ਮੇਰੀਆਂ ਫਸਲਾਂ', 'माझी पिके'),
   help: r('सहायता', 'Help', 'ਮਦਦ', 'मदत'),
+  /* Chat assistant (Gemini chatbot) tiles & screen */
+  chat_withAssistant: r('सहायक से बात करें', 'Chat with Assistant', 'ਸਹਾਇਕ ਨਾਲ ਗੱਲ ਕਰੋ', 'सहायकाशी चॅट करा'),
+  chat_title: r('AgroBridge सहायक', 'AgroBridge Assistant', 'AgroBridge ਸਹਾਇਕ', 'AgroBridge सहायक'),
+  chat_greeting: r(
+    'नमस्ते 🙏 मैं AgroBridge सहायक हूँ। स्लॉट बुकिंग, टोकन, गेट एंट्री, कतार, गुणवत्ता जांच, तौल और भुगतान – जो भी पूछना चाहें, हिंदी या अंग्रेज़ी में पूछिए।',
+    'Namaste 🙏 I am the AgroBridge Assistant. Ask me anything about slot booking, tokens, gate entry, queues, quality check, weighing or payments – in Hindi or English.',
+    'ਸਤ ਸ੍ਰੀ ਅਕਾਲ 🙏 ਮੈਂ AgroBridge ਸਹਾਇਕ ਹਾਂ। ਸਲਾਟ ਬੁੱਕਿੰਗ, ਟੋਕਨ, ਗੇਟ ਐਂਟਰੀ, ਕਤਾਰ, ਗੁਣਵੱਤਾ ਜਾਂਚ, ਤੋਲ ਅਤੇ ਭੁਗਤਾਨ – ਜੋ ਵੀ ਪੁੱਛਣਾ ਹੋਵੇ, ਪੰਜਾਬੀ ਜਾਂ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਪੁੱਛੋ।',
+    'नमस्कार 🙏 मी AgroBridge सहायक आहे. स्लॉट बुकिंग, टोकन, गेट प्रवेश, रांग, गुणवत्ता तपासणी, वजन आणि पेमेंट – जे काही विचारायचे असेल, मराठी किंवा इंग्रजीत विचारा.'
+  ),
+  chat_placeholder: r('यहाँ लिखें…', 'Type your message…', 'ਇੱਥੇ ਲਿਖੋ…', 'इथे लिहा…'),
+  chat_send: r('भेजें', 'Send', 'ਭੇਜੋ', 'पाठवा'),
+  chat_error: r('सहायक से संपर्क नहीं हो सका। कृपया दोबारा कोशिश करें।', 'Could not reach the Assistant. Please try again.', 'ਸਹਾਇਕ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।', 'सहायकाशी संपर्क करता आला नाही. कृपया पुन्हा प्रयत्न करा.'),
   activeBooking: r('सक्रिय बुकिंग', 'Active Booking', 'ਸਰਗਰਮ ਬੁਕਿੰਗ', 'सक्रिय बुकिंग'),
   trackStatus: r('पूरा विवरण देखें', 'View full details', 'ਪੂਰਾ ਵੇਰਵਾ ਵੇਖੋ', 'संपूर्ण तपशील पहा'),
   fd_myTokensN: r('मेरे टोकन ({n})', 'My Tokens ({n})', 'ਮੇਰੇ ਟੋਕਨ ({n})', 'माझे टोकन ({n})'),

@@ -314,9 +314,9 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('help')}
-            icon="help-circle-outline"
-            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
+            title={tr('chat_withAssistant')}
+            icon="chatbubbles-outline"
+            onPress={() => navigation.navigate('Chatbot')}
           />
 
           {IVR_BASE_URL ? (
