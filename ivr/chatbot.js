@@ -16,7 +16,7 @@ function createChatbot({ db }) {
   const genAI = new GoogleGenerativeAI(apiKey);
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-3.6-flash",
+    model: "gemini-3.1-flash-lite",
     systemInstruction: `
 You are AgroBridge Assistant, a helpful assistant for farmers using AgroBridge.
 
