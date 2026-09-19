@@ -34,6 +34,10 @@ import {
   CANCEL_HOURS,
   fixPrice,
   STATUS,
+  subscribeToCentre,
+  yardNoticeFor,
+  markYardChoice,
+  cancelForYardIncident,
 } from '../../services/bookings';
 import { CROP_LIST, cropLabel, gradeLabel, centreLabel, gradedMsp } from '../../services/centres';
 import { useLang } from '../../i18n/LanguageContext';
@@ -108,7 +112,10 @@ export default function TokenDetailScreen({ navigation, route }) {
 
   const unsubQueue = useRef(null);
   const unsubYard = useRef(null);
+  const unsubCentre = useRef(null);
   const [yardRows, setYardRows] = useState([]);
+  const [centre, setCentre] = useState(null);      // install52: live yard state
+  const [yardBusy, setYardBusy] = useState(false);
 
   useEffect(() => {
     if (!tokenId) {
@@ -128,6 +135,7 @@ export default function TokenDetailScreen({ navigation, route }) {
           setQueue
         );
         unsubYard.current = subscribeToTodaysQueue(fresh.centreId, fresh.date, setYardRows);
+        unsubCentre.current = subscribeToCentre(fresh.centreId, setCentre);
       }
     });
 
@@ -142,8 +150,45 @@ export default function TokenDetailScreen({ navigation, route }) {
         unsubYard.current();
         unsubYard.current = null;
       }
+      if (unsubCentre.current) {
+        unsubCentre.current();
+        unsubCentre.current = null;
+      }
     };
   }, [tokenId]);
+
+  // install52: yard incident -> the farmer decides (wait / cancel & re-book)
+  const yardRebook = () => {
+    Alert.alert(tr('td_yardRebook'), tr('td_yardRebookConfirm'), [
+      { text: tr('no'), style: 'cancel' },
+      {
+        text: tr('yes'),
+        style: 'destructive',
+        onPress: async () => {
+          setYardBusy(true);
+          try {
+            const t = token;
+            await cancelForYardIncident(tokenId);
+            const cropRow = CROP_LIST.find((c) => c.id === t.crop) || { id: t.crop, name: t.cropName || t.crop };
+            navigation.replace('SlotSelection', {
+              crop: { ...cropRow, name: t.cropName || cropRow.name },
+              centre: { id: t.centreId, name: t.centreName, ...(centre || {}) },
+              quantity: Number(t.declaredQuintals || t.approxQuantityQuintals) || 10,
+              fromYardIncident: true,
+            });
+          } catch (error) {
+            Alert.alert(tr('error'), trError(error, 'td_cancelFail'));
+          } finally {
+            setYardBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+  const yardWait = async () => {
+    setYardBusy(true);
+    try { await markYardChoice(tokenId, 'wait'); } catch (e) { /* non-fatal */ } finally { setYardBusy(false); }
+  };
 
   const [lateBusy, setLateBusy] = useState(false);
   const choose = async (choice) => {
@@ -357,6 +402,38 @@ export default function TokenDetailScreen({ navigation, route }) {
         </View>
 
         <QueueStatusCard view={view} lane={token.status === STATUS.IN_GATE ? laneAhead(token, queue, yardRows) : null} />
+
+        {/* install53: transfer pass that ran out of its 90-min window */}
+        {token.cancelReason === 'transferExpired' ? (
+          <View style={styles.yardBox}><Text style={styles.yardSub}>{tr('tf_expired')}</Text></View>
+        ) : null}
+
+        {/* install52: yard incident -> farmer chooses (wait with estimate / cancel & re-book) */}
+        {(() => {
+          const yn = yardNoticeFor(centre, token, queue);
+          if (!yn || view?.slotState === 'passed') return null;
+          const normalMin = Math.round((Number(queue?.slotExpectedMinutes?.[token.slotTime]) || Number(queue?.slotLoadMinutes?.[token.slotTime]) || 0) + 10);
+          return (
+            <View style={styles.yardBox}>
+              <Text style={styles.yardTitle}>{tr('td_yardTitle', { p: Math.round(yn.floorUsedPercent) })}</Text>
+              <Text style={styles.yardSub}>{tr('td_yardSub')}</Text>
+              <Text style={styles.yardEst}>
+                {yn.estimate.stopped ? tr('td_yardStopped') : tr('td_yardEst', { a: yn.estimate.minMin, b: yn.estimate.maxMin, n: normalMin })}
+              </Text>
+              {token.yardChoice === 'wait' ? (
+                <View>
+                  <Text style={styles.yardSub}>{tr('td_yardWaiting')}</Text>
+                  <PrimaryButton title={tr('td_yardChange')} variant="outline" loading={yardBusy} onPress={() => markYardChoice(tokenId, null)} style={{ marginTop: 8 }} />
+                </View>
+              ) : (
+                <View>
+                  <PrimaryButton title={tr('td_yardWait')} loading={yardBusy} onPress={yardWait} style={{ marginTop: 10 }} />
+                  <PrimaryButton title={tr('td_yardRebook')} variant="danger" loading={yardBusy} onPress={yardRebook} style={{ marginTop: 8 }} />
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* install49: hour missed -> farmer chooses */}
         {view?.slotState === 'passed' && !token.lateChoice && [STATUS.BOOKED, STATUS.MISSED].includes(token.status) ? (
@@ -876,6 +953,10 @@ const styles = StyleSheet.create({
   priceCard: { borderColor: '#F59E0B', borderWidth: 2 },
   priceHint: { color: Colors.subText, fontSize: 13, marginBottom: 12 },
   lateBox: { backgroundColor: '#FEE2E2', borderColor: '#DC2626', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16 },
+  yardBox: { backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16 },
+  yardTitle: { fontWeight: '900', color: '#92400E', fontSize: 15 },
+  yardSub: { color: '#92400E', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  yardEst: { color: '#78350F', fontSize: 14, fontWeight: '800', marginTop: 8 },
   lateTitle: { fontWeight: '900', color: '#991B1B', fontSize: 15 },
   lateSub: { color: '#991B1B', fontSize: 13, marginTop: 4, lineHeight: 18 },
   cancelNote: { color: Colors.subText, fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 17 },

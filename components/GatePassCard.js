@@ -40,6 +40,11 @@ export default function GatePassCard({ token, compact = false }) {
           <Text style={styles.value}>
             {token.date} • {token.slotWindow}
           </Text>
+          {token.transferValidUntil ? (
+            <Text style={[styles.value, { color: '#1D4ED8' }]}>
+              {tr('tf_badge', { t: String(token.transferValidUntil).slice(11, 16) })}{token.transferFromName ? ` · ${tr('tf_badgeFrom', { from: token.transferFromName })}` : ''}
+            </Text>
+          ) : null}
 
           <Text style={styles.label}>{tr('crop')}</Text>
           <Text style={styles.value}>{cropLabel(token, lang)}</Text>

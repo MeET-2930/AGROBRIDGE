@@ -1,5 +1,5 @@
 /*
- * screens/officer/EngineScreen.js   (install44)
+ * screens/officer/EngineScreen.js   (install44, yard card install52)
  * ---------------------------------------------------------------
  * Mandi Admin: "Capacity engine" - the visible face of the ML.
  *   1. Today's capacity   set q/h (+/-) vs LEARNED q/h (Model B) + switch
@@ -22,6 +22,7 @@ import { getCurrentUserSession } from '../../services/auth';
 import { CROP_LIST, cropLabel, centreLabel } from '../../services/centres';
 import {
   fetchEngineInsights, saveEngineSettings, setTodayThroughput, setSlotClosed, retrainFromHistory, resetEngineLearning, setPerishableReserve, todayString,
+  saveYardState, recordLifted, declareYardIncident, saveTransferSettings,
 } from '../../services/bookings';
 
 export default function EngineScreen({ navigation }) {
@@ -34,9 +35,21 @@ export default function EngineScreen({ navigation }) {
   // install49: typed values (admin can type a number, not only +/-)
   const [qhText, setQhText] = useState('');
   const [perText, setPerText] = useState('');
+  // install52: yard inputs (typed)
+  const [yd, setYd] = useState({ floorCapacityQ: '', floorUsedQ: '', bagsInStock: '', labourTeams: '', labourTeamsNormal: '' });
+  const [liftText, setLiftText] = useState('');
   useEffect(() => {
     if (data) { setQhText(String(data.setThroughput)); setPerText(String(data.perishableReservePercent)); }
-  }, [data?.setThroughput, data?.perishableReservePercent]);
+    if (data?.yard?.state) {
+      const y = data.yard.state;
+      setYd({
+        floorCapacityQ: String(y.floorCapacityQ ?? ''), floorUsedQ: String(Math.round(y.floorUsedQ ?? 0)),
+        bagsInStock: y.bagsInStock == null ? '' : String(y.bagsInStock),
+        labourTeams: y.labourTeams == null ? '' : String(y.labourTeams), labourTeamsNormal: y.labourTeamsNormal == null ? '' : String(y.labourTeamsNormal),
+      });
+    }
+  }, [data?.setThroughput, data?.perishableReservePercent, data?.yard?.state?.updatedAt]);
+  const numOrNull = (t) => { const n = parseInt(String(t).replace(/[^0-9]/g, ''), 10); return Number.isNaN(n) ? null : n; };
   const clampInt = (txt, lo, hi) => {
     const n = parseInt(String(txt).replace(/[^0-9]/g, ''), 10);
     if (Number.isNaN(n)) return null;
@@ -196,6 +209,130 @@ export default function EngineScreen({ navigation }) {
           <Text style={styles.small}>{tr('en_perRule')}</Text>
         </View>
 
+        {/* 1c. install52: YARD - floor / bags / labour (root causes R6 + R7) */}
+        {data.yard ? (() => {
+          const yf = data.yard.factors;
+          const inc = data.yard.incident;
+          const proj = data.yard.projection;
+          const reasonTxt = (data.yard.reasons || []).map((r) => tr(`yd_reason_${r}`)).join(', ') || tr('yd_reason_floor');
+          const pctColor = yf.floorUsedPercent >= 85 ? '#DC2626' : yf.floorUsedPercent >= 60 ? '#D97706' : '#16A34A';
+          return (
+            <View style={[styles.card, inc?.active && { borderColor: '#DC2626' }]}>
+              <Text style={styles.title}>{tr('yd_title')}</Text>
+              <Text style={styles.sub}>{tr('yd_sub')}</Text>
+
+              <View style={styles.ydStatusRow}>
+                <View style={[styles.ydPill, { backgroundColor: pctColor }]}><Text style={styles.ydPillText}>{tr('yd_floorNow', { p: Math.round(yf.floorUsedPercent), free: yf.floorFreeQ })}</Text></View>
+              </View>
+              <View style={styles.ydBarWrap}><View style={[styles.ydBar, { width: `${Math.min(100, yf.floorUsedPercent)}%`, backgroundColor: pctColor }]} /><View style={[styles.ydMark, { left: '60%' }]} /><View style={[styles.ydMark, { left: '85%', backgroundColor: '#DC2626' }]} /></View>
+              <Text style={styles.small}>{tr('yd_labourNow', { f: yf.labourFactor })}{yf.bagCapQ != null ? ` · ${yf.bagCapQ > 0 ? tr('yd_bagsNow', { q: yf.bagCapQ }) : tr('yd_bagsOut')}` : ''}</Text>
+
+              <View style={styles.ydGrid}>
+                <YdField label={tr('yd_floorCap')} value={yd.floorCapacityQ} onChange={(v) => setYd({ ...yd, floorCapacityQ: v })} />
+                <YdField label={tr('yd_floorUsed')} value={yd.floorUsedQ} onChange={(v) => setYd({ ...yd, floorUsedQ: v })} />
+                <YdField label={tr('yd_bags')} value={yd.bagsInStock} onChange={(v) => setYd({ ...yd, bagsInStock: v })} placeholder="—" />
+                <View style={{ flexDirection: 'row', flex: 1, minWidth: 150 }}>
+                  <YdField label={tr('yd_labour')} value={yd.labourTeams} onChange={(v) => setYd({ ...yd, labourTeams: v })} placeholder="—" style={{ flex: 1 }} />
+                  <Text style={styles.ydSlash}>/</Text>
+                  <YdField label=" " value={yd.labourTeamsNormal} onChange={(v) => setYd({ ...yd, labourTeamsNormal: v })} placeholder="—" style={{ flex: 1 }} />
+                </View>
+              </View>
+              <TouchableOpacity style={styles.retrain} disabled={busy} onPress={() => act(() => saveYardState(centreId, {
+                floorCapacityQ: numOrNull(yd.floorCapacityQ), floorUsedQ: numOrNull(yd.floorUsedQ), bagsInStock: numOrNull(yd.bagsInStock),
+                labourTeams: numOrNull(yd.labourTeams), labourTeamsNormal: numOrNull(yd.labourTeamsNormal),
+              }), tr('recorded'))}>
+                <Text style={styles.retrainText}>{tr('yd_save')}</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.stepRow, { marginTop: 14 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ydLabel}>{tr('yd_lifted')}</Text>
+                  <TextInput style={styles.ydInput} value={liftText} onChangeText={(t) => setLiftText(t.replace(/[^0-9]/g, '').slice(0, 6))} keyboardType="number-pad" placeholder="0" />
+                </View>
+                <TouchableOpacity style={[styles.retrain, { marginTop: 18, marginLeft: 10, paddingHorizontal: 14 }]} disabled={busy || !liftText} onPress={() => act(async () => { await recordLifted(centreId, liftText); setLiftText(''); }, tr('recorded'))}>
+                  <Text style={styles.retrainText}>{tr('yd_liftedBtn')}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* projection */}
+              <Text style={[styles.title, { marginTop: 14, fontSize: 13 }]}>{tr('yd_projTitle')}</Text>
+              <Text style={styles.small}>{tr('yd_projHead')}</Text>
+              {proj.rows.map((r) => (
+                <View key={r.dayOffset} style={styles.ydProjRow}>
+                  <Text style={styles.ydProjDay}>{r.dayOffset === 0 ? tr('yd_day0') : tr('yd_dayN', { d: r.dayOffset })}</Text>
+                  <Text style={[styles.ydProjCell, { color: r.floorStartPercent >= 85 ? '#DC2626' : r.floorStartPercent >= 60 ? '#D97706' : Colors.navy }]}>{r.floorStartPercent}%</Text>
+                  <Text style={styles.ydProjCell}>{r.bookedQ} q</Text>
+                  <Text style={styles.ydProjCell}>−{r.liftQ} q</Text>
+                  <View style={[styles.ydProjBarWrap]}><View style={[styles.ydProjBar, { width: `${Math.round(r.factor * 100)}%`, backgroundColor: r.factor >= 0.99 ? '#16A34A' : r.factor > 0 ? '#D97706' : '#DC2626' }]} /></View>
+                  <Text style={styles.ydProjPct}>{Math.round(r.factor * 100)}%</Text>
+                </View>
+              ))}
+              <Text style={styles.small}>{proj.recoveryDays > 0 ? tr('yd_recovery', { d: proj.recoveryDays }) : tr('yd_recoveryNow')}</Text>
+              <Text style={styles.small}>{tr('yd_projRule')}</Text>
+
+              {/* incident */}
+              <View style={[styles.ydInc, inc?.active ? styles.ydIncOn : null]}>
+                <Text style={[styles.rowValue, inc?.active && { color: '#991B1B' }]}>{inc?.active ? tr('yd_incOn', { r: reasonTxt }) : tr('yd_incOff')}</Text>
+                {inc?.active && inc.auto ? <Text style={styles.small}>{tr('yd_incAuto')}</Text> : null}
+                {inc?.active ? (
+                  <TouchableOpacity style={[styles.retrain, { marginTop: 8 }]} disabled={busy} onPress={() => act(() => declareYardIncident(centreId, false, inc.reason), tr('recorded'))}>
+                    <Text style={styles.retrainText}>{tr('yd_clear')}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.resetBtn} disabled={busy} onPress={() => Alert.alert(tr('yd_declare'), tr('yd_declareConfirm'), [
+                    { text: tr('no'), style: 'cancel' },
+                    { text: tr('yes'), style: 'destructive', onPress: () => act(() => declareYardIncident(centreId, true, 'floor'), tr('dl_yardDone')) },
+                  ])}>
+                    <Text style={styles.resetText}>{tr('yd_declare')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })() : null}
+
+        {/* 1d. install53: SPARE capacity - walk-ins "Now" + cross-centre transfers */}
+        {data.spare ? (() => {
+          const sp = data.spare; const d = sp.day; const tf = data.transfer;
+          const cur = d.hours[d.nowIdx];
+          return (
+            <View style={styles.card}>
+              <Text style={styles.title}>{tr('sp_title')}</Text>
+              <Text style={styles.sub}>{tr('sp_sub')}</Text>
+              <Text style={styles.learnedValue}>{tr('sp_now', { m: Math.round(d.nowSpareMinutes), q: cur?.spareQuintals ?? 0 })}</Text>
+              <Text style={styles.small}>{tr('sp_later', { m: Math.round(d.laterSpareMinutes) })}{sp.utilisationPercent != null ? ` · ${tr('sp_util', { p: sp.utilisationPercent })}` : ''}</Text>
+              <Text style={styles.small}>{tr('sp_used', { w: sp.used.walkIns, t: sp.used.transfersIn, q: sp.used.spareQuintals })}</Text>
+              <Text style={[styles.small, { fontWeight: '800', color: sp.offer.minutes > 0 ? '#166534' : Colors.subText }]}>
+                {sp.offer.minutes > 0 ? tr('sp_offer', { m: sp.offer.minutes }) : tr('sp_offerNone', { r: tr(`sp_r_${sp.offer.reason || 'tooLittle'}`) })}
+              </Text>
+              <Text style={[styles.small, { marginTop: 8 }]}>{tr('sp_hourHead')}</Text>
+              {d.hours.map((h, i) => (
+                <View key={h.slotTime} style={styles.lhRow}>
+                  <Text style={[styles.lhHour, i === d.nowIdx && { color: '#166534' }]}>{h.slotTime}</Text>
+                  <Text style={styles.spCell}>{Math.round(h.bookedMinutes)}</Text>
+                  <Text style={styles.spCell}>{Math.round(h.arrivedMinutes)}</Text>
+                  <Text style={styles.spCell}>{Math.round(h.expectedStillMinutes)}</Text>
+                  <View style={styles.lhBarWrap}><View style={[styles.lhBar, { width: `${Math.min(100, Math.max(0, h.spareMinutes) / 60 * 100)}%`, backgroundColor: h.state === 'closed' ? '#CBD5E1' : '#16A34A' }]} /></View>
+                  <Text style={[styles.lhVal, { color: h.spareMinutes < 0 ? '#DC2626' : '#166534' }]}>{Math.round(h.spareMinutes)}</Text>
+                </View>
+              ))}
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={styles.rowValue}>{tr('sp_accept')}</Text>
+                  <Text style={styles.small}>{tr('sp_share')}: {tf.maxTransferSharePercent}%</Text>
+                </View>
+                <Switch value={tf.acceptTransfers} disabled={busy} onValueChange={(v) => act(() => saveTransferSettings(centreId, { acceptTransfers: v }))} />
+              </View>
+              <View style={styles.stepRow}>
+                <TouchableOpacity style={styles.stepBtn} disabled={busy} onPress={() => act(() => saveTransferSettings(centreId, { maxTransferSharePercent: tf.maxTransferSharePercent - 10 }))}><Ionicons name="remove" size={22} color={Colors.primary} /></TouchableOpacity>
+                <Text style={[styles.big, { flex: 1, textAlign: 'center' }]}>{tf.maxTransferSharePercent}%</Text>
+                <TouchableOpacity style={styles.stepBtn} disabled={busy} onPress={() => act(() => saveTransferSettings(centreId, { maxTransferSharePercent: tf.maxTransferSharePercent + 10 }))}><Ionicons name="add" size={22} color={Colors.primary} /></TouchableOpacity>
+              </View>
+              <Text style={styles.small}>{tr('sp_rule')}</Text>
+            </View>
+          );
+        })() : null}
+
         {/* 2. Model switches */}
         <View style={styles.card}>
           <Text style={styles.title}>{tr('en_modelsTitle')}</Text>
@@ -286,8 +423,45 @@ function ToggleRow({ label, sub, value, onChange, disabled }) {
   );
 }
 
+function YdField({ label, value, onChange, placeholder = '', style }) {
+  return (
+    <View style={[{ flex: 1, minWidth: 140, marginRight: 8, marginBottom: 8 }, style]}>
+      <Text style={styles.ydLabel}>{label}</Text>
+      <TextInput
+        style={styles.ydInput}
+        value={value}
+        onChangeText={(t) => onChange(t.replace(/[^0-9]/g, '').slice(0, 6))}
+        keyboardType="number-pad"
+        placeholder={placeholder}
+        placeholderTextColor={Colors.subText}
+        returnKeyType="done"
+        selectTextOnFocus
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  ydStatusRow: { flexDirection: 'row', marginTop: 4 },
+  spCell: { width: 34, fontSize: 11, color: Colors.navy, textAlign: 'right' },
+  ydPill: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  ydPillText: { color: Colors.white, fontWeight: '800', fontSize: 12 },
+  ydBarWrap: { height: 10, backgroundColor: '#E5E7EB', borderRadius: 5, marginTop: 8, overflow: 'hidden' },
+  ydBar: { height: 10, borderRadius: 5 },
+  ydMark: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: '#D97706' },
+  ydGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 },
+  ydLabel: { color: Colors.subText, fontSize: 11, fontWeight: '700', marginBottom: 2 },
+  ydInput: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, height: 40, paddingHorizontal: 10, color: Colors.navy, fontWeight: '800' },
+  ydSlash: { alignSelf: 'flex-end', marginBottom: 18, marginHorizontal: 4, color: Colors.subText, fontWeight: '800' },
+  ydProjRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
+  ydProjDay: { width: 44, fontSize: 11, fontWeight: '700', color: Colors.navy },
+  ydProjCell: { width: 52, fontSize: 11, color: Colors.navy, textAlign: 'right' },
+  ydProjBarWrap: { flex: 1, height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden', marginHorizontal: 6 },
+  ydProjBar: { height: 8, borderRadius: 4 },
+  ydProjPct: { width: 36, fontSize: 11, fontWeight: '800', color: Colors.navy, textAlign: 'right' },
+  ydInc: { marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
+  ydIncOn: { backgroundColor: '#FEE2E2', marginHorizontal: -16, paddingHorizontal: 16, paddingBottom: 12, borderRadius: 0 },
   content: { padding: 20, paddingBottom: 40 },
   centre: { fontWeight: '800', color: Colors.navy, marginBottom: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },

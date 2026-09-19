@@ -48,6 +48,7 @@ export default function GateRebookScreen({ navigation, route }) {
   const [quantity, setQuantity] = useState(Number(previous?.approxQuantityQuintals) || 10);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [isNow, setIsNow] = useState(false);   // install53: spare-room "Now" pass
 
   const change = (d) => setQuantity((q) => Math.max(1, Math.min(999, q + d)));
 
@@ -78,6 +79,7 @@ export default function GateRebookScreen({ navigation, route }) {
         Alert.alert(tr('gr_noRoom'), tr('gr_noRoomSub', { q: quantity }));
         return;
       }
+      setIsNow(Boolean(out.now));
       setResult(out.booking);
     } catch (error) {
       Alert.alert(tr('error'), trError(error, 'ss_bookFailSub'));
@@ -92,8 +94,9 @@ export default function GateRebookScreen({ navigation, route }) {
         <AppHeader navigation={navigation} showBack title={tr('gr_title')} />
         <View style={styles.done}>
           <Ionicons name="checkmark-circle" size={64} color="#16A34A" />
-          <Text style={styles.doneTitle}>{tr('gr_done')}</Text>
+          <Text style={styles.doneTitle}>{isNow ? tr('gr_nowPass') : tr('gr_done')}</Text>
           <Text style={styles.doneSlot}>{passLabel(result)}</Text>
+          {isNow ? <Text style={[styles.doneHint, { color: '#166534', fontWeight: '800' }]}>{tr('gr_nowHint')}</Text> : null}
           <Text style={styles.doneSub}>{result.date}</Text>
           <Text style={styles.doneCode}>{tr('gr_tellFarmer', { code: String(result.gatePassCode).replace(/(\d{3})(\d{3})/, '$1 $2') })}</Text>
           <Text style={styles.doneHint}>{tr('gr_waitHint', { t: result.arriveAt || passLabel(result) })}</Text>

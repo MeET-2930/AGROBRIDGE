@@ -34,17 +34,23 @@ import {
   setDoc,
   updateDoc,
   deleteField,
+  arrayUnion,
+  increment,
   where,
 } from 'firebase/firestore';
 
 import { db } from './firebase';
-import { fetchCentreById, normalizePlate, cropClassOf } from './centres';
+import { fetchCentreById, fetchCentres, normalizePlate, cropClassOf } from './centres';
 import {
-  CAPACITY_DEFAULTS, centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour,
+  CAPACITY_DEFAULTS, centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour, loadMinutesFor,
 } from '../engine/capacity';
 import { correctionRatio, trainCorrection } from '../engine/models/correction';
 import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
 import { effectiveThroughput, learnThroughput } from '../engine/models/throughput';
+import {
+  yardState, yardFactors, floorProjection, scaleCapacity, waitEstimate, shouldAutoDeclare, yardReasons, YARD_DEFAULTS,
+} from '../engine/yard';
+import { spareDay, canAdmitNow, transferOffer, distanceKm, utilisation, SPARE_DEFAULTS } from '../engine/spare';
 import ENGINE_PARAMS from '../engine/models/params';
 import { todayLocal, parseLocalDate, localDateString } from './dates';
 import { tErr } from './i18nError';
@@ -168,7 +174,7 @@ export async function fetchFarmerHistory(farmerId) {
   if (!farmerId) return empty;
   try {
     const snap = await getDocs(query(collection(db, 'bookings'), where('farmerId', '==', farmerId)));
-    const rows = snap.docs.map((d) => d.data()).filter((b) => CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID);
+    const rows = snap.docs.map((d) => d.data()).filter((b) => (CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID) && !b.yardIncidentCancel);
     const pairs = rows
       .filter((b) => Number(b.actualQuantity) > 0 && Number(b.declaredQuintals || b.approxQuantityQuintals) > 0)
       .sort((a, b) => String(b.weighedAt || '').localeCompare(String(a.weighedAt || '')))
@@ -226,6 +232,369 @@ export async function engineInputs({ centre, farmerId, crop, quintals, date, slo
       modelVersion: ENGINE_PARAMS.version, trainedOn: nsParams || corrParams ? 'this-mandi' : ENGINE_PARAMS.trainedOn,
     },
   };
+}
+
+/* ===============================================================
+ * SPARE CAPACITY  (install53)   walk-in "Now" + cross-centre transfer
+ * ---------------------------------------------------------------
+ * Planned capacity is sold days ahead and PROMISED. Spare is what turns
+ * out free ON THE DAY (no-shows, pessimistic floor projection, fast
+ * labour). It is never promised in advance; it is used, in order, by
+ * farmers already inside, walk-ins at the gate ("Now"), and same-day
+ * transfers from a congested mandi in the same cluster.
+ *   centre.acceptTransfers (default true), centre.maxTransferSharePercent
+ *   (default 30), centre.clusterId (default 'default').
+ * =============================================================== */
+
+function minutesSinceOpen(centre, now = new Date()) {
+  const [h0] = String(centre?.operatingStartTime || '08:00').split(':').map(Number);
+  return (now.getHours() - h0) * 60 + now.getMinutes();
+}
+
+/**
+ * Live spare picture for a centre today. Uses only the queue document
+ * (booked / expected minutes per hour) and today's rows (arrived loads).
+ */
+export async function fetchSpareNow(centreId, crop = '', now = new Date()) {
+  const centre = await fetchCentreById(centreId);
+  if (!centre) throw tErr('err.mandiNotFound');
+  const date = todayString(now);
+  const qSnap = await getDoc(queueRef(centreId, date));
+  const queue = qSnap.exists() ? qSnap.data() : {};
+  const rows = await fetchTodaysQueue(centreId, date);
+  const yp = await yardPlan(centre, crop, centreId);
+  const slots = windowList(centre);
+  const hours = slots.map((slotTime) => {
+    const cap = capacityWithYard(centre, crop, slotTime, yp, date);
+    // arrived minutes = loads of this hour that have entered, at this hour's throughput
+    const arrivedQ = rows.filter((b) => b.slotTime === slotTime && (INSIDE_STATUSES.includes(b.status) || b.status === STATUS.PAID))
+      .reduce((s, b) => s + (Number(b.actualQuantity) || Number(b.engine?.reservedQuintals) || Number(b.declaredQuintals || b.approxQuantityQuintals) || 0), 0);
+    return {
+      slotTime, cap,
+      bookedMinutes: Number(queue.slotLoadMinutes?.[slotTime]) || 0,
+      expectedMinutes: queue.slotExpectedMinutes?.[slotTime] != null ? Number(queue.slotExpectedMinutes[slotTime]) : null,
+      arrivedMinutes: loadMinutesFor(arrivedQ, cap.throughput),
+    };
+  });
+  const day = spareDay(hours, minutesSinceOpen(centre, now));
+  const gateWaiting = rows.filter((b) => b.status === STATUS.BOOKED && slotState(b, now) === 'open').length;
+  const reservedTransferMinutes = rows.filter((b) => b.transferFrom && b.status === STATUS.BOOKED).reduce((s, b) => s + (Number(b.loadMinutes) || 0), 0);
+  const offer = transferOffer(day, {
+    reservedTransferMinutes, gateWaiting, yardLevel: yp.factors.incidentLevel,
+    acceptTransfers: centre.acceptTransfers !== false, maxTransferSharePercent: centre.maxTransferSharePercent,
+  });
+  const used = {
+    walkIns: rows.filter((b) => b.walkIn).length,
+    transfersIn: rows.filter((b) => b.transferFrom).length,
+    spareQuintals: Math.round(rows.filter((b) => b.spareUsed).reduce((s, b) => s + (Number(b.declaredQuintals || b.approxQuantityQuintals) || 0), 0)),
+  };
+  return { centre, date, day, gateWaiting, offer, used, utilisationPercent: utilisation(day), yardLevel: yp.factors.incidentLevel, throughput: hours[0]?.cap?.throughput || 0 };
+}
+
+/** Admin: transfer settings. */
+export async function saveTransferSettings(centreId, { acceptTransfers, maxTransferSharePercent, clusterId }) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const patch = {};
+  if (acceptTransfers != null) patch.acceptTransfers = Boolean(acceptTransfers);
+  if (maxTransferSharePercent != null) patch.maxTransferSharePercent = Math.max(0, Math.min(100, Math.round(Number(maxTransferSharePercent) || 0)));
+  if (clusterId != null) patch.clusterId = String(clusterId || 'default');
+  await updateDoc(doc(db, 'centres', centreId), patch);
+  return patch;
+}
+
+/**
+ * Other mandis in the same cluster that have spare TODAY for this load.
+ * Returns [{ centre, km, offerMinutes, untilLabel }] sorted by distance.
+ * Nothing is reserved by looking.
+ */
+export async function findTransferOptions(fromCentreId, crop, quintals, farmerLat = null, farmerLon = null) {
+  const from = await fetchCentreById(fromCentreId);
+  if (!from) return [];
+  const all = await fetchCentres();
+  const cluster = from.clusterId || 'default';
+  const out = [];
+  for (const c of all) {
+    if (c.id === fromCentreId) continue;
+    if ((c.clusterId || 'default') !== cluster) continue;
+    if (Array.isArray(c.acceptedCrops) && c.acceptedCrops.length && crop && !c.acceptedCrops.includes(crop)) continue;
+    try {
+      const sp = await fetchSpareNow(c.id, crop);
+      const need = loadMinutesFor(quintals, sp.throughput || 400);
+      if (sp.offer.minutes < need) continue;
+      const lat = farmerLat ?? from.latitude, lon = farmerLon ?? from.longitude;
+      const lastSlot = windowList(c).slice(-1)[0] || '17:00';
+      out.push({ centre: c, km: distanceKm(lat, lon, c.latitude, c.longitude), offerMinutes: sp.offer.minutes, needMinutes: need, untilLabel: windowLabelFor(lastSlot, 1).split(' - ')[1], gateWaiting: sp.gateWaiting });
+    } catch (e) { /* skip centre */ }
+  }
+  return out.sort((a, b) => (a.km ?? 9e9) - (b.km ?? 9e9));
+}
+
+/**
+ * Issue a same-day TRANSFER pass at `toCentreId`, valid for
+ * SPARE_DEFAULTS.transferWindowMin minutes. Booked into the current
+ * hour (or the next with room), consuming spare only. If the farmer
+ * does not arrive in the window the pass expires with NO no-show mark.
+ */
+export async function bookTransfer({ farmerId, farmerName, farmerPhone, fromCentreId, toCentreId, crop, cropName, quintals }) {
+  const to = await fetchCentreById(toCentreId);
+  const from = await fetchCentreById(fromCentreId);
+  if (!to || !from) throw tErr('err.mandiNotFound');
+  const sp = await fetchSpareNow(toCentreId, crop);
+  const q = Math.max(1, Number(quintals) || 1);
+  const need = loadMinutesFor(q, sp.throughput || 400);
+  if (sp.offer.minutes < need) throw tErr('err.transferGone');
+  const now = new Date();
+  const date = todayString(now);
+  const slots = windowList(to);
+  const nowH = now.getHours();
+  const yp = await yardPlan(to, crop, toCentreId);
+  const validUntil = new Date(now.getTime() + SPARE_DEFAULTS.transferWindowMin * 60000).toISOString();
+  let start = slots.findIndex((t) => Number(t.split(':')[0]) >= nowH);
+  if (start < 0) throw tErr('err.transferGone');
+  const qSnap = await getDoc(queueRef(toCentreId, date));
+  const queue = qSnap.exists() ? qSnap.data() : {};
+  for (let i = Math.max(0, start - 1); i < slots.length; i += 1) {
+    if (Number(slots[i].split(':')[0]) < nowH) continue;
+    const cap = capacityWithYard(to, crop, slots[i], yp, date);
+    const plan = planLoad(cap, slots, queue, i, q, { cropClass: cropClassOf(crop), leadDays: 0, pShow: 1, ratio: 1 });
+    if (!plan.ok) continue;
+    try {
+      const booking = await createBooking({
+        farmerId, farmerName, farmerPhone, centreId: toCentreId, crop, cropName, approxQuantityQuintals: q, date, slotTime: slots[i],
+        slotWindow: windowLabelFor(slots[i], plan.needed), bookedVia: 'app',
+        extra: { spareUsed: true, transferFrom: fromCentreId, transferFromName: from.name, transferValidUntil: validUntil },
+      });
+      notifyCentreOfficers(toCentreId, ['gate'], makeItem('nt_off_transfer_t', 'nt_off_transfer_b', { name: farmerName || farmerPhone, q, from: from.name }, routes.officerStage('gate')));
+      return booking;
+    } catch (e) {
+      if (String(e?.message || '').includes('maxTokens')) throw e;
+    }
+  }
+  throw tErr('err.transferGone');
+}
+
+/** Transfer pass: 'valid' | 'expired' (window over) | null (not a transfer). */
+export function transferState(booking, now = new Date()) {
+  if (!booking?.transferValidUntil) return null;
+  return now.getTime() <= new Date(booking.transferValidUntil).getTime() ? 'valid' : 'expired';
+}
+
+/**
+ * Gate: expire transfer passes whose window is over. Closed as CANCELLED
+ * (reason transferExpired) - never a no-show. Room goes back to spare.
+ */
+export async function expireTransferPasses(rows, now = new Date()) {
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r.status === STATUS.BOOKED && transferState(r, now) === 'expired');
+  let n = 0;
+  for (const r of list) {
+    try {
+      await advanceStage(r.tokenId, { status: STATUS.MISSED, missedAt: now.toISOString() });
+      await updateDoc(doc(db, 'bookings', r.tokenId), { status: STATUS.CANCELLED, cancelledAt: now.toISOString(), cancelReason: 'transferExpired', yardIncidentCancel: true });
+      n += 1;
+    } catch (e) { /* another device did it */ }
+  }
+  return n;
+}
+
+/* ===============================================================
+ * YARD: FLOOR / BAGS / LABOUR  (install52)   root causes R6 + R7
+ * ---------------------------------------------------------------
+ * The weighbridge is not the only limit - the FLOOR is. Every quintal
+ * weighed lies in bags on the floor until a lifting truck removes it.
+ * centre.yard = { floorCapacityQ, floorUsedQ, bagsInStock, labourTeams,
+ *                 labourTeamsNormal, liftedHistory[], incident{} }
+ *   + weighing  -> floorUsedQ += actual (recordWeighing)
+ *   - lifting   -> admin types "lifted today" (recordLifted)
+ * The planner shrinks bookable minutes on days the floor is projected
+ * to be full (engine/yard.js floorProjection). No booking is ever
+ * moved: the farmer chooses wait / cancel & re-book (yard incident).
+ * =============================================================== */
+
+/** A normal day's intake in quintals (throughput x operating hours). */
+export function normalDayIntake(centre, crop = '') {
+  return Math.max(1, centreCapacity(centre, crop).throughput * windowList(centre).length);
+}
+
+/** Reserved quintals already booked per day from today for `days` days. */
+export async function bookedQuintalsByDay(centreId, days = YARD_DEFAULTS.projectionDays, fromDate = null) {
+  const out = [];
+  const start = fromDate ? parseLocalDate(fromDate) : new Date();
+  for (let d = 0; d < days; d += 1) {
+    const dt = new Date(start.getTime()); dt.setDate(dt.getDate() + d);
+    try {
+      const snap = await getDoc(queueRef(centreId, todayString(dt)));
+      const q = snap.exists() ? snap.data() : {};
+      const res = q.slotReservedQuintals && Object.keys(q.slotReservedQuintals).length ? q.slotReservedQuintals : q.slotQuintals || {};
+      out.push(Object.values(res).reduce((s, v) => s + (Number(v) || 0), 0));
+    } catch (e) { out.push(0); }
+  }
+  return out;
+}
+
+/**
+ * Everything the planner needs from the yard for one centre:
+ *   factors      labour multiplier, bag cap, floor %, incident level
+ *   projection   floor day by day -> factorByDay (1 = normal, 0 = closed)
+ *   factorFor(dateStr)  bookable factor for that date
+ * Bags cap TODAY only (tomorrow's bardana may arrive tonight).
+ */
+export async function yardPlan(centre, crop = '', centreId = null) {
+  const y = yardState(centre?.yard);
+  const factors = yardFactors(y);
+  const normal = normalDayIntake(centre, crop);
+  const cid = centreId || centre?.id;
+  const booked = cid ? await bookedQuintalsByDay(cid, y.projectionDays) : [];
+  const projection = floorProjection(y, booked, normal);
+  const today = todayString();
+  const bagFactor = factors.bagCapQ == null ? 1 : Math.min(1, factors.bagCapQ / normal);
+  const factorFor = (dateStr) => {
+    const off = leadDaysBetween(Date.now(), dateStr);
+    const f = off >= 0 && off < projection.factorByDay.length ? projection.factorByDay[off] : 1;
+    return dateStr === today ? Math.min(f, bagFactor) : f;
+  };
+  return { yard: y, factors, projection, normal, factorFor, incident: y.incident || null, reasons: yardReasons(y) };
+}
+
+/** Capacity for one hour on one date with the yard applied. */
+export function capacityWithYard(centre, crop, slotTime, plan, dateStr) {
+  const base = effectiveCapacity(centre, crop, slotTime);
+  if (!plan) return base;
+  return scaleCapacity(base, plan.factorFor(dateStr), plan.factors.labourFactor);
+}
+
+/** Admin: set yard numbers (floor capacity/used, bags, labour). */
+export async function saveYardState(centreId, patch) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const cur = (await fetchCentreById(centreId))?.yard || {};
+  const clean = {};
+  Object.entries(patch || {}).forEach(([k, v]) => { clean[k] = v === '' ? null : v; });
+  const next = { ...cur, ...clean, updatedAt: new Date().toISOString() };
+  await updateDoc(doc(db, 'centres', centreId), { yard: next });
+  await syncYardIncident(centreId, next);
+  return next;
+}
+
+/** Admin: "lifted today" - quintals that left the yard. Lowers the floor. */
+export async function recordLifted(centreId, quintals) {
+  await requireOfficerDuty(centreId, ['admin']);
+  const q = Math.max(0, Math.round(Number(quintals) || 0));
+  const cur = yardState((await fetchCentreById(centreId))?.yard);
+  const today = todayString();
+  const hist = [{ date: today, q }, ...cur.liftedHistory.filter((h) => h.date !== today)].slice(0, 10);
+  const next = { ...cur, floorUsedQ: Math.max(0, Math.round(cur.floorUsedQ - q)), liftedTodayQ: q, liftedHistory: hist, updatedAt: new Date().toISOString() };
+  await updateDoc(doc(db, 'centres', centreId), { yard: next });
+  await syncYardIncident(centreId, next);
+  return next;
+}
+
+/**
+ * Declare / clear a yard incident (floor full, no bags, lifting stopped).
+ * on = true  -> every farmer with a pass TODAY is told: wait (estimate)
+ *               or cancel & re-book, no penalty. Day excluded from ML.
+ * on = false -> back to normal; passes issued meanwhile lose the banner.
+ */
+export async function declareYardIncident(centreId, on, reason = 'floor', { auto = false } = {}) {
+  if (!auto) await requireOfficerDuty(centreId, DUTY_FOR_STAGE.delay);
+  const centre = await fetchCentreById(centreId);
+  const cur = yardState(centre?.yard);
+  const today = todayString();
+  const incident = on
+    ? { active: true, since: cur.incident?.active ? cur.incident.since : new Date().toISOString(), reason, auto, dates: Array.from(new Set([...(cur.incident?.dates || []), today])), dismissedAt: null }
+    : { ...(cur.incident || {}), active: false, clearedAt: new Date().toISOString(), dismissedAt: auto ? null : new Date().toISOString() };
+  await updateDoc(doc(db, 'centres', centreId), { 'yard.incident': incident, ...(on ? { engineExcludeDates: arrayUnion(today) } : {}) });
+  const f = yardFactors(cur);
+  const item = on
+    ? makeItem('nt_yard_t', 'nt_yard_b', { p: Math.round(f.floorUsedPercent) }, routes.farmerHome())
+    : makeItem('nt_yardOk_t', 'nt_yardOk_b', {}, routes.farmerHome());
+  notifyFarmersAtCentre(centreId, today, item);
+  notifyCentreOfficers(centreId, ['*'], { ...item, route: routes.officerQueue() });
+  return incident;
+}
+
+/** Auto-declare when the arithmetic crosses the hard line (admin may clear). */
+async function syncYardIncident(centreId, yard) {
+  const y = yardState(yard);
+  const f = yardFactors(y);
+  const active = Boolean(y.incident?.active);
+  if (!active && shouldAutoDeclare(y) && !y.incident?.dismissedAt) {
+    await declareYardIncident(centreId, true, yardReasons(y)[0] || 'floor', { auto: true });
+  } else if (active && y.incident?.auto && f.incidentLevel === 'ok') {
+    await declareYardIncident(centreId, false, y.incident.reason, { auto: true });
+  }
+}
+
+/** Live centre document (yard state changes while the farmer looks at his pass). */
+export function subscribeToCentre(centreId, callback) {
+  if (!centreId) return () => {};
+  return onSnapshot(doc(db, 'centres', centreId), (snap) => callback(snap.exists() ? { id: snap.id, ...snap.data() } : null), () => callback(null));
+}
+
+/**
+ * What the pass screen shows during an incident for THIS booking:
+ * null when nothing applies, else { level, floorUsedPercent, estimate:{minMin,maxMin,stopped}, reasons }.
+ * Pure given centre + booking + queue (all already on the screen).
+ */
+export function yardNoticeFor(centre, booking, queue, now = new Date()) {
+  const y = yardState(centre?.yard);
+  if (!y.incident?.active) return null;
+  if (!booking || booking.status !== STATUS.BOOKED) return null;
+  if (booking.date !== todayString(now)) return null;
+  const f = yardFactors(y);
+  const slots = windowList(centre);
+  const idx = slots.indexOf(booking.slotTime);
+  const exp = queue?.slotExpectedMinutes || queue?.slotLoadMinutes || {};
+  const mine = Number(exp[booking.slotTime]) || 0;
+  // backlog: earlier hours whose work is not finished yet (rough: expected - actual share)
+  let backlog = 0;
+  for (let i = 0; i < idx; i += 1) {
+    const s = slots[i];
+    const booked = Number(exp[s]) || 0;
+    const doneQ = Number(queue?.slotActualQuintals?.[s]) || 0;
+    const bookedQ = Number(queue?.slotReservedQuintals?.[s] || queue?.slotQuintals?.[s]) || 0;
+    const doneShare = bookedQ > 0 ? Math.min(1, doneQ / bookedQ) : 1;
+    backlog += booked * (1 - doneShare);
+  }
+  const estimate = waitEstimate({ minutesBookedInHour: mine, backlogMinutes: backlog, floorUsedPercent: f.floorUsedPercent, labourFactor: f.labourFactor });
+  return { level: f.incidentLevel, floorUsedPercent: f.floorUsedPercent, estimate, reasons: yardReasons(y), reason: y.incident.reason, since: y.incident.since };
+}
+
+/** Farmer: "I'll wait" - recorded so the box collapses; nothing else changes. */
+export async function markYardChoice(tokenId, choice) {
+  if (!tokenId) throw new Error('Token ID is required');
+  await updateDoc(doc(db, 'bookings', tokenId), { yardChoice: choice, yardChoiceAt: new Date().toISOString() });
+  return choice;
+}
+
+/**
+ * Farmer: "Cancel & re-book" during a yard incident. Bypasses the 48 h
+ * window, releases the room, and is NOT a no-show: the row is flagged
+ * yardIncidentCancel and ignored by Model C / farmer history.
+ */
+export async function cancelForYardIncident(tokenId) {
+  if (!tokenId) throw new Error('Token ID is required');
+  const bookingRef = doc(db, 'bookings', tokenId);
+  return runTransaction(db, async (tx) => {
+    const bSnap = await tx.get(bookingRef);
+    if (!bSnap.exists()) throw tErr('err.tokenNotFound');
+    const booking = bSnap.data();
+    if (booking.status !== STATUS.BOOKED) throw tErr('err.cannotCancel');
+    const qRef = queueRef(booking.centreId, booking.date);
+    const qSnap = await tx.get(qRef);
+    tx.update(bookingRef, {
+      status: STATUS.CANCELLED, cancelledAt: new Date().toISOString(),
+      cancelReason: 'yardIncident', yardIncidentCancel: true, yardChoice: 'rebook',
+    });
+    if (qSnap.exists()) {
+      const data = qSnap.data();
+      const position = Number(booking.positionAssigned) || 0;
+      tx.update(qRef, {
+        ...releaseLoad(data, booking),
+        openPositions: (Array.isArray(data.openPositions) ? data.openPositions : []).filter((p) => p !== position),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return true;
+  });
 }
 
 /* ===============================================================
@@ -363,8 +732,11 @@ export async function fetchCentreSlots(centreId, dateStr, { crop = '', quintals 
   // install44: ask the engine with the ML inputs for THIS farmer
   const { opts, audit } = await engineInputs({ centre, farmerId, crop, quintals, date: dateStr, slotTime: null });
   const list = windowList(centre);
+  // install52: the floor / bags / labour shrink what may be booked on this date
+  const yp = await yardPlan(centre, crop, centreId);
+  const dayFactor = yp.factorFor(dateStr);
   const slots = list.map((slotTime, idx) => {
-    const cap = effectiveCapacity(centre, crop, slotTime);
+    const cap = capacityWithYard(centre, crop, slotTime, yp, dateStr);
     const plan = planLoad(cap, list, queue, idx, quintals, opts);
     const hour = Number(slotTime.split(':')[0]);
     return {
@@ -373,7 +745,7 @@ export async function fetchCentreSlots(centreId, dateStr, { crop = '', quintals 
       runLabel: plan.ok ? windowLabelFor(slotTime, plan.needed) : null,
       needed: plan.needed || 1,
       fits: plan.ok,
-      reason: plan.reason,
+      reason: !plan.ok && dayFactor <= 0.01 ? 'yard' : plan.reason,
       isFull: !plan.ok,
       closed: Boolean(queue.closedSlots?.[slotTime]),
       horizon: plan.horizon || null,
@@ -389,7 +761,10 @@ export async function fetchCentreSlots(centreId, dateStr, { crop = '', quintals 
   const tooBig = slots.length > 0 && slots.every((s) => s.reason === 'tooBig');
   const firstFit = slots.find((s) => s.fits) || null;
 
-  return { centre, date: dateStr, slots, firstFit, tooBig, capacity: effectiveCapacity(centre, crop, list[0]), engine: audit };
+  return {
+    centre, date: dateStr, slots, firstFit, tooBig, capacity: effectiveCapacity(centre, crop, list[0]), engine: audit,
+    yard: { factor: Math.round(dayFactor * 100) / 100, floorUsedPercent: yp.factors.floorUsedPercent, labourFactor: yp.factors.labourFactor, incidentActive: Boolean(yp.incident?.active), recoveryDays: yp.projection.recoveryDays, reasons: yp.reasons },
+  };
 }
 
 /* ===============================================================
@@ -470,6 +845,7 @@ export async function createBooking({
   slotTime,
   slotWindow,
   bookedVia = 'app', // 'app' | 'ivr' | 'gate'
+  extra = {},        // install53: { walkIn, transferFrom, transferValidUntil, spareUsed }
 }) {
   if (!farmerId) throw new Error('Farmer ID is required');
   if (!centreId) throw new Error('Mandi centre is required');
@@ -491,7 +867,9 @@ export async function createBooking({
     throw tErr('err.maxTokens');
   }
 
-  const cap = effectiveCapacity(centre, crop, slotTime);
+  // install52: same yard-scaled capacity the slot screen showed
+  const yp = await yardPlan(centre, crop, centreId);
+  const cap = capacityWithYard(centre, crop, slotTime, yp, date);
   const slots = windowList(centre);
   const startIdx = slots.indexOf(slotTime);
   if (startIdx < 0) throw tErr('err.slotFull');
@@ -576,6 +954,12 @@ export async function createBooking({
       arriveAt: fmt(turn),
       expectedFinishAt: fmt(finish),
       bookedVia,
+      // install53: spare-capacity passes
+      walkIn: Boolean(extra.walkIn),
+      spareUsed: Boolean(extra.spareUsed),
+      transferFrom: extra.transferFrom || null,
+      transferFromName: extra.transferFromName || null,
+      transferValidUntil: extra.transferValidUntil || null,
 
       status: STATUS.BOOKED,
 
@@ -1054,9 +1438,14 @@ export async function markGateEntry(
   // hour over -> the pass is expired and the farmer must be REBOOKED
   // (rebookAtGate) into the next hour with room. No queue-jumping.
   if (booking.status === STATUS.BOOKED && !TESTING_MODE) {
-    const st = slotState(booking);
-    if (st === 'before') throw tErr('err.slotNotOpen');
-    if (st === 'passed') throw tErr('err.slotPassed');
+    // install53: a transfer pass is valid for its window, not for an hour
+    const ts = transferState(booking);
+    if (ts === 'expired') throw tErr('err.transferExpired');
+    if (ts !== 'valid') {
+      const st = slotState(booking);
+      if (st === 'before') throw tErr('err.slotNotOpen');
+      if (st === 'passed') throw tErr('err.slotPassed');
+    }
   }
 
   /*
@@ -1147,17 +1536,32 @@ export async function rebookAtGate({ centreId, farmerId, farmerName, farmerPhone
 
   const date = todayString();
   const slots = windowList(centre);
-  const nowH = new Date().getHours();
+  const now = new Date();
+  const nowH = now.getHours();
   const q = Math.max(1, Number(quintals) || 1);
   const qSnap = await getDoc(queueRef(centreId, date));
   const queue = qSnap.exists() ? qSnap.data() : {};
+  const yp = await yardPlan(centre, crop, centreId);
+
+  // install53: is there SPARE right now (no-shows, fast day)? Then the
+  // current hour gets a "Now" pass even if its planned minutes are sold.
+  let nowPass = false;
+  try {
+    const sp = await fetchSpareNow(centreId, crop, now);
+    const need = loadMinutesFor(q, sp.throughput || 400);
+    nowPass = canAdmitNow(sp.day, need, Math.max(0, sp.gateWaiting - 1));
+  } catch (e) { nowPass = false; }
 
   // Current hour first (gate is idle right now?), then later hours.
   let startIdx = slots.findIndex((t) => Number(t.split(':')[0]) >= nowH);
   if (startIdx < 0) return { booking: null, reason: 'noRoomToday' };
+  const curIdx = slots.findIndex((t) => Number(t.split(':')[0]) === nowH);
 
   for (let i = startIdx; i < slots.length; i++) {
-    const cap = effectiveCapacity(centre, crop, slots[i]);
+    const useSpare = nowPass && i === curIdx;
+    const base = capacityWithYard(centre, crop, slots[i], yp, date);
+    // spare pass: planner may use the whole hour incl. buffer, expected minutes only
+    const cap = useSpare ? { ...base, bookableMinutes: base.fullMinutes, reserveMinutes: 0 } : base;
     const eng = await engineInputs({ centre, farmerId: farmerId || farmerPhone, crop, quintals: q, date, slotTime: slots[i], bookedVia: 'gate' });
     const plan = planLoad(cap, slots, queue, i, q, eng.opts);
     if (!plan.ok) continue;
@@ -1165,9 +1569,10 @@ export async function rebookAtGate({ centreId, farmerId, farmerName, farmerPhone
       const booking = await createBooking({
         farmerId: farmerId || farmerPhone, farmerName, farmerPhone, centreId, crop, cropName,
         approxQuantityQuintals: q, date, slotTime: slots[i], slotWindow: windowLabelFor(slots[i], plan.needed), bookedVia: 'gate',
+        extra: { walkIn: !previousTokenId, spareUsed: useSpare },
       });
       if (previousTokenId) updateDoc(doc(db, 'bookings', booking.tokenId), { rebookedFrom: previousTokenId }).catch(() => {});
-      return { booking, reason: null };
+      return { booking, reason: null, now: useSpare };
     } catch (e) {
       if (String(e?.message || '').includes('maxTokens')) throw e;
       // room went in the meantime - try the next hour
@@ -1308,6 +1713,14 @@ export async function recordWeighing(
   };
 
   const result = await advanceStage(tokenId, patch);
+  // install52: every weighed quintal now lies on the FLOOR until lifted
+  if (pre.centreId && net > 0) {
+    try {
+      await updateDoc(doc(db, 'centres', pre.centreId), { 'yard.floorUsedQ': increment(net) });
+      const c = await fetchCentreById(pre.centreId);
+      await syncYardIncident(pre.centreId, c?.yard);
+    } catch (e) { /* non-fatal */ }
+  }
   // install49: polite note (never a penalty) when actual differs a lot from declared
   if (variance != null && Math.abs(variance) > tolerance) {
     notifyUser(pre.farmerId, makeItem(variance > 0 ? 'nt_overDeclared_t' : 'nt_underDeclared_t', variance > 0 ? 'nt_overDeclared_b' : 'nt_underDeclared_b',
@@ -1648,6 +2061,18 @@ export async function reportCentreDelay(centreId, delayMinutes, reason) {
     { merge: true }
   );
 
+  // install51: a reported delay marks TODAY as an incident day - Model B
+  // will not learn capacity from it (a breakdown is not the yard's speed).
+  if ((parseInt(delayMinutes, 10) || 0) > 0) {
+    try { await updateDoc(doc(db, 'centres', centreId), { engineExcludeDates: arrayUnion(todayString()) }); } catch (e) { /* non-fatal */ }
+  }
+
+  // install52: "yard full / lifting stopped" is a yard incident, not a delay
+  if (String(reason || '').toLowerCase().startsWith('yard')) {
+    await declareYardIncident(centreId, true, 'floor');
+    return true;
+  }
+
   // install28: everyone waiting today hears about it.
   const item = makeItem('nt_delay_t', 'nt_delay_b', { minutes: parseInt(delayMinutes, 10) || 0, reason: reason || '' }, routes.farmerHome());
   notifyFarmersAtCentre(centreId, todayString(), item);
@@ -1732,6 +2157,15 @@ export async function markLateChoice(tokenId, choice) {
   if (![STATUS.BOOKED, STATUS.MISSED].includes(b.status)) throw tErr('err.cannotCancel');
 
   if (choice === 'notComing') {
+    // install52: on a yard-incident day "not coming" is NOT a no-show
+    const c = await fetchCentreById(b.centreId).catch(() => null);
+    if (c?.yard?.incident?.active && (c.yard.incident.dates || []).includes(b.date)) {
+      if (b.status === STATUS.BOOKED) {
+        await advanceStage(tokenId, { status: STATUS.MISSED, missedAt: new Date().toISOString() });
+      }
+      await updateDoc(ref, { status: STATUS.CANCELLED, cancelledAt: new Date().toISOString(), cancelReason: 'yardIncident', yardIncidentCancel: true, lateChoice: 'notComing' });
+      return 'notComing';
+    }
     // close it and release the room (if not already released by expiry)
     if (b.status === STATUS.BOOKED) {
       await advanceStage(tokenId, { status: STATUS.NO_SHOW, noShowAt: new Date().toISOString(), lateChoice: 'notComing' });
@@ -1763,13 +2197,14 @@ export async function findNextDateWithRoom(centreId, crop, quintals, fromOffset 
   const centre = await fetchCentreById(centreId);
   if (!centre) return null;
   const slots = windowList(centre);
+  const yp = await yardPlan(centre, crop, centreId);
   for (let off = fromOffset; off <= 7; off += 1) {
     const d = new Date(); d.setDate(d.getDate() + off);
     const date = todayString(d);
     const qSnap = await getDoc(queueRef(centreId, date));
     const queue = qSnap.exists() ? qSnap.data() : {};
     for (let i = 0; i < slots.length; i += 1) {
-      const cap = effectiveCapacity(centre, crop, slots[i]);
+      const cap = capacityWithYard(centre, crop, slots[i], yp, date);
       const plan = planLoad(cap, slots, queue, i, quintals, { cropClass: cropClassOf(crop), leadDays: off });
       if (plan.ok) return { date, slotTime: slots[i] };
     }
@@ -1791,6 +2226,7 @@ export async function rebookLate(tokenId, { date = null } = {}) {
   const q = Number(prev.declaredQuintals || prev.approxQuantityQuintals) || 1;
   const centre = await fetchCentreById(prev.centreId);
   const slots = windowList(centre);
+  const yp = await yardPlan(centre, prev.crop, prev.centreId);
 
   const tryDay = async (day, fromHour) => {
     const qSnap = await getDoc(queueRef(prev.centreId, day));
@@ -1798,7 +2234,7 @@ export async function rebookLate(tokenId, { date = null } = {}) {
     let start = slots.findIndex((t) => Number(t.split(':')[0]) >= fromHour);
     if (start < 0) return null;
     for (let i = start; i < slots.length; i += 1) {
-      const cap = effectiveCapacity(centre, prev.crop, slots[i]);
+      const cap = capacityWithYard(centre, prev.crop, slots[i], yp, day);
       const eng = await engineInputs({ centre, farmerId: prev.farmerId, crop: prev.crop, quintals: q, date: day, slotTime: slots[i], bookedVia: 'gate' });
       const plan = planLoad(cap, slots, queue, i, q, eng.opts);
       if (!plan.ok) continue;
@@ -1893,10 +2329,11 @@ export async function fetchEngineInsights(centreId, dateStr = null, crop = '') {
   const queue = qSnap.exists() ? qSnap.data() : {};
   const todays = await fetchTodaysQueue(centreId, date);
   const weighings = await fetchWeighings(centreId, 30);
-  const learned = learnThroughput(weighings);
+  const learned = learnThroughput(weighings, { excludeDays: centre.engineExcludeDates || [] });
+  const yp = await yardPlan(centre, crop, centreId);
 
   const hours = slots.map((slotTime) => {
-    const cap = effectiveCapacity(centre, crop, slotTime);
+    const cap = capacityWithYard(centre, crop, slotTime, yp, date);
     const rows = todays.filter((b) => b.slotTime === slotTime);
     const nominal = Number(queue.slotLoadMinutes?.[slotTime]) || 0;
     const expected = queue.slotExpectedMinutes?.[slotTime] != null ? Number(queue.slotExpectedMinutes[slotTime]) : nominal;
@@ -1950,6 +2387,12 @@ export async function fetchEngineInsights(centreId, dateStr = null, crop = '') {
       closedCount: closed.length,
     },
     model: ENGINE_PARAMS,
+    yard: {
+      state: yp.yard, factors: yp.factors, projection: yp.projection, normalDayIntake: yp.normal,
+      todayFactor: Math.round(yp.factorFor(date) * 100) / 100, incident: yp.incident, reasons: yp.reasons,
+    },
+    spare: await fetchSpareNow(centreId, crop).catch(() => null),
+    transfer: { acceptTransfers: centre.acceptTransfers !== false, maxTransferSharePercent: Number(centre.maxTransferSharePercent) || SPARE_DEFAULTS.maxTransferSharePercent, clusterId: centre.clusterId || 'default' },
   };
 }
 
@@ -1963,7 +2406,7 @@ export async function retrainFromHistory(centreId) {
   await requireOfficerDuty(centreId, ['admin']);
   const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId)));
   const rows = snap.docs.map((d) => d.data());
-  const closedRows = rows.filter((b) => CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID);
+  const closedRows = rows.filter((b) => (CLOSED_STATUSES.includes(b.status) || b.status === STATUS.PAID) && !b.yardIncidentCancel);
 
   const corr = trainCorrection(closedRows.map((b) => ({ farmerId: b.farmerId, crop: b.crop, declared: b.declaredQuintals || b.approxQuantityQuintals, actual: b.actualQuantity })));
 
@@ -1984,7 +2427,8 @@ export async function retrainFromHistory(centreId) {
     });
   const noshow = trainNoShow(ns);
 
-  const learned = learnThroughput(rows.filter((b) => b.weighedAt && Number(b.actualQuantity) > 0));
+  const centreDoc = await fetchCentreById(centreId);
+  const learned = learnThroughput(rows.filter((b) => b.weighedAt && Number(b.actualQuantity) > 0), { excludeDays: centreDoc?.engineExcludeDates || [] });
   const local = { correction: corr, noshow, learnedThroughput: learned, trainedAt: new Date().toISOString(), samples: closedRows.length };
   await saveEngineSettings(centreId, { localParams: local, learnedThroughput: learned });
   return local;

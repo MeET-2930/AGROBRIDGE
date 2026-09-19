@@ -111,3 +111,94 @@ screens/officer/EngineScreen  admin UI (switches, retrain, model card)
 screens/officer/HourBoardScreen  per-hour board
 simulate.js                   season generator / evaluator (Node, no app)
 ```
+
+---
+
+## 6. install51 — bad-day guard and the Azadpur benchmark
+
+### The problem you raised
+A yard doing 400 q/h has a breakdown and does 200 q/h for three hours, one day only. That day must not drag Model B down.
+
+### Two protections (both in `engine/models/throughput.js`)
+1. **Reported delay → day excluded.** When the admin uses **Report delay** (any minutes > 0), today's date is added to `centre.engineExcludeDates`. Model B skips those days entirely (Retrain and the Engine screen both pass the list).
+2. **Automatic outlier guard.** For an hour with ≥4 busy days, any reading below **60 % of that hour's median** is treated as an incident and skipped, and counted under "outliers skipped". So even an *unreported* breakdown cannot lower the estimate.
+Plus the old rule: quiet hours can only raise an estimate, never lower it.
+
+### Testing it
+```bash
+node simulate.js --dry --days 14 --learn-from 5 --incident 4,9
+```
+Day 4 breaks (capacity halves 10:00–13:00) **and is reported**; day 9 breaks and is **not reported**. In the report: day 4/9 rows show "BREAKDOWN", late % spikes that day, but the 13:00 learned value on day 10 does **not** drop, and the guard line says "1 day excluded, N observations auto-skipped".
+
+In the app: admin → **Report delay** (e.g. 60 min, "weighbridge fault") → Capacity engine → Retrain. That date is now ignored by Model B. (Admin → Reset learning does not clear the date list; it is data, not learning.)
+
+### Azadpur benchmark — are we at real scale?
+Public figures for Azadpur APMC: 12–15 k tonnes/day, 1,000+ trucks, trading midnight–noon, 22 auction sheds. AgroBridge runs one *centre per shed* (as it runs one per mandi), so the benchmark simulates **one shed: ~6,000 q/day, 60–90 trucks of 35–200 q, 00:00–12:00**, with a hidden curve (gate jam till 1 AM, peak 3–7 AM, dead after 10).
+```bash
+node simulate.js --dry --mandi azadpur --days 14 --learn-from 5 --incident 6 --seed 5
+```
+Result (3 seeds): late finishes **31–35 % → 10–17 %**, leftover after close **400–490 q → 45–75 q**, 11:00 learned 263–308 vs truth 260. Model A error ~3–4 % vs ~9 % declared, same as Gurugram.
+
+**Honest reading:** it works at that scale, and it does *not* reach ~1 % late like Gurugram. Why: Azadpur loads are 200 q trucks against a 260–760 q/h curve that swings 3× within the session, so a single truck spilling over costs 20–40 min; and 15 % buffer is thin for that variance. Two things would close the gap and are worth saying to judges: a **per-hour buffer** (bigger where Model B's MAE is bigger) and **arrival-time check-in** (the on-my-way feature) so the planner knows who is actually coming. Neither is built yet.
+
+What the benchmark does **not** prove: real Azadpur numbers per hour (mine are assumptions shaped from public descriptions), multi-shed interaction, and gate congestion outside the yard. Say "calibrated to public Azadpur scale, not to Azadpur data".
+
+### Simulator realism fix in this build
+The mandi day is now one continuous clock: a truck spilling from 12:50 into 13:10 is weighed at 13:00's slower rate, and every farmer is served strictly in booked-hour order. Before-learning numbers are therefore worse (more honest) than the install50 report showed.
+
+## 7. install52 — the YARD: floor, bags, labour (root causes R6 + R7)
+
+### Why
+The weighbridge is not the only limit — the **floor** is. Every weighed quintal lies in bags on the floor until a lifting truck removes it. When lifting stalls (Karnal 2021: 78 % unlifted, gate passes stopped 24 h; Haryana 2025: 45 % lifted statewide) the yard fills and unloading physically stops, however fast the weighbridge is. No state system counts the floor: e-Kharid keeps issuing quota passes until an officer shuts the gate and farmers find out at the gate.
+
+### What the engine does now (`engine/yard.js`, pure)
+* `centre.yard = { floorCapacityQ, floorUsedQ, bagsInStock, labourTeams, labourTeamsNormal, liftedHistory[], incident{} }`
+* **+ every weighing** adds to `floorUsedQ` automatically. **− "Record lifting"** (admin types quintals that left) lowers it.
+* `floorProjection()` runs the arithmetic forward day by day: `floor_tomorrow = floor_today + booked_intake − expected_lifting` (lifting = average of your last "Record lifting" entries; none → a normal day's intake is assumed, so the floor only bites when it is *already* high).
+* Result per day: a **factor 0..1** — up to 60 % floor = 1 (normal), 60–85 % shrinks linearly, ≥ 85 % = 0 (no new slots). `scaleCapacity()` multiplies the hour's bookable minutes by it. Labour: `q/h × teams/normal`. Bags: today's cap = bags × 0.5 q.
+* The slot screen, `createBooking`, gate re-book and "next date with room" all use the same scaled capacity, so what the farmer sees is what the transaction enforces.
+
+### Yard incident (≥ 85 % floor, or no bags) — the farmer decides
+* Declared automatically from the arithmetic (admin can clear it), or by the admin on **Report delay → "Yard full / lifting stopped"** or on the Engine screen.
+* Every farmer with a pass **today** gets a notification. His pass shows an amber box: floor %, an **honest wait range** (or "unloading stopped — no estimate"), and two buttons: **I'll wait** (pass unchanged) or **Cancel & re-book** (cancelled with `yardIncidentCancel: true` — bypasses the 48 h rule, **not** a no-show, ignored by Model C and farmer history — then straight to the slot list, which is already thinned by the projection).
+* Nothing is moved, nothing is guaranteed, nobody is penalised. The incident day is excluded from Model B (install51 guard).
+
+### Admin click-through
+Admin **9000000005 → Capacity engine → "Yard status"** card: floor % bar with 60 / 85 marks, four typed fields (floor capacity, on floor now, bags, labour today/normal) → **Save yard numbers**; "Lifted today" → **Record lifting**; the 7-day projection table (floor at start · booked · lift · slots open %); the incident box with **Declare yard full / Yard back to normal**.
+
+### Testing it
+```bash
+node simulate.js --dry --days 12 --learn-from 4 --lifting-crisis 5,8 --seed 7            # yard model ON
+node simulate.js --dry --days 12 --learn-from 4 --lifting-crisis 5,8 --seed 7 --no-yard  # blind baseline
+```
+Days 5–8 lifting trucks run at 15 %. Seed 7 result:
+
+| | yard model ON | blind baseline (today's e-Kharid) |
+|---|---|---|
+| farmers who drove in and could not unload | **0** | **121** (days 6–8) |
+| farmers told in advance, re-booked free | 66 | 0 |
+| peak floor | 95 % | 100 % for 3 days |
+| slots offered on day 7 | 0 (incident, announced) | 98 passes issued, 59 stranded |
+
+Honest caveats: the engine cannot create floor space — if lifting stops for a week the yard is shut either way; it only makes that **orderly and announced days ahead**. The 60 % cancel rate on incident days is an assumption (depends on farmers reading the notice → SMS, install55). Floor capacity in quintals is one number the admin sets once.
+
+## 8. install53 — SPARE capacity: walk-in "Now" and cross-centre transfer
+
+### Why
+Every safeguard (Model B buffer, floor projection, share cap, incident closures) makes the engine **offer less** — right for promises made days ahead, but it leaves room on the table: big no-shows, a floor projection that turned out pessimistic (trucks came overnight), a fast labour day. Spare is that room, discovered **on the day**, never booked in advance and never promised — so a wrong forecast costs nothing.
+
+### Arithmetic (`engine/spare.js`, pure)
+Per hour: `spare = fullMinutes − arrivedMinutes − (bookedNotArrived × P(still coming))`. P decays as the hour ages (35 min in ≈ 50 %, 50 min ≈ 10 %); a pass expires at H+60 anyway (install49). Spare from a closed hour is gone — time can't be stored.
+
+### Who uses it, in order
+1. Farmers already inside (nothing to do — they're there).
+2. **Walk-ins at the gate**: *Book at gate* now returns a **"Send in NOW"** pass when the current hour has spare ≥ the load and fewer than 3 vehicles wait at the gate. Flag `walkIn`, `spareUsed`.
+3. **Cross-centre transfers**: when a farmer's own mandi is thin today (yard incident re-book, or nothing fits today), the slot screen lists nearby mandis in the same `clusterId` that publish spare. He takes a **90-minute transfer pass** (`transferFrom`, `transferValidUntil`); it sits in the gate's green block while valid; if he doesn't arrive it expires as `cancelled/transferExpired` — never a no-show.
+
+A centre publishes at most `maxTransferSharePercent` (default 30 %) of its spare, only when it has ≥ 20 min, no gate queue, and its own yard is below the hard line. Tomorrow's planned capacity is never given away.
+
+### Admin click-through
+Capacity engine → **"Spare room right now"** card: spare this hour / later, utilisation, per-hour table (booked · arrived · still expected · spare), what is published to other mandis and why not, the *Accept transfers* switch and the share %.
+
+### Honest notes
+Spare depends on `arrived` being stamped at gate scan — it is. Transfers assume the state allows selling at another mandi in the district (Haryana did during COVID; e-Kharid passes are otherwise mandi-bound — an integration point, not a technical limit). All seeded centres share the default cluster, so the demo works out of the box.

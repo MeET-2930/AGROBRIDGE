@@ -29,6 +29,20 @@
 
 export const ALPHAS = [0.15, 0.3, 0.5, 0.7];
 
+/*
+ * install51 - BAD-DAY GUARD. A breakdown (bridge fault, power cut, strike,
+ * rain) makes an hour clear far less than it can. Two protections:
+ *   1. EXPLICIT: days the admin reported a delay ("Report delay" screen)
+ *      are passed in as excludeDays and never used for learning.
+ *   2. AUTOMATIC: an observation below OUTLIER_FRACTION of that hour's
+ *      median busy observation is treated as an incident and skipped
+ *      (needs >= 3 other busy days so the median means something).
+ * Skipped observations are counted in `incidents` so the admin can see
+ * the model noticed. Capacity can only be proven UP by an odd day, never
+ * knocked DOWN by one.
+ */
+export const OUTLIER_FRACTION = 0.6;
+
 /** Group weighed quintals by date and local clock hour, and flag busy hours. */
 export function observedByDayHour(rows) {
   const out = {};      // { '2026-04-11': { 9: 298, 10: 340 } }
@@ -65,14 +79,24 @@ function ewma(series, alpha) {
  * Learn throughput. `minDays` = how many BUSY days an hour needs before we
  * trust its own estimate (else the overall busy average is used).
  */
-export function learnThroughput(rows, { minDays = 2 } = {}) {
+export function learnThroughput(rows, { minDays = 2, excludeDays = [] } = {}) {
   const { out: byDay, busy } = observedByDayHour(rows);
-  const days = Object.keys(byDay).sort();
-  const empty = { perHour: {}, overall: null, alpha: 0.3, days: 0, samples: 0, mae: null, band: null, busyDays: {}, hours: [], lowerBound: {} };
+  const skip = new Set((excludeDays || []).map(String));
+  const days = Object.keys(byDay).filter((d) => !skip.has(d)).sort();
+  const empty = { perHour: {}, overall: null, alpha: 0.3, days: 0, samples: 0, mae: null, band: null, busyDays: {}, hours: [], lowerBound: {}, incidents: {}, excludedDays: skip.size };
   if (!days.length) return empty;
 
   const hours = Array.from(new Set(days.flatMap((d) => Object.keys(byDay[d]).map(Number)))).sort((a, b) => a - b);
-  const busySeries = (h) => days.filter((d) => busy[d]?.[h] && byDay[d][h] != null).map((d) => byDay[d][h]);
+  const incidents = {};
+  const busySeries = (h) => {
+    const raw = days.filter((d) => busy[d]?.[h] && byDay[d][h] != null).map((d) => byDay[d][h]);
+    if (raw.length < 4) return raw;
+    const sorted = [...raw].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const kept = raw.filter((v) => v >= median * OUTLIER_FRACTION);
+    incidents[h] = raw.length - kept.length;
+    return kept;
+  };
   const quietMax = (h) => Math.max(0, ...days.filter((d) => !busy[d]?.[h] && byDay[d][h] != null).map((d) => byDay[d][h]));
 
   // choose alpha by total backtest error across busy series only
@@ -117,6 +141,8 @@ export function learnThroughput(rows, { minDays = 2 } = {}) {
     hours,
     busyDays,
     lowerBound,
+    incidents,
+    excludedDays: skip.size,
   };
 }
 

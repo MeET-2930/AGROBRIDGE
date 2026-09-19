@@ -30,6 +30,8 @@ import {
   rebookLate,
   isSoon,
   passLabel as passLabelOf,
+  transferState,
+  expireTransferPasses,
 } from '../../services/bookings';
 
 import { getCurrentUserSession } from '../../services/auth';
@@ -117,6 +119,8 @@ export default function StageQueueScreen({ navigation, route }) {
           // install42: passes whose hour ended without entry expire here
           // (room goes back to the hour). No-op in TESTING_MODE.
           if (stage?.action === 'gate') expireMissedPasses(list).catch(() => {});
+          // install53: transfer passes whose 90-min window is over expire (no penalty)
+          if (stage?.action === 'gate') expireTransferPasses(list).catch(() => {});
         });
       };
 
@@ -210,10 +214,11 @@ export default function StageQueueScreen({ navigation, route }) {
            */
           [
             { key: 'late', style: styles.blockLate, title: tr('sq_blockLate'), rows: lateReqs },
-            { key: 'open', style: styles.blockOpen, title: tr('sq_blockOpen'), rows: list.filter((t) => slotState(t) === 'open') },
-            { key: 'soon', style: styles.blockSoon, title: tr('sq_blockSoon'), rows: list.filter((t) => slotState(t) === 'before' && isSoon(t)) },
-            { key: 'passed', style: styles.blockPassed, title: tr('sq_blockPassed'), rows: list.filter((t) => slotState(t) === 'passed') },
-            { key: 'before', style: styles.blockLater, title: tr('sq_blockLater'), rows: list.filter((t) => slotState(t) === 'before' && !isSoon(t)) },
+            // install53: transfer passes are valid for a window, not an hour -> they sit in the green block while valid
+            { key: 'open', style: styles.blockOpen, title: tr('sq_blockOpen'), rows: list.filter((t) => transferState(t) === 'valid' || (!transferState(t) && slotState(t) === 'open')) },
+            { key: 'soon', style: styles.blockSoon, title: tr('sq_blockSoon'), rows: list.filter((t) => !transferState(t) && slotState(t) === 'before' && isSoon(t)) },
+            { key: 'passed', style: styles.blockPassed, title: tr('sq_blockPassed'), rows: list.filter((t) => transferState(t) === 'expired' || (!transferState(t) && slotState(t) === 'passed')) },
+            { key: 'before', style: styles.blockLater, title: tr('sq_blockLater'), rows: list.filter((t) => !transferState(t) && slotState(t) === 'before' && !isSoon(t)) },
           ].filter((b) => b.key !== 'late' || b.rows.length > 0).map((block) => (
             <View key={block.key} style={[styles.block, block.style]}>
               <View style={styles.blockHead}>
@@ -230,6 +235,11 @@ export default function StageQueueScreen({ navigation, route }) {
                       <Text style={styles.slot}>{passLabel(token)}</Text>
                     </View>
                     <Text style={styles.name}>{token.farmerName}</Text>
+                    {token.transferFrom ? (
+                      <Text style={styles.tag}>{tr('gl_transfer')} · {tr('tf_badgeFrom', { from: token.transferFromName || token.transferFrom })} · {tr('tf_badge', { t: String(token.transferValidUntil || '').slice(11, 16) })}</Text>
+                    ) : token.walkIn ? (
+                      <Text style={styles.tag}>{tr('gl_walkIn')}</Text>
+                    ) : null}
                     <Text style={styles.sub}>+91 {token.farmerPhone}</Text>
                     <Text style={styles.passCode}>{tr('sq_gatePass', { code: gatePassCodeOf(token) })}</Text>
                     <View style={styles.metaRow}>
@@ -388,6 +398,7 @@ const styles = StyleSheet.create({
   token: { fontSize: 22, fontWeight: '900', color: Colors.navy },
   block: { borderRadius: 16, padding: 12, marginBottom: 14, borderWidth: 2 },
   blockOpen: { backgroundColor: '#DCFCE7', borderColor: '#16A34A' },
+  tag: { alignSelf: 'flex-start', backgroundColor: '#1D4ED8', color: '#FFFFFF', fontWeight: '800', fontSize: 10, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginTop: 2, overflow: 'hidden' },
   blockPassed: { backgroundColor: '#FECACA', borderColor: '#B91C1C', borderWidth: 2 },
   blockSoon: { backgroundColor: '#FFEDD5', borderColor: '#F59E0B' },
   blockLate: { backgroundColor: '#FFF1F2', borderColor: '#E11D48', borderWidth: 2 },

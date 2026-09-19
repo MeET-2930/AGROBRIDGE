@@ -28,7 +28,7 @@ import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
-import { fetchCentreSlots, createBooking } from '../../services/bookings';
+import { fetchCentreSlots, createBooking, findTransferOptions, bookTransfer } from '../../services/bookings';
 import DateCalendar from '../../components/DateCalendar';
 import { cropClassOf } from '../../services/centres';
 import { getCurrentUserSession } from '../../services/auth';
@@ -53,7 +53,7 @@ import { centreLabel } from '../../services/centres';
 
 export default function SlotSelectionScreen({ navigation, route }) {
   const { tr, lang, trError } = useLang();
-  const { crop, centre, quantity = 10 } = route.params || {};
+  const { crop, centre, quantity = 10, fromYardIncident = false } = route.params || {};
 
   // Local date, never UTC. See services/dates.js for why.
   const today = todayLocal();
@@ -61,6 +61,9 @@ export default function SlotSelectionScreen({ navigation, route }) {
   const [date, setDate] = useState(today);
   const [slots, setSlots] = useState([]);
   const [tooBig, setTooBig] = useState(false);
+  const [yardInfo, setYardInfo] = useState(null);   // install52: floor / recovery for this date
+  const [transfers, setTransfers] = useState(null); // install53: nearby mandis with spare today (null = not checked)
+  const [transferBusy, setTransferBusy] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -91,6 +94,15 @@ export default function SlotSelectionScreen({ navigation, route }) {
 
       setSlots(usable);
       setTooBig(Boolean(result?.tooBig));
+      setYardInfo(result?.yard || null);
+      // install53: today thin here? look for spare in the cluster (same-day only)
+      const thinToday = date === today && (!usable.some((s) => s.fits) || fromYardIncident || (result?.yard?.factor ?? 1) < 0.5);
+      if (thinToday) {
+        setTransfers(undefined);
+        findTransferOptions(centre.id, crop?.id, quantity).then(setTransfers).catch(() => setTransfers([]));
+      } else {
+        setTransfers(null);
+      }
       setSelected(usable.find((s) => s.fits) || null);
     } catch (error) {
       console.error('Slot loading error:', error);
@@ -106,6 +118,34 @@ export default function SlotSelectionScreen({ navigation, route }) {
   useEffect(() => {
     loadSlots();
   }, [date, centre?.id, quantity]);
+
+  const takeTransfer = (opt) => {
+    const until = new Date(Date.now() + 90 * 60000);
+    const t = `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}`;
+    Alert.alert(tr('tf_go'), tr('tf_confirm', { mandi: centreLabel(opt.centre, lang), t }), [
+      { text: tr('no'), style: 'cancel' },
+      {
+        text: tr('yes'),
+        onPress: async () => {
+          const session = await getCurrentUserSession();
+          if (!session?.uid) { Alert.alert(tr('loginRequired'), tr('loginAgain')); return; }
+          setTransferBusy(true);
+          try {
+            const booking = await bookTransfer({
+              farmerId: session.uid, farmerName: session.name, farmerPhone: session.phone,
+              fromCentreId: centre.id, toCentreId: opt.centre.id, crop: crop.id, cropName: crop.name, quintals: Number(quantity),
+            });
+            navigation.reset({ index: 0, routes: [{ name: 'TokenConfirmation', params: { booking } }] });
+          } catch (error) {
+            Alert.alert(tr('ss_bookFail'), trError(error, 'ss_bookFailSub'));
+            loadSlots();
+          } finally {
+            setTransferBusy(false);
+          }
+        },
+      },
+    ]);
+  };
 
   const confirm = async () => {
     if (!selected || !selected.fits) {
@@ -202,6 +242,37 @@ export default function SlotSelectionScreen({ navigation, route }) {
           </View>
         ) : (
           <>
+            {fromYardIncident ? (
+              <View style={styles.noticeInfo}>
+                <Text style={styles.noticeInfoText}>{tr('ss_yardRebook')}</Text>
+              </View>
+            ) : null}
+            {transfers === undefined ? (
+              <View style={styles.noticeInfo}><Text style={styles.noticeInfoText}>{tr('tf_checking')}</Text></View>
+            ) : Array.isArray(transfers) && transfers.length ? (
+              <View style={styles.tfBox}>
+                <Text style={styles.tfTitle}>{tr('tf_title')}</Text>
+                <Text style={styles.tfSub}>{tr('tf_sub')}</Text>
+                {transfers.map((opt) => (
+                  <View key={opt.centre.id} style={styles.tfRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tfName}>{centreLabel(opt.centre, lang)}</Text>
+                      <Text style={styles.tfMeta}>{tr('tf_row', { km: opt.km ?? '?', until: opt.untilLabel, g: opt.gateWaiting })}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.tfBtn} disabled={transferBusy} onPress={() => takeTransfer(opt)}>
+                      <Text style={styles.tfBtnText}>{tr('tf_go')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : Array.isArray(transfers) && (fromYardIncident || !firstFit) ? (
+              <View style={styles.noticeInfo}><Text style={styles.noticeInfoText}>{tr('tf_none')}</Text></View>
+            ) : null}
+            {yardInfo && yardInfo.factor < 0.99 ? (
+              <View style={styles.noticeYard}>
+                <Text style={styles.noticeYardText}>{tr('ss_yardThin', { p: Math.round(yardInfo.floorUsedPercent), d: yardInfo.recoveryDays })}</Text>
+              </View>
+            ) : null}
             {tooBig ? (
               <View style={styles.notice}>
                 <Text style={styles.noticeText}>{tr('ss_tooBig', { q: quantity })}</Text>
@@ -252,6 +323,8 @@ export default function SlotSelectionScreen({ navigation, route }) {
                         ? tr('ss_tooLate')
                         : slot.reason === 'closed'
                         ? tr('ss_closed')
+                        : slot.reason === 'yard'
+                        ? tr('ss_yard')
                         : slot.reason === 'horizon'
                         ? tr('ss_horizon', { d: slot.horizon })
                         : tr('ss_noRoom', { q: quantity })}
@@ -327,6 +400,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   noticeInfoText: { color: '#0D47A1', fontWeight: '700', fontSize: 13, lineHeight: 18 },
+  tfBox: { backgroundColor: '#ECFDF5', borderColor: '#16A34A', borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
+  tfTitle: { color: '#166534', fontWeight: '800', fontSize: 14 },
+  tfSub: { color: '#166534', fontSize: 12, lineHeight: 17, marginTop: 2, marginBottom: 6 },
+  tfRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#BBF7D0' },
+  tfName: { color: Colors.navy, fontWeight: '800', fontSize: 13 },
+  tfMeta: { color: Colors.subText, fontSize: 11, marginTop: 2 },
+  tfBtn: { backgroundColor: '#16A34A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginLeft: 8 },
+  tfBtnText: { color: Colors.white, fontWeight: '800', fontSize: 12 },
+  noticeYard: { backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 1, borderRadius: 10, padding: 10, marginBottom: 12 },
+  noticeYardText: { color: '#92400E', fontWeight: '700', fontSize: 13, lineHeight: 18 },
 
   dates: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   dateChip: {
