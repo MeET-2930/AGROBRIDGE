@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
+import { getCurrentUserSession } from '../../services/auth';
 import { sendChatMessage } from '../../services/chatbot';
 
 let counter = 0;
@@ -108,8 +109,16 @@ export default function ChatbotScreen({ navigation }) {
     setSending(true);
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text }]);
 
+    let phone = null;
     try {
-      const reply = await sendChatMessage(text, messages);
+      const session = await getCurrentUserSession();
+      phone = session?.uid || null;
+    } catch (e) {
+      phone = null;
+    }
+
+    try {
+      const reply = await sendChatMessage(text, messages, phone);
       setMessages((prev) => [...prev, { id: nextId(), role: 'bot', text: reply }]);
     } catch (e) {
       setError(e);

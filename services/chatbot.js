@@ -4,7 +4,10 @@
  * Client for the AgroBridge Assistant (read-only Gemini chatbot).
  * Talks to ivr/chatbot-local.js  ->  POST http://localhost:3001/chat
  *
- *   in:  { message, history }          out:  { reply }
+ *   in:  { message, history, phone }   out:  { reply }
+ *
+ * `phone` is the logged-in farmer's 10-digit phone (session uid).
+ * It is optional: without it the assistant answers general FAQs.
  *
  * `history` is the list of prior chat messages in Gemini turn
  * format ({ role: 'user' | 'model', parts: [{ text }] }), built
@@ -66,22 +69,27 @@ export function buildHistory(messages = []) {
  * Send one farmer message to the AgroBridge Assistant.
  * @param {string} message        farmer text (Hindi/Hinglish/English)
  * @param {Array}  history        prior messages (screen format)
+ * @param {string} [phone]        logged-in farmer's phone/uid (optional)
  * @returns {Promise<string>}     the assistant's reply text
  */
-export async function sendChatMessage(message, history = []) {
+export async function sendChatMessage(message, history = [], phone = null) {
   const text = String(message || '').trim();
   if (!text) throw new ChatError('EMPTY_MESSAGE', 'Empty message');
   if (text.length > 2000) throw new ChatError('TOO_LONG', 'Message is too long');
+
+  const body = {
+    message: text,
+    history: buildHistory(history),
+  };
+  const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (cleanPhone) body.phone = cleanPhone;
 
   let res;
   try {
     res = await fetch(CHATBOT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: text,
-        history: buildHistory(history),
-      }),
+      body: JSON.stringify(body),
     });
   } catch (e) {
     throw new ChatError('NETWORK', 'Cannot reach the Assistant server');
