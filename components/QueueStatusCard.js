@@ -26,7 +26,8 @@ import { useLang } from '../i18n/LanguageContext';
 
 const LEVELS = {
   waiting: { bg: '#F5F5F5', border: '#BDBDBD', dot: '#9E9E9E', text: '#424242', icon: 'time-outline' },
-  ready: { bg: '#FFF8E1', border: '#FFB300', dot: '#FFA000', text: '#E65100', icon: 'alert-circle-outline' },
+  ready: { bg: '#FEE2E2', border: '#DC2626', dot: '#DC2626', text: '#991B1B', icon: 'alert-circle-outline' },      // hour passed = RED
+  soon: { bg: '#FFF7ED', border: '#F59E0B', dot: '#F59E0B', text: '#9A3412', icon: 'timer-outline' },           // opens in <=15 min = AMBER
   go: { bg: '#E8F5E9', border: '#2E7D32', dot: '#2E7D32', text: '#1B5E20', icon: 'checkmark-circle-outline' },
   action: { bg: '#FFF7ED', border: '#F59E0B', dot: '#F59E0B', text: '#9A3412', icon: 'hand-right-outline' },
   inside: { bg: '#E3F2FD', border: '#1565C0', dot: '#1565C0', text: '#0D47A1', icon: 'business-outline' },
@@ -99,9 +100,14 @@ export default function QueueStatusCard({ view, lane, onPress }) {
         </View>
       ) : null}
 
-      {view.level === 'ready' && view.slotState === 'passed' ? (
-        <View style={[styles.callToAction, { backgroundColor: '#E65100' }]}>
-          <Text style={styles.callToActionText}>{tr('q_goRebook')}</Text>
+      {view.level === 'ready' && view.slotState === 'passed' && !view.lateChoice ? (
+        <View style={[styles.callToAction, { backgroundColor: '#DC2626' }]}>
+          <Text style={styles.callToActionText}>{tr('q_chooseBelow')}</Text>
+        </View>
+      ) : null}
+      {view.level === 'soon' ? (
+        <View style={[styles.callToAction, { backgroundColor: '#F59E0B' }]}>
+          <Text style={styles.callToActionText}>{tr('q_getReady')}</Text>
         </View>
       ) : null}
     </Wrapper>

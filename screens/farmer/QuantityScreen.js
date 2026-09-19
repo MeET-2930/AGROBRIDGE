@@ -15,6 +15,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  TextInput,
   Alert,
 } from 'react-native';
 
@@ -34,7 +35,7 @@ export default function QuantityScreen({ navigation, route }) {
 
   const [quantity, setQuantity] = useState(10);
 
-  const change = (delta) => setQuantity((q) => Math.max(1, Math.min(999, q + delta)));
+  const change = (delta) => setQuantity((q) => Math.max(1, Math.min(9999, (Number(q) || 0) + delta)));
 
   const next = () => {
     if (!crop?.id || !centre?.id) {
@@ -69,7 +70,17 @@ export default function QuantityScreen({ navigation, route }) {
               <Text style={styles.quantityButtonText}>−</Text>
             </TouchableOpacity>
 
-            <Text style={styles.quantityValue}>{quantity}</Text>
+            <TextInput
+              style={styles.quantityValue}
+              value={String(quantity)}
+              keyboardType="numeric"
+              maxLength={4}
+              selectTextOnFocus
+              onChangeText={(v) => {
+                const n = parseInt(String(v).replace(/\D/g, ''), 10);
+                setQuantity(Number.isFinite(n) ? Math.max(0, Math.min(9999, n)) : 0);
+              }}
+            />
 
             <TouchableOpacity style={styles.quantityButton} onPress={() => change(1)} onLongPress={() => change(5)}>
               <Text style={styles.quantityButtonText}>+</Text>

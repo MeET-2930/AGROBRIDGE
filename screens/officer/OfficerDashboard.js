@@ -322,6 +322,17 @@ export default function OfficerDashboard({ navigation }) {
         {isAdmin ? (
           <TouchableOpacity
             style={styles.toolRow}
+            onPress={() => navigation.navigate('HourBoard')}
+          >
+            <Ionicons name="time-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('en_boardTitle')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
+          <TouchableOpacity
+            style={styles.toolRow}
             onPress={() => navigation.navigate('DelayReport')}
           >
             <Ionicons

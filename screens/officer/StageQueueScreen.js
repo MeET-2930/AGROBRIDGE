@@ -26,6 +26,10 @@ import {
   yardRef,
   slotState,
   expireMissedPasses,
+  fetchRebookRequests,
+  rebookLate,
+  isSoon,
+  passLabel as passLabelOf,
 } from '../../services/bookings';
 
 import { getCurrentUserSession } from '../../services/auth';
@@ -45,6 +49,51 @@ export default function StageQueueScreen({ navigation, route }) {
   const stage = getStageById(stageId);
 
   const [rows, setRows] = useState([]);
+  const [lateReqs, setLateReqs] = useState([]);
+  const [busyId, setBusyId] = useState(null);
+  const centreRef = useRef(null);
+
+  // install49: officer presses "Re-book" on a late farmer's request.
+  // System looks at the WHOLE remaining day; if nothing fits, asks the
+  // officer to offer the farmer the next date with room.
+  const handleLateRebook = async (req) => {
+    setBusyId(req.tokenId);
+    try {
+      const res = await rebookLate(req.tokenId);
+      if (!res.needsNextDay) {
+        Alert.alert(tr('sq_lateDone'), tr('sq_lateDoneBody', { pass: passLabelOf(res.booking) }));
+        setLateReqs((l) => l.filter((x) => x.tokenId !== req.tokenId));
+        return;
+      }
+      if (!res.next?.date) {
+        Alert.alert(tr('sq_lateNone'), tr('sq_lateNoneBody'));
+        return;
+      }
+      Alert.alert(
+        tr('sq_lateNextTitle'),
+        tr('sq_lateNextBody', { date: res.next.date, hour: res.next.label || '' }),
+        [
+          { text: tr('sq_lateGoHome'), style: 'cancel' },
+          {
+            text: tr('sq_lateBookIt'),
+            onPress: async () => {
+              try {
+                const r2 = await rebookLate(req.tokenId, { date: res.next.date });
+                if (r2.booking) {
+                  Alert.alert(tr('sq_lateDone'), tr('sq_lateDoneBody', { pass: passLabelOf(r2.booking) }));
+                  setLateReqs((l) => l.filter((x) => x.tokenId !== req.tokenId));
+                } else Alert.alert(tr('sq_lateNone'), tr('sq_lateNoneBody'));
+              } catch (e) { Alert.alert(tr('error'), trError(e, 'notRecorded')); }
+            },
+          },
+        ]
+      );
+    } catch (e) {
+      Alert.alert(tr('error'), trError(e, 'notRecorded'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const unsub = useRef(null);
 
@@ -60,8 +109,11 @@ export default function StageQueueScreen({ navigation, route }) {
           return;
         }
 
+        centreRef.current = user.centreId;
         unsub.current = subscribeToTodaysQueue(user.centreId, null, (list) => {
           if (alive) setRows(list);
+          // install49: refresh the "I'm late, re-book me" requests box
+          if (stage?.action === 'gate') fetchRebookRequests(user.centreId).then((r) => alive && setLateReqs(r)).catch(() => {});
           // install42: passes whose hour ended without entry expire here
           // (room goes back to the hour). No-op in TESTING_MODE.
           if (stage?.action === 'gate') expireMissedPasses(list).catch(() => {});
@@ -157,10 +209,12 @@ export default function StageQueueScreen({ navigation, route }) {
            * order), red = hour passed (rebook on arrival), grey = later.
            */
           [
+            { key: 'late', style: styles.blockLate, title: tr('sq_blockLate'), rows: lateReqs },
             { key: 'open', style: styles.blockOpen, title: tr('sq_blockOpen'), rows: list.filter((t) => slotState(t) === 'open') },
+            { key: 'soon', style: styles.blockSoon, title: tr('sq_blockSoon'), rows: list.filter((t) => slotState(t) === 'before' && isSoon(t)) },
             { key: 'passed', style: styles.blockPassed, title: tr('sq_blockPassed'), rows: list.filter((t) => slotState(t) === 'passed') },
-            { key: 'before', style: styles.blockLater, title: tr('sq_blockLater'), rows: list.filter((t) => slotState(t) === 'before') },
-          ].map((block) => (
+            { key: 'before', style: styles.blockLater, title: tr('sq_blockLater'), rows: list.filter((t) => slotState(t) === 'before' && !isSoon(t)) },
+          ].filter((b) => b.key !== 'late' || b.rows.length > 0).map((block) => (
             <View key={block.key} style={[styles.block, block.style]}>
               <View style={styles.blockHead}>
                 <Text style={styles.blockTitle}>{block.title}</Text>
@@ -183,7 +237,12 @@ export default function StageQueueScreen({ navigation, route }) {
                       <Text style={styles.meta}>{token.approxQuantityQuintals} {tr('quintalShort')}</Text>
                     </View>
                     <View style={styles.actions}>
-                      {block.key === 'passed' ? (
+                      {block.key === 'late' ? (
+                        <TouchableOpacity style={[styles.primary, busyId === token.tokenId && styles.primaryDim]} disabled={busyId === token.tokenId} onPress={() => handleLateRebook(token)}>
+                          <Text style={styles.primaryText}>{busyId === token.tokenId ? '…' : tr('sq_lateRebookBtn')}</Text>
+                          <Ionicons name="calendar-outline" size={16} color={Colors.white} />
+                        </TouchableOpacity>
+                      ) : block.key === 'passed' ? (
                         <TouchableOpacity style={styles.primary} onPress={() => navigation.navigate('GateRebook', { previous: token })}>
                           <Text style={styles.primaryText}>{tr('gs_rebook')}</Text>
                           <Ionicons name="arrow-forward" size={16} color={Colors.white} />
@@ -329,7 +388,9 @@ const styles = StyleSheet.create({
   token: { fontSize: 22, fontWeight: '900', color: Colors.navy },
   block: { borderRadius: 16, padding: 12, marginBottom: 14, borderWidth: 2 },
   blockOpen: { backgroundColor: '#DCFCE7', borderColor: '#16A34A' },
-  blockPassed: { backgroundColor: '#FEE2E2', borderColor: '#DC2626' },
+  blockPassed: { backgroundColor: '#FECACA', borderColor: '#B91C1C', borderWidth: 2 },
+  blockSoon: { backgroundColor: '#FFEDD5', borderColor: '#F59E0B' },
+  blockLate: { backgroundColor: '#FFF1F2', borderColor: '#E11D48', borderWidth: 2 },
   blockLater: { backgroundColor: '#F1F5F9', borderColor: '#94A3B8' },
   blockHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   blockTitle: { fontSize: 16, fontWeight: '900', color: Colors.navy, flex: 1 },

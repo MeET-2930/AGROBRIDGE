@@ -29,6 +29,9 @@ import {
   subscribeToQueue,
   buildQueueView,
   cancelBooking,
+  markLateChoice,
+  canCancel,
+  CANCEL_HOURS,
   fixPrice,
   STATUS,
 } from '../../services/bookings';
@@ -141,6 +144,19 @@ export default function TokenDetailScreen({ navigation, route }) {
       }
     };
   }, [tokenId]);
+
+  const [lateBusy, setLateBusy] = useState(false);
+  const choose = async (choice) => {
+    setLateBusy(true);
+    try {
+      await markLateChoice(tokenId, choice);
+      if (choice === 'notComing') navigation.goBack();
+    } catch (error) {
+      Alert.alert(tr('error'), trError(error, 'notRecorded'));
+    } finally {
+      setLateBusy(false);
+    }
+  };
 
   const confirmCancel = () => {
     Alert.alert(tr('td_cancelConfirm'), tr('td_cancelConfirmSub'), [
@@ -341,6 +357,36 @@ export default function TokenDetailScreen({ navigation, route }) {
         </View>
 
         <QueueStatusCard view={view} lane={token.status === STATUS.IN_GATE ? laneAhead(token, queue, yardRows) : null} />
+
+        {/* install49: hour missed -> farmer chooses */}
+        {view?.slotState === 'passed' && !token.lateChoice && [STATUS.BOOKED, STATUS.MISSED].includes(token.status) ? (
+          <View style={styles.lateBox}>
+            <Text style={styles.lateTitle}>{tr('td_lateTitle')}</Text>
+            <Text style={styles.lateSub}>{tr('td_lateSub')}</Text>
+            <PrimaryButton
+              title={tr('td_lateYes')}
+              loading={lateBusy}
+              onPress={() => choose('late')}
+              style={{ marginTop: 10 }}
+            />
+            <PrimaryButton
+              title={tr('td_lateNo')}
+              variant="danger"
+              loading={lateBusy}
+              onPress={() => Alert.alert(tr('td_lateNo'), tr('td_lateNoConfirm'), [
+                { text: tr('no'), style: 'cancel' },
+                { text: tr('yes'), style: 'destructive', onPress: () => choose('notComing') },
+              ])}
+              style={{ marginTop: 8 }}
+            />
+          </View>
+        ) : null}
+        {token.lateChoice === 'late' && token.status === STATUS.MISSED && !token.rebookedTo ? (
+          <View style={styles.lateBox}>
+            <Text style={styles.lateTitle}>{tr('td_lateWaiting')}</Text>
+            <Text style={styles.lateSub}>{tr('td_lateWaitingSub')}</Text>
+          </View>
+        ) : null}
 
         {/* Gate pass: only useful until the vehicle is inside */}
         {token.status === STATUS.BOOKED ? (
@@ -617,6 +663,14 @@ export default function TokenDetailScreen({ navigation, route }) {
                 value={`${token.quantityVariancePercent > 0 ? '+' : ''}${token.quantityVariancePercent}%`}
               />
             ) : null}
+            {token.overDeclaredTolerance ? (
+              <View style={styles.varianceNote}>
+                <Ionicons name="information-circle-outline" size={18} color="#92400E" />
+                <Text style={styles.varianceNoteText}>
+                  {tr(token.quantityVariancePercent > 0 ? 'td_varianceOver' : 'td_varianceUnder', { d: token.declaredQuintals || token.approxQuantityQuintals, a: token.actualQuantity, p: Math.abs(Math.round(token.quantityVariancePercent)) })}
+                </Text>
+              </View>
+            ) : null}
             {Array.isArray(token.vehicles) && token.vehicles.length > 0 ? (
               <View>
                 <TouchableOpacity onPress={() => setShowTrucks((v) => !v)} style={styles.trucksToggle}>
@@ -734,14 +788,18 @@ export default function TokenDetailScreen({ navigation, route }) {
           </View>
         </Modal>
 
-        {token.status === STATUS.BOOKED ? (
-          <PrimaryButton
-            title={tr('td_cancelBooking')}
-            variant="danger"
-            loading={cancelling}
-            onPress={confirmCancel}
-            style={{ marginTop: 4 }}
-          />
+        {token.status === STATUS.BOOKED && view?.slotState !== 'passed' ? (
+          canCancel(token) ? (
+            <PrimaryButton
+              title={tr('td_cancelBooking')}
+              variant="danger"
+              loading={cancelling}
+              onPress={confirmCancel}
+              style={{ marginTop: 4 }}
+            />
+          ) : (
+            <Text style={styles.cancelNote}>{tr('td_cancelClosed', { h: CANCEL_HOURS })}</Text>
+          )
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -817,6 +875,12 @@ const styles = StyleSheet.create({
   receiptCard: { borderColor: Colors.secondary, borderWidth: 2 },
   priceCard: { borderColor: '#F59E0B', borderWidth: 2 },
   priceHint: { color: Colors.subText, fontSize: 13, marginBottom: 12 },
+  lateBox: { backgroundColor: '#FEE2E2', borderColor: '#DC2626', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16 },
+  lateTitle: { fontWeight: '900', color: '#991B1B', fontSize: 15 },
+  lateSub: { color: '#991B1B', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  cancelNote: { color: Colors.subText, fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 17 },
+  varianceNote: { flexDirection: 'row', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 8, padding: 10, marginTop: 8 },
+  varianceNoteText: { flex: 1, color: '#92400E', fontSize: 12, lineHeight: 17 },
   deductBox: { marginTop: 6, backgroundColor: '#FFF7ED', borderRadius: 8, padding: 8 },
   deductLine: { fontSize: 12, fontWeight: '800', color: Colors.navy },
   deductWhy: { fontSize: 12, color: Colors.subText, marginTop: 2, lineHeight: 16 },

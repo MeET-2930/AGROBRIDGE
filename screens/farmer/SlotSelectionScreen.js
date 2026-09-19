@@ -29,6 +29,8 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
 import { fetchCentreSlots, createBooking } from '../../services/bookings';
+import DateCalendar from '../../components/DateCalendar';
+import { cropClassOf } from '../../services/centres';
 import { getCurrentUserSession } from '../../services/auth';
 import {
   todayLocal,
@@ -173,32 +175,14 @@ export default function SlotSelectionScreen({ navigation, route }) {
           </Text>
         </Text>
 
-        <View style={styles.dates}>
-          {[0, 1, 2].map((offset) => {
-            const dateString = dateOffsetLocal(offset);
-            const isSelected = date === dateString;
-
-            return (
-              <TouchableOpacity
-                key={dateString}
-                style={[styles.dateChip, isSelected && styles.dateOn]}
-                onPress={() => setDate(dateString)}
-              >
-                <Text
-                  style={[styles.dateText, isSelected && styles.dateTextOn]}
-                >
-                  {friendlyDateLabel(dateString, lang)}
-                </Text>
-
-                <Text
-                  style={[styles.dateSmall, isSelected && styles.dateTextOn]}
-                >
-                  {dateString.slice(8)}/{dateString.slice(5, 7)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {/* install49: calendar. Grain up to 7 days ahead, perishables today/tomorrow. */}
+        <DateCalendar
+          value={date}
+          onChange={setDate}
+          minDate={today}
+          maxDate={dateOffsetLocal(cropClassOf(crop?.id) === 'perishable' ? 1 : 7)}
+          lang={lang}
+        />
 
         <Text style={styles.sectionTitle}>{tr('ss_pickSlot')}</Text>
 

@@ -46,7 +46,7 @@ import { correctionRatio, trainCorrection } from '../engine/models/correction';
 import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
 import { effectiveThroughput, learnThroughput } from '../engine/models/throughput';
 import ENGINE_PARAMS from '../engine/models/params';
-import { todayLocal, parseLocalDate } from './dates';
+import { todayLocal, parseLocalDate, localDateString } from './dates';
 import { tErr } from './i18nError';
 import { requireOfficerDuty, DUTY_FOR_STAGE } from './auth';
 import { TESTING_MODE } from './config';
@@ -105,8 +105,8 @@ export const CLOSED_STATUSES = [
  * Today's date in the DEVICE's timezone, not UTC.
  * See services/dates.js for why this matters.
  */
-export function todayString() {
-  return todayLocal();
+export function todayString(d = null) {
+  return d ? localDateString(d) : todayLocal();
 }
 
 export function queueDocId(centreId, dateStr) {
@@ -260,6 +260,25 @@ export function slotState(booking, now = new Date()) {
   const arrivalEnd = new Date(b.start.getTime() + 60 * 60000);
   if (now.getTime() >= arrivalEnd.getTime()) return 'passed';
   return 'open';
+}
+
+/** install49: 'soon' = within SOON_MIN minutes of the hour opening (amber light). */
+export const SOON_MIN = 15;
+export function isSoon(booking, now = new Date()) {
+  const b = slotBounds(booking);
+  if (!b) return false;
+  const ms = b.start.getTime() - EARLY_GRACE_MIN * 60000 - now.getTime();
+  return ms > 0 && ms <= SOON_MIN * 60000;
+}
+
+/** install49: farmer may cancel only up to CANCEL_HOURS before the arrival hour. */
+export const CANCEL_HOURS = 48;
+export function canCancel(booking, now = new Date()) {
+  // (deliberately NOT bypassed in TESTING_MODE so the rule can be demonstrated:
+  //  a booking for today/tomorrow shows "window closed", one 3+ days ahead can cancel)
+  const b = slotBounds(booking);
+  if (!b) return true;
+  return b.start.getTime() - now.getTime() >= CANCEL_HOURS * 3600000;
 }
 
 /** Minutes until the arrival hour opens (0 if open/passed). */
@@ -774,25 +793,29 @@ export function buildQueueView(booking, queue) {
   if (state === 'before') {
     const mins = minutesUntilSlot(booking);
     return {
-      level: 'waiting',
+      level: isSoon(booking) ? 'soon' : 'waiting',
       slotState: state,
       tokensAhead: 0,
       nowServingToken: null,
       etaMinutes: mins,
-      headline: msg('qv_slotBefore_h', { t: label }),
-      detail: mins <= 90 ? msg('qv_slotBefore_soon_d', { m: mins }) : msg('qv_slotBefore_d', { t: arrive }),
+      headline: isSoon(booking) ? msg('qv_soon_h') : msg('qv_slotBefore_h', { t: label }),
+      detail: isSoon(booking)
+        ? msg('qv_soon_d', { min: Math.max(1, mins) })
+        : (mins <= 90 ? msg('qv_slotBefore_soon_d', { m: mins }) : msg('qv_slotBefore_d', { t: arrive })),
     };
   }
 
-  if (state === 'passed') {
+  if (state === 'passed' || status === STATUS.MISSED) {
+    const choice = booking?.lateChoice || null;   // null | 'late' | 'notComing'
     return {
       level: 'ready',
-      slotState: state,
+      slotState: 'passed',
+      lateChoice: choice,
       tokensAhead: 0,
       nowServingToken: null,
       etaMinutes: 0,
-      headline: msg('qv_slotPassed_h', { t: label }),
-      detail: msg('qv_slotPassed_d'),
+      headline: msg(choice === 'late' ? 'qv_lateRequested_h' : 'qv_slotPassed_h', { t: label }),
+      detail: msg(choice === 'late' ? 'qv_lateRequested_d' : 'qv_slotPassed_d'),
     };
   }
 
@@ -1284,7 +1307,13 @@ export async function recordWeighing(
       : null,
   };
 
-  return advanceStage(tokenId, patch);
+  const result = await advanceStage(tokenId, patch);
+  // install49: polite note (never a penalty) when actual differs a lot from declared
+  if (variance != null && Math.abs(variance) > tolerance) {
+    notifyUser(pre.farmerId, makeItem(variance > 0 ? 'nt_overDeclared_t' : 'nt_underDeclared_t', variance > 0 ? 'nt_overDeclared_b' : 'nt_underDeclared_b',
+      { d: declared, a: net, p: Math.abs(Math.round(variance)) }, routes.farmerToken(tokenId)));
+  }
+  return result;
 }
 
 /**
@@ -1414,6 +1443,11 @@ export async function cancelBooking(tokenId) {
 
     if (booking.status !== STATUS.BOOKED) {
       throw tErr('err.cannotCancel');
+    }
+    // install49: cancellation window closes 48 h before the arrival hour.
+    // Inside that window the pass simply runs out -> MISSED (no-show).
+    if (!canCancel(booking)) {
+      throw tErr('err.cancelWindow', { h: CANCEL_HOURS });
     }
 
     const qRef = queueRef(booking.centreId, booking.date);
@@ -1676,6 +1710,122 @@ export async function fetchOfficerSummary(centreId, dateStr = null) {
     console.error('Error fetching officer summary:', error);
     return empty;
   }
+}
+
+/* ===============================================================
+ * MISSED HOUR  (install49)
+ * ---------------------------------------------------------------
+ *  farmer:  markLateChoice(tokenId, 'late' | 'notComing')
+ *           'late'      -> the gate officer sees him in the RE-BOOK box
+ *           'notComing' -> pass closed as no-show, room stays released
+ *  gate:    fetchRebookRequests(centreId)  -> tokens with lateChoice 'late'
+ *           rebookLate(tokenId)            -> today first; if nothing today,
+ *                                             returns { needsNextDay, nextDate }
+ *           rebookLate(tokenId, { date })  -> book that day (farmer said yes)
+ * =============================================================== */
+export async function markLateChoice(tokenId, choice) {
+  if (!tokenId) throw new Error('Token ID is required');
+  const ref = doc(db, 'bookings', tokenId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw tErr('err.tokenNotFound');
+  const b = snap.data();
+  if (![STATUS.BOOKED, STATUS.MISSED].includes(b.status)) throw tErr('err.cannotCancel');
+
+  if (choice === 'notComing') {
+    // close it and release the room (if not already released by expiry)
+    if (b.status === STATUS.BOOKED) {
+      await advanceStage(tokenId, { status: STATUS.NO_SHOW, noShowAt: new Date().toISOString(), lateChoice: 'notComing' });
+    } else {
+      await updateDoc(ref, { status: STATUS.NO_SHOW, noShowAt: new Date().toISOString(), lateChoice: 'notComing' });
+    }
+    return 'notComing';
+  }
+  // 'late': expire the pass if still booked (frees room), flag for the gate
+  if (b.status === STATUS.BOOKED) {
+    await advanceStage(tokenId, { status: STATUS.MISSED, missedAt: new Date().toISOString(), lateChoice: 'late', lateRequestedAt: new Date().toISOString() });
+  } else {
+    await updateDoc(ref, { lateChoice: 'late', lateRequestedAt: new Date().toISOString() });
+  }
+  notifyCentreOfficers(b.centreId, ['gate'], makeItem('nt_off_lateReq_t', 'nt_off_lateReq_b', { name: b.farmerName || b.farmerPhone, q: b.approxQuantityQuintals, crop: b.crop }, routes.officerStage('gate')));
+  return 'late';
+}
+
+/** Gate: farmers who said "I am late, please re-book me" and are not yet re-booked. */
+export async function fetchRebookRequests(centreId) {
+  if (!centreId) return [];
+  const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId), where('lateChoice', '==', 'late')));
+  return snap.docs.map((d) => d.data()).filter((b) => b.status === STATUS.MISSED && !b.rebookedTo)
+    .sort((a, b) => String(a.lateRequestedAt || '').localeCompare(String(b.lateRequestedAt || '')));
+}
+
+/** First date (today .. +7) that has room for this load; null if none. */
+export async function findNextDateWithRoom(centreId, crop, quintals, fromOffset = 1) {
+  const centre = await fetchCentreById(centreId);
+  if (!centre) return null;
+  const slots = windowList(centre);
+  for (let off = fromOffset; off <= 7; off += 1) {
+    const d = new Date(); d.setDate(d.getDate() + off);
+    const date = todayString(d);
+    const qSnap = await getDoc(queueRef(centreId, date));
+    const queue = qSnap.exists() ? qSnap.data() : {};
+    for (let i = 0; i < slots.length; i += 1) {
+      const cap = effectiveCapacity(centre, crop, slots[i]);
+      const plan = planLoad(cap, slots, queue, i, quintals, { cropClass: cropClassOf(crop), leadDays: off });
+      if (plan.ok) return { date, slotTime: slots[i] };
+    }
+  }
+  return null;
+}
+
+/**
+ * Gate: re-book a late farmer. Whole day is considered (current hour
+ * onward). Nothing today -> { booking: null, needsNextDay: true, next }.
+ * Pass { date } to book a specific later day after the farmer agrees.
+ */
+export async function rebookLate(tokenId, { date = null } = {}) {
+  const ref = doc(db, 'bookings', tokenId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw tErr('err.tokenNotFound');
+  const prev = snap.data();
+  await requireOfficerDuty(prev.centreId, DUTY_FOR_STAGE.gate);
+  const q = Number(prev.declaredQuintals || prev.approxQuantityQuintals) || 1;
+  const centre = await fetchCentreById(prev.centreId);
+  const slots = windowList(centre);
+
+  const tryDay = async (day, fromHour) => {
+    const qSnap = await getDoc(queueRef(prev.centreId, day));
+    const queue = qSnap.exists() ? qSnap.data() : {};
+    let start = slots.findIndex((t) => Number(t.split(':')[0]) >= fromHour);
+    if (start < 0) return null;
+    for (let i = start; i < slots.length; i += 1) {
+      const cap = effectiveCapacity(centre, prev.crop, slots[i]);
+      const eng = await engineInputs({ centre, farmerId: prev.farmerId, crop: prev.crop, quintals: q, date: day, slotTime: slots[i], bookedVia: 'gate' });
+      const plan = planLoad(cap, slots, queue, i, q, eng.opts);
+      if (!plan.ok) continue;
+      try {
+        const booking = await createBooking({
+          farmerId: prev.farmerId, farmerName: prev.farmerName, farmerPhone: prev.farmerPhone, centreId: prev.centreId,
+          crop: prev.crop, cropName: prev.cropName, approxQuantityQuintals: q, date: day, slotTime: slots[i],
+          slotWindow: windowLabelFor(slots[i], plan.needed), bookedVia: 'gate',
+        });
+        await updateDoc(ref, { rebookedTo: booking.tokenId, rebookedAtGate: true });
+        updateDoc(doc(db, 'bookings', booking.tokenId), { rebookedFrom: tokenId }).catch(() => {});
+        return booking;
+      } catch (e) {
+        if (String(e?.message || '').includes('maxTokens')) throw e;
+      }
+    }
+    return null;
+  };
+
+  if (date) {
+    const booking = await tryDay(date, 0);
+    return booking ? { booking, needsNextDay: false, next: null } : { booking: null, needsNextDay: true, next: await findNextDateWithRoom(prev.centreId, prev.crop, q, 1) };
+  }
+  const today = todayString();
+  const booking = await tryDay(today, new Date().getHours());
+  if (booking) return { booking, needsNextDay: false, next: null };
+  return { booking: null, needsNextDay: true, next: await findNextDateWithRoom(prev.centreId, prev.crop, q, 1) };
 }
 
 /* ===============================================================

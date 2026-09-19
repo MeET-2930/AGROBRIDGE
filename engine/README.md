@@ -18,6 +18,7 @@ ml/                 make_dataset.py (synthetic season), train_noshow.py (scikit-
 ```
 
 Prove it works outside the app:  `node engine/selftest.mjs`
+Play a whole season and watch it learn:  `node simulate.js --reset --days 10`  (see ML-SIMULATION-GUIDE.md)
 
 Retrain:  `python ml/make_dataset.py && python ml/train_noshow.py`
 (replace `ml/data/bookings.csv` with a real export when you have one, then

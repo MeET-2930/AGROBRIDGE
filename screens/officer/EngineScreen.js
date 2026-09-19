@@ -4,15 +4,13 @@
  * Mandi Admin: "Capacity engine" - the visible face of the ML.
  *   1. Today's capacity   set q/h (+/-) vs LEARNED q/h (Model B) + switch
  *   2. Model switches     Model A (declared correction), Model C (no-show)
- *   3. Hour board         booked % (nominal) vs expected %, declared /
- *                         reserved / actual q, vehicles, missed, rebooked,
- *                         close / reopen hour
+ *   3. Hour board         -> moved to HourBoardScreen (install49)
  *   4. Model health       engine error vs raw declared error, predicted
  *                         vs actual show-rate, model card, Retrain button
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert, Switch, ActivityIndicator,
+  View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert, Switch, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +31,17 @@ export default function EngineScreen({ navigation }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showCard, setShowCard] = useState(false);
+  // install49: typed values (admin can type a number, not only +/-)
+  const [qhText, setQhText] = useState('');
+  const [perText, setPerText] = useState('');
+  useEffect(() => {
+    if (data) { setQhText(String(data.setThroughput)); setPerText(String(data.perishableReservePercent)); }
+  }, [data?.setThroughput, data?.perishableReservePercent]);
+  const clampInt = (txt, lo, hi) => {
+    const n = parseInt(String(txt).replace(/[^0-9]/g, ''), 10);
+    if (Number.isNaN(n)) return null;
+    return Math.max(lo, Math.min(hi, n));
+  };
 
   const load = useCallback(async (cid = centreId, c = crop) => {
     if (!cid) return;
@@ -107,8 +116,16 @@ export default function EngineScreen({ navigation }) {
               <Ionicons name="remove" size={22} color={Colors.primary} />
             </TouchableOpacity>
             <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={styles.big}>{data.setThroughput}</Text>
-              <Text style={styles.small}>{tr('en_setQh')}</Text>
+              <TextInput
+                style={styles.bigInput}
+                value={qhText}
+                onChangeText={(t) => setQhText(t.replace(/[^0-9]/g, '').slice(0, 5))}
+                onBlur={() => { const n = clampInt(qhText, 25, 20000); if (n != null && n !== data.setThroughput) act(() => setTodayThroughput(centreId, crop, n)); else setQhText(String(data.setThroughput)); }}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                selectTextOnFocus
+              />
+              <Text style={styles.small}>{tr('en_setQh')} · {tr('en_typeHint')}</Text>
             </View>
             <TouchableOpacity style={styles.stepBtn} disabled={busy} onPress={() => act(() => setTodayThroughput(centreId, crop, data.setThroughput + 25))}>
               <Ionicons name="add" size={22} color={Colors.primary} />
@@ -130,9 +147,23 @@ export default function EngineScreen({ navigation }) {
             </View>
           </View>
           {learned?.perHour && Object.keys(learned.perHour).length ? (
-            <Text style={styles.perHour}>
-              {Object.keys(learned.perHour).map((h) => `${h}:00 → ${learned.perHour[h]}`).join('   ')}
-            </Text>
+            <View style={{ marginTop: 8 }}>
+              {(learned.hours || Object.keys(learned.perHour).map(Number)).map((h) => {
+                const v = learned.perHour[h];
+                const busy = learned.busyDays?.[h] || 0;
+                return (
+                  <View key={h} style={styles.lhRow}>
+                    <Text style={styles.lhHour}>{String(h).padStart(2, '0')}:00</Text>
+                    <View style={styles.lhBarWrap}>
+                      <View style={[styles.lhBar, { width: `${Math.min(100, Math.round(((v || data.setThroughput) / Math.max(data.setThroughput, ...Object.values(learned.perHour))) * 100))}%`, backgroundColor: v ? '#2563EB' : '#CBD5E1' }]} />
+                    </View>
+                    <Text style={[styles.lhVal, !v && { color: Colors.subText }]}>{v ? `${v}` : `${data.setThroughput}*`}</Text>
+                    <Text style={styles.lhDays}>{tr('en_busyDays', { n: busy })}</Text>
+                  </View>
+                );
+              })}
+              <Text style={styles.small}>{tr('en_learnedLegend')}</Text>
+            </View>
           ) : (
             <Text style={styles.small}>{tr('en_noLearned')}</Text>
           )}
@@ -146,9 +177,17 @@ export default function EngineScreen({ navigation }) {
             <TouchableOpacity style={styles.stepBtn} disabled={busy} onPress={() => act(() => setPerishableReserve(centreId, data.perishableReservePercent - 5))}>
               <Ionicons name="remove" size={22} color={Colors.primary} />
             </TouchableOpacity>
-            <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={styles.big}>{data.perishableReservePercent}%</Text>
-              <Text style={styles.small}>{tr('en_perOfHour')}</Text>
+            <View style={{ alignItems: 'center', flex: 1, flexDirection: 'row', justifyContent: 'center' }}>
+              <TextInput
+                style={[styles.bigInput, { minWidth: 70 }]}
+                value={perText}
+                onChangeText={(t) => setPerText(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                onBlur={() => { const n = clampInt(perText, 0, 60); if (n != null && n !== data.perishableReservePercent) act(() => setPerishableReserve(centreId, n)); else setPerText(String(data.perishableReservePercent)); }}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                selectTextOnFocus
+              />
+              <Text style={styles.big}>%</Text>
             </View>
             <TouchableOpacity style={styles.stepBtn} disabled={busy} onPress={() => act(() => setPerishableReserve(centreId, data.perishableReservePercent + 5))}>
               <Ionicons name="add" size={22} color={Colors.primary} />
@@ -170,37 +209,15 @@ export default function EngineScreen({ navigation }) {
           />
         </View>
 
-        {/* 3. Hour board */}
-        <View style={styles.card}>
-          <Text style={styles.title}>{tr('en_boardTitle')}</Text>
-          <Text style={styles.sub}>{tr('en_boardSub')}</Text>
-          {data.hours.map((h) => (
-            <View key={h.slotTime} style={[styles.hourRow, h.closed && styles.hourClosed]}>
-              <View style={styles.hourHead}>
-                <Text style={styles.hourLabel}>{h.label}</Text>
-                <Text style={styles.hourPct}>{h.usedPercent}% {tr('en_booked')} · {h.expectedPercent}% {tr('en_expected')}</Text>
-              </View>
-              <View style={styles.bar}>
-                <View style={[styles.barNominal, { width: `${Math.min(100, h.usedPercent)}%` }]} />
-                <View style={[styles.barExpected, { width: `${Math.min(100, h.expectedPercent)}%` }]} />
-                <View style={[styles.barBuffer, { left: `${Math.round((h.bookableMinutes / 60) * 100)}%` }]} />
-              </View>
-              <Text style={styles.hourMeta}>
-                {tr('en_declared')} {h.declaredQuintals} · {tr('en_reserved')} {h.reservedQuintals} · {tr('en_actual')} {h.actualQuintals} {tr('quintalShort')}
-              </Text>
-              <Text style={styles.hourMeta}>
-                {tr('en_vehicles')} {h.vehicles} · {tr('en_inside')} {h.inside} · {tr('en_paid')} {h.paid} · {tr('en_missed')} {h.missed} · {tr('en_rebooked')} {h.rebooked} · {h.throughput} {tr('en_qh')}{h.throughputSource !== 'set' ? '*' : ''}
-              </Text>
-              <TouchableOpacity
-                style={[styles.closeBtn, h.closed && styles.reopenBtn]} disabled={busy}
-                onPress={() => act(() => setSlotClosed(centreId, data.date, h.slotTime, !h.closed))}
-              >
-                <Text style={[styles.closeBtnText, h.closed && { color: Colors.primary }]}>{h.closed ? tr('en_reopen') : tr('en_close')}</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-          <Text style={styles.small}>{tr('en_legend')}</Text>
-        </View>
+        {/* 3. Hour-by-hour board moved to its own screen (install49) */}
+        <TouchableOpacity style={styles.linkCard} onPress={() => navigation.navigate('HourBoard', { crop })}>
+          <Ionicons name="time-outline" size={22} color={Colors.primary} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.title}>{tr('en_boardTitle')}</Text>
+            <Text style={styles.small}>{tr('hb_openHint')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+        </TouchableOpacity>
 
         {/* 4. Model health */}
         <View style={styles.card}>
@@ -285,10 +302,18 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
   stepBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
   big: { fontSize: 34, fontWeight: '900', color: Colors.navy },
+  bigInput: { fontSize: 32, fontWeight: '900', color: Colors.navy, textAlign: 'center', borderBottomWidth: 2, borderBottomColor: Colors.primary, minWidth: 110, paddingVertical: 2 },
+  linkCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.primary, marginBottom: 14 },
   learnedBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 10, padding: 12, marginTop: 10 },
   learnedLabel: { color: Colors.subText, fontWeight: '700', fontSize: 12 },
   learnedValue: { color: Colors.navy, fontWeight: '900', fontSize: 20 },
   perHour: { color: Colors.subText, fontSize: 11, marginTop: 8, lineHeight: 16 },
+  lhRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  lhHour: { width: 44, fontSize: 12, fontWeight: '700', color: Colors.navy },
+  lhBarWrap: { flex: 1, height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden', marginHorizontal: 6 },
+  lhBar: { height: 8, borderRadius: 4 },
+  lhVal: { width: 44, fontSize: 12, fontWeight: '800', color: '#1D4ED8', textAlign: 'right' },
+  lhDays: { width: 56, fontSize: 10, color: Colors.subText, textAlign: 'right' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border },
   hourRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border },
   hourClosed: { backgroundColor: '#FEE2E2', marginHorizontal: -16, paddingHorizontal: 16 },

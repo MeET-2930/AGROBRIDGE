@@ -13,6 +13,7 @@ import ReportsScreen from '../screens/officer/ReportsScreen';
 import GateRebookScreen from '../screens/officer/GateRebookScreen';
 import GateScanScreen from '../screens/officer/GateScanScreen';
 import EngineScreen from '../screens/officer/EngineScreen';
+import HourBoardScreen from '../screens/officer/HourBoardScreen';
 import HelpScreen from '../screens/common/HelpScreen';
 import NotificationsScreen from '../screens/common/NotificationsScreen';
 
@@ -33,6 +34,7 @@ export default function OfficerStack() {
       <Stack.Screen name="GateScan" component={GateScanScreen} />
       <Stack.Screen name="GateRebook" component={GateRebookScreen} />
       <Stack.Screen name="Engine" component={EngineScreen} />
+      <Stack.Screen name="HourBoard" component={HourBoardScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>

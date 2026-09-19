@@ -55,3 +55,5 @@ backup-before-install37/
 backup-before-install38/
 backup-before-install39/
 backup-before-install40/
+backup-before-*/
+sim-report*.txt
