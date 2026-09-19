@@ -36,7 +36,7 @@ Rules:
 - Do not make bookings, cancellations, payments, or other changes.
 - You are currently a READ-ONLY assistant.
 - Keep answers concise and practical.
-- Respond in the farmer's language: English, Hindi, or Hinglish.
+- Response language: if the farmer context specifies a RESPONSE LANGUAGE, it is the farmer's selected app language and the DEFAULT response language - follow it. Otherwise match the farmer's message language (English, Hindi, or Hinglish).
 `,
   });
 
@@ -145,7 +145,7 @@ Rules:
     };
   }
 
-  async function chat({ message, phone, history = [] }) {
+  async function chat({ message, phone, history = [], language = null }) {
     const cleanMessage = String(message || "").trim();
 
     if (!cleanMessage) {
@@ -156,10 +156,29 @@ Rules:
       throw new Error("Message is too long");
     }
 
+    const langCode = String(language || "").toLowerCase();
+    const langName = {
+      en: "English",
+      hi: "Hindi",
+      pa: "Punjabi",
+      mr: "Marathi",
+    }[langCode] || null;
+    const languageLine = langName
+      ? `RESPONSE LANGUAGE: ${langName} (${langCode}).
+The farmer's selected app language is ${langName}. ALWAYS answer in ${langName} by default.
+- English app -> English. Hindi app -> Hindi. Punjabi app -> Punjabi. Marathi app -> Marathi.
+- Do not randomly switch languages. Do not mix languages unless ${langName} itself naturally requires it.
+- If the farmer explicitly asks for a different response language, that explicit request may override this default.
+- Otherwise ALWAYS answer in ${langName}. The question's language alone must NOT change your response language.`
+      : `No app language was supplied. Match the farmer's message language (English, Hindi, or Hinglish).`;
+
     const context = await getContext(phone);
 
     const contextText = `
 Farmer context (LIVE data from Firestore for this farmer; null means unavailable):
+
+LANGUAGE:
+${languageLine}
 
 BOOKING:
 ${JSON.stringify(context.booking ?? null, null, 2)}

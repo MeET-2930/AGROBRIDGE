@@ -73,9 +73,10 @@ export function buildHistory(messages = []) {
  * @param {string} message        farmer text (Hindi/Hinglish/English)
  * @param {Array}  history        prior messages (screen format)
  * @param {string} [phone]        logged-in farmer's phone/uid (optional)
+ * @param {string} [language]     selected app language: en | hi | pa | mr
  * @returns {Promise<string>}     the assistant's reply text
  */
-export async function sendChatMessage(message, history = [], phone = null) {
+export async function sendChatMessage(message, history = [], phone = null, language = null) {
   const text = String(message || '').trim();
   if (!text) throw new ChatError('EMPTY_MESSAGE', 'Empty message');
   if (text.length > 2000) throw new ChatError('TOO_LONG', 'Message is too long');
@@ -86,6 +87,8 @@ export async function sendChatMessage(message, history = [], phone = null) {
   };
   const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
   if (cleanPhone) body.phone = cleanPhone;
+  const cleanLang = String(language || '').toLowerCase();
+  if (['en', 'hi', 'pa', 'mr'].includes(cleanLang)) body.language = cleanLang;
 
   let res;
   try {

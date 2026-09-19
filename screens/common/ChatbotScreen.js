@@ -22,15 +22,6 @@ import { sendChatMessage } from '../../services/chatbot';
 let counter = 0;
 const nextId = () => `m${Date.now()}-${(counter += 1)}`;
 
-const FAQ_QUESTIONS = [
-  'Mera token kya hai?',
-  'Meri queue position kya hai?',
-  'Mere se pehle kitne farmers hain?',
-  'Mera payment status kya hai?',
-  'Slot kaise book karu?',
-  'Mandi kab khulti hai?',
-];
-
 function renderRichText(body, baseStyle, boldStyle) {
   const parts = String(body || '').split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
@@ -120,6 +111,15 @@ export default function ChatbotScreen({ navigation }) {
   const [error, setError] = useState(null);
   const listRef = useRef(null);
 
+  const faqQuestions = [
+    tr('chat_faq1'),
+    tr('chat_faq2'),
+    tr('chat_faq3'),
+    tr('chat_faq4'),
+    tr('chat_faq5'),
+    tr('chat_faq6'),
+  ];
+
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => {
       if (listRef.current && typeof listRef.current.scrollToEnd === 'function') {
@@ -145,14 +145,14 @@ export default function ChatbotScreen({ navigation }) {
     }
 
     try {
-      const reply = await sendChatMessage(text, messages, phone);
+      const reply = await sendChatMessage(text, messages, phone, lang);
       setMessages((prev) => [...prev, { id: nextId(), role: 'bot', text: reply }]);
     } catch (e) {
       setError(e);
     } finally {
       setSending(false);
     }
-  }, [sending, messages]);
+  }, [sending, messages, lang]);
 
   const send = useCallback(() => {
     const text = String(input || '').trim();
@@ -221,7 +221,7 @@ export default function ChatbotScreen({ navigation }) {
             <Text style={styles.faqTitle}>{tr('chat_faqTitle')}</Text>
             <Text style={styles.faqHint}>{tr('chat_faqHint')}</Text>
             <View style={styles.chipRow}>
-              {FAQ_QUESTIONS.map((q) => (
+              {faqQuestions.map((q) => (
                 <TouchableOpacity
                   key={q}
                   style={styles.chip}

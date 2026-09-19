@@ -468,6 +468,7 @@ app.post("/chat", async (req, res) => {
       message,
       phone,
       history,
+      language,
     } = req.body;
 
     const result =
@@ -475,6 +476,7 @@ app.post("/chat", async (req, res) => {
         message,
         phone,
         history,
+        language,
       });
 
     res.json(result);
