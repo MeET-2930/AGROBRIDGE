@@ -314,12 +314,6 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('help')}
-            icon="help-circle-outline"
-            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
-          />
-
-          <DashboardCard
             title={tr('chat_withAssistant')}
             icon="chatbubbles-outline"
             onPress={() => navigation.navigate('Chatbot')}
@@ -332,6 +326,12 @@ export default function FarmerDashboard({ navigation }) {
               onPress={callMe}
             />
           ) : null}
+
+          <DashboardCard
+            title={tr('help')}
+            icon="help-circle-outline"
+            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
+          />
         </View>
       </ScrollView>
 
