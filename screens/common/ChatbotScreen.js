@@ -122,7 +122,7 @@ const CHAT_GREETING = {
 
 Try asking: 'How do I book a slot?', 'What's my token status?', 'When is my turn at the gate?', 'How does the assay work?', 'What documents do I need?', or 'MSP vs auction – which is better?'
 
-You can ask in English, Hindi, or Hinglish.`,
+You can ask in English, Hindi, Punjabi, or Marathi.`,
   pa: `ਸਤ ਸ੍ਰੀ ਅਕਾਲ 🙏 ਮੈਂ AgroBridge ਸਹਾਇਕ ਹਾਂ। ਮੈਂ ਇਨ੍ਹਾਂ ਸਾਰਿਆਂ ਵਿੱਚ ਤੁਹਾਡੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ:
 • ਸਲਾਟ ਬੁੱਕਿੰਗ
 • ਟੋਕਨ ਅਤੇ ਕਤਾਰ (ਕਿਊ) ਸਥਿਤੀ
