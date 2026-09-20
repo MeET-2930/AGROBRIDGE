@@ -87,6 +87,8 @@ export default function MarkPaidScreen({ navigation, route }) {
   const [parchiRate, setParchiRate] = useState('');
   const [parchiNote, setParchiNote] = useState('');
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [jformNo, setJformNo] = useState('');   // install55: state-system document numbers
+  const [utr, setUtr] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -157,6 +159,8 @@ export default function MarkPaidScreen({ navigation, route }) {
         ratePerQuintal: rate,
         grade,
         paymentBasis: basis,
+        jformNo,
+        utr,
         parchi,
         cashierName: session?.name || null,
       });
@@ -321,6 +325,14 @@ export default function MarkPaidScreen({ navigation, route }) {
           </Text>
           <Text style={styles.previewNet}>{tr('mp_net', { n: net.toFixed(2) })}</Text>
         </View>
+
+        {/* install55: the state system's own numbers. e-Kharid/Anaaj Kharid issue the
+            J-form; PFMS returns the UTR. Typed here today; a live feed fills the same fields. */}
+        <Text style={styles.label}>{tr('mp_jform')}</Text>
+        <TextInput style={styles.input} value={jformNo} onChangeText={setJformNo} placeholder={tr('mp_jformPh')} placeholderTextColor="#999" autoCapitalize="characters" />
+        <Text style={styles.label}>{tr('mp_utr')}</Text>
+        <TextInput style={styles.input} value={utr} onChangeText={setUtr} placeholder={tr('mp_utrPh')} placeholderTextColor="#999" autoCapitalize="characters" />
+        <Text style={{ fontSize: 12, color: Colors.subText, marginTop: 6 }}>{tr('mp_railHint')}</Text>
       </ScrollView>
 
       <View style={styles.footer}>

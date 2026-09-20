@@ -25,7 +25,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const WIPE = ['bookings', 'centreQueues', 'auctions', 'delays', 'notifications', 'feedback'];
-const KEEP_PHONES = ['9000000001', '9000000002', '9000000003', '9000000004', '9000000005', '9100000001', '9100000002', '9100000003', '9100000004', '9100000005', '9100000006', '9100000007', '9100000008', '9100000009'];
+const KEEP_PHONES = ['9000000001', '9000000002', '9000000003', '9000000004', '9000000005', '9100000001', '9100000002', '9100000003', '9100000004', '9100000005', '9100000006', '9100000007', '9100000008', '9100000009', '9200000001', '9200000002', '9200000003'];
 const ALSO_USERS = process.argv.includes('--users');
 
 async function pruneUsers() {

@@ -11,6 +11,7 @@
  * Accounts (OTP 1234 for all)  -  install45 team-test set, NO traders:
  *   Officers 9000000001 gate | 02 assay | 03 weighbridge | 04 cashier | 05 admin (code AGB-ADMIN-2026)
  *   Farmers  9100000001 .. 9100000009   (already registered + Aadhaar-verified mock, no tokens)
+ *   Arhtiyas 9200000001 .. 9200000003   (install55; farmers 01-03 linked to 9200000001)
  *   Need a trader for the auction test? Register one in the app.
  * After running: log out and back in on every phone / browser tab.
  *
@@ -158,14 +159,23 @@ const centres = [
   },
 ];
 
+// install55: the Gurugram demo mandi gets two sheds, Sunday off, one holiday (Gandhi Jayanti)
+const YARD55 = {
+  centre_gurugram_01: {
+    sheds: [{ id: 'S1', name: 'Shed 1 (Garg dhera)', floorCapacityQ: 3000 }, { id: 'S2', name: 'Shed 2 (Bansal dhera)', floorCapacityQ: 2500 }, { id: 'S3', name: 'Open platform', floorCapacityQ: 4000 }],
+    shedUsedQ: { S1: 0, S2: 0, S3: 0 },
+    closedDays: [0], holidays: [{ date: '2026-10-02', label: 'Gandhi Jayanti' }], hoursOverride: {},
+    yieldTable: { wheat: 20, paddy: 25, mustard: 8, bajra: 10 },
+  },
+};
 async function seedCentres() {
-  for (const c of centres) { const { id, ...data } = c; await setDoc(doc(db, 'centres', id), data); }
+  for (const c of centres) { const { id, ...data } = c; await setDoc(doc(db, 'centres', id), { closedDays: [0], holidays: [], hoursOverride: {}, ...(YARD55[id] || {}), ...data }); }
   console.log(`  centres: ${centres.length} mandis written`);
 }
 
 /* ============================ 2. wipe ============================ */
-const WIPE = ['bookings', 'centreQueues', 'auctions', 'delays', 'notifications', 'feedback'];
-const KEEP_PHONES = ['9000000001', '9000000002', '9000000003', '9000000004', '9000000005', '9100000001', '9100000002', '9100000003', '9100000004', '9100000005', '9100000006', '9100000007', '9100000008', '9100000009'];
+const WIPE = ['bookings', 'centreQueues', 'auctions', 'delays', 'notifications', 'feedback', 'smsOutbox'];
+const KEEP_PHONES = ['9000000001', '9000000002', '9000000003', '9000000004', '9000000005', '9100000001', '9100000002', '9100000003', '9100000004', '9100000005', '9100000006', '9100000007', '9100000008', '9100000009', '9200000001', '9200000002', '9200000003'];
 
 async function wipe(name) {
   const snap = await getDocs(collection(db, name));
@@ -201,15 +211,24 @@ const farmer = (phone, name) => ({
   govIdType: 'aadhaar', govIdNumber: `XXXX XXXX ${phone.slice(-4)}`, govIdVerifiedAt: new Date().toISOString(),
   licenseNumber: null, businessName: null, isVerified: true, createdAt: serverTimestamp(),
 });
+// install55: arhtiyas (commission agents) - same licence fields as the old trader role, plus a shed
+const arhtiya = (phone, name, businessName, licenseNumber, shedId) => ({
+  phone, role: 'arhtiya', name, businessName, licenseNumber, shedId, employeeId: null, officerDuty: null, ...CENTRE,
+  govIdType: 'aadhaar', govIdNumber: `XXXX XXXX ${phone.slice(-4)}`, govIdVerifiedAt: new Date().toISOString(), isVerified: true, createdAt: serverTimestamp(),
+});
 const ACCOUNTS = [
+  arhtiya('9200000001', 'Suresh Garg',  'Garg & Sons Commission Agents', 'HR-ARH-0451', 'S1'),
+  arhtiya('9200000002', 'Naresh Bansal', 'Bansal Traders',               'HR-ARH-0782', 'S2'),
+  arhtiya('9200000003', 'Kishan Lal',   'Kishan Lal & Co.',              'HR-ARH-1103', ''),
   officer('9000000001', 'Ramesh Kumar', 'gate',        'GGN-GATE-01'),
   officer('9000000002', 'Sunita Yadav', 'assay',       'GGN-QC-01'),
   officer('9000000003', 'Mahesh Saini', 'weighbridge', 'GGN-WB-01'),
   officer('9000000004', 'Pooja Sharma', 'accounts',    'GGN-ACC-01'),
   officer('9000000005', 'Vikram Singh', 'admin',       'GGN-ADM-01'),
-  farmer('9100000001', 'Balwant Singh'),
-  farmer('9100000002', 'Om Prakash'),
-  farmer('9100000003', 'Sarita Devi'),
+  // farmers 01-03 are linked to arhtiya 9200000001 so his dashboard has something to show
+  { ...farmer('9100000001', 'Balwant Singh'), arhtiyaId: '9200000001', arhtiyaName: 'Garg & Sons Commission Agents', nominees: [{ name: 'Gurmeet Singh', relation: 'son', phone: '9100000101' }] },
+  { ...farmer('9100000002', 'Om Prakash'),    arhtiyaId: '9200000001', arhtiyaName: 'Garg & Sons Commission Agents' },
+  { ...farmer('9100000003', 'Sarita Devi'),   arhtiyaId: '9200000001', arhtiyaName: 'Garg & Sons Commission Agents' },
   farmer('9100000004', 'Jagdish Yadav'),
   farmer('9100000005', 'Meena Kumari'),
   farmer('9100000006', 'Harpreet Kaur'),
@@ -220,7 +239,7 @@ const ACCOUNTS = [
 
 async function seedAccounts() {
   for (const u of ACCOUNTS) await setDoc(doc(db, 'users', u.phone), u);
-  console.log('  accounts: 5 officers + 9 farmers written (no traders)');
+  console.log('  accounts: 5 officers + 9 farmers + 3 arhtiyas written (no traders)');
 }
 
 /* ============================ 4. fake farmers in today's queue ============================ */

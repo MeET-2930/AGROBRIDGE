@@ -50,7 +50,7 @@ export default function OtpScreen({ navigation, route }) {
       }
 
       const target =
-        session.role === 'officer' ? 'Officer' : session.role === 'trader' ? 'Trader' : 'Farmer';
+        session.role === 'officer' ? 'Officer' : session.role === 'trader' ? 'Trader' : session.role === 'arhtiya' ? 'Arhtiya' : 'Farmer';
 
       navigation.getParent()?.reset({ index: 0, routes: [{ name: target }] });
     } catch (error) {

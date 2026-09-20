@@ -29,6 +29,9 @@ import {
   subscribeToQueue,
   buildQueueView,
   cancelBooking,
+  cancelWet,
+  stageOf,
+  checklistFor,
   markLateChoice,
   canCancel,
   CANCEL_HOURS,
@@ -63,17 +66,27 @@ const AMBER = '#F59E0B';
  * Stage checklist shown to the farmer so they always know
  * where they are in the process.
  */
-const STAGES = [
-  { key: STATUS.BOOKED, label: 'stage_booked' },
-  { key: STATUS.IN_GATE, label: 'stage_gate' },
-  { key: STATUS.ASSAY, label: 'stage_assay' },
-  { key: STATUS.PRICE_FIXED, label: 'stage_price' },
-  { key: STATUS.WEIGHING, label: 'stage_weigh' },
-  { key: STATUS.PAYMENT_PENDING, label: 'stage_payReady' },
-  { key: STATUS.PAID, label: 'stage_paid' },
+/*
+ * install55: the REAL yard chain. Optional steps (heap, bagging) are shown
+ * only when the mandi actually recorded them, so a small centre that
+ * skips them does not show a dangling grey step forever.
+ *   booked -> gate -> [heap] -> assay -> accepted -> [bagged] -> weighed -> J-form -> lifted -> money in bank
+ */
+const STAGES_ALL = [
+  { key: 'booked', label: 'stage_booked' },
+  { key: 'in-gate', label: 'stage_gate' },
+  { key: 'heaped', label: 'fs_heaped', optional: true },
+  { key: 'assay', label: 'stage_assay' },
+  { key: 'accepted', label: 'stage_price' },
+  { key: 'bagged', label: 'fs_bagged', optional: true },
+  { key: 'weighing', label: 'stage_weigh' },
+  { key: 'j-form', label: 'fs_j-form' },
+  { key: 'lifted', label: 'fs_lifted' },
+  { key: 'credited', label: 'fs_credited' },
 ];
-
-const STAGE_ORDER = STAGES.map((s) => s.key);
+function stagesFor(token) {
+  return STAGES_ALL.filter((s) => !s.optional || (s.key === 'heaped' && token?.heapedAt) || (s.key === 'bagged' && token?.baggedAt));
+}
 
 export default function TokenDetailScreen({ navigation, route }) {
   const { tr, lang, trError } = useLang();
@@ -250,7 +263,12 @@ export default function TokenDetailScreen({ navigation, route }) {
   }
 
   const view = buildQueueView(token, queue);
-  const currentIndex = STAGE_ORDER.indexOf(token.status);
+  const STAGES = stagesFor(token);
+  const fine = stageOf(token);
+  // 'weighing' status means weighing is IN PROGRESS -> the done step is 'accepted'/'bagged'
+  const doneKey = token.status === STATUS.WEIGHING ? (token.baggedAt ? 'bagged' : 'accepted') : token.status === STATUS.PAYMENT_PENDING ? 'weighing' : fine;
+  const currentIndex = STAGES.findIndex((s) => s.key === doneKey);
+  const checklist = Array.isArray(token.checklist) ? token.checklist : checklistFor(token.crop);
 
   // install43: MSP depends on grade. `priced` = { advertised, deduction, rate, reasonKey, factors }
   const priced = gradedMsp(token?.crop, token?.grade || 'FAQ', token || {});
@@ -408,6 +426,52 @@ export default function TokenDetailScreen({ navigation, route }) {
           <View style={styles.yardBox}><Text style={styles.yardSub}>{tr('tf_expired')}</Text></View>
         ) : null}
 
+        {/* install55: rejected -> say exactly why and what to do */}
+        {token.status === STATUS.REJECTED ? (
+          <View style={[styles.yardBox, { backgroundColor: '#FEE2E2', borderColor: Colors.error }]}>
+            <Text style={styles.yardTitle}>{tr('td_rejTitle')}</Text>
+            <Text style={styles.yardSub}>{tr(`rej_${token.rejectReason || 'quality'}_farmer`, { m: token.moisturePercent ?? '-', f: token.foreignMatterPercent ?? '-' })}</Text>
+            {token.rejectReason === 'moisture' || token.rejectReason === 'foreignMatter' ? (
+              <PrimaryButton title={tr('td_rebookAfterFix')} style={{ marginTop: 10, height: 44 }} onPress={() => navigation.navigate('CropSelection')} />
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* install55: inspector's next round - only meaningful once the farmer is inside */}
+        {token.status === STATUS.IN_GATE && centre?.assayRound?.at ? (
+          <View style={styles.roundBox}>
+            <Ionicons name="walk-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.roundText}>{tr('td_assayRound', { t: centre.assayRound.at })}</Text>
+          </View>
+        ) : null}
+
+        {/* install55: pre-arrival checklist + "still wet?" free re-book */}
+        {token.status === STATUS.BOOKED && view?.slotState !== 'passed' ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{tr('td_checklist')}</Text>
+            {checklist.map((k) => (
+              <View key={k} style={styles.ckRow}>
+                <Ionicons name="checkbox-outline" size={18} color={Colors.secondary} />
+                <Text style={styles.ckText}>{tr(k)}</Text>
+              </View>
+            ))}
+            <TouchableOpacity style={styles.wetBtn} disabled={cancelling} onPress={() => {
+              Alert.alert(tr('td_wetQ'), tr('td_wetSub'), [
+                { text: tr('no'), style: 'cancel' },
+                { text: tr('td_wetYes'), onPress: async () => {
+                  setCancelling(true);
+                  try { await cancelWet(tokenId); navigation.replace('CropSelection'); }
+                  catch (e) { Alert.alert(tr('error'), trError(e, 'td_cancelFail')); }
+                  finally { setCancelling(false); }
+                } },
+              ]);
+            }}>
+              <Ionicons name="water-outline" size={18} color="#0369A1" />
+              <Text style={styles.wetText}>{tr('td_wetBtn')}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* install52: yard incident -> farmer chooses (wait with estimate / cancel & re-book) */}
         {(() => {
           const yn = yardNoticeFor(centre, token, queue);
@@ -490,7 +554,7 @@ export default function TokenDetailScreen({ navigation, route }) {
              * step is the amber "in progress" one. Booking is
              * complete the moment the token exists.
              */
-            const isPaid = token.status === STATUS.PAID;
+            const isPaid = Boolean(token.creditedAt);
             const done = isPaid || (currentIndex >= 0 && index <= currentIndex);
             const active = !isPaid && index === currentIndex + 1;
             const isLast = index === STAGES.length - 1;
@@ -787,6 +851,9 @@ export default function TokenDetailScreen({ navigation, route }) {
             <Text style={styles.slipLabel}>{tr('pc_officialTitle')}</Text>
 
             <Row label={tr('td_receiptNo')} value={token.receiptId} />
+            <Row label={tr('td_jform')} value={token.jformNo || '—'} />
+            <Row label={tr('td_lifted')} value={token.liftedAt ? String(token.liftedAt).slice(0, 16).replace('T', ' ') : tr('td_liftedPending')} />
+            <Row label={tr('td_credited')} value={token.creditedAt ? `${tr('td_creditedYes')}${token.utr ? ' • UTR ' + token.utr : ''}` : tr('td_creditedPending')} />
             <Row label={tr('quantity')} value={`${token.actualQuantity} ${tr('quintal')}`} />
             <Row label={tr('rate')} value={`₹${token.ratePerQuintal} ${tr('perQuintal')}`} />
             <Row label={tr('td_total')} value={`₹${token.grossAmount}`} />
@@ -953,6 +1020,12 @@ const styles = StyleSheet.create({
   priceCard: { borderColor: '#F59E0B', borderWidth: 2 },
   priceHint: { color: Colors.subText, fontSize: 13, marginBottom: 12 },
   lateBox: { backgroundColor: '#FEE2E2', borderColor: '#DC2626', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16 },
+  roundBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#E8F5E9', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#A5D6A7' },
+  roundText: { flex: 1, color: Colors.navy, fontWeight: '700', fontSize: 14 },
+  ckRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 },
+  ckText: { flex: 1, color: Colors.text, fontSize: 14 },
+  wetBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, borderWidth: 1.5, borderColor: '#0369A1', borderRadius: 10, padding: 10, backgroundColor: '#F0F9FF' },
+  wetText: { color: '#0369A1', fontWeight: '800', fontSize: 14, flex: 1 },
   yardBox: { backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16 },
   yardTitle: { fontWeight: '900', color: '#92400E', fontSize: 15 },
   yardSub: { color: '#92400E', fontSize: 13, marginTop: 4, lineHeight: 18 },

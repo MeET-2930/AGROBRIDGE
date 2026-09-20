@@ -51,14 +51,15 @@ import TokenConfirmationScreen from './screens/farmer/TokenConfirmationScreen';
 import TokenDetailScreen from './screens/farmer/TokenDetailScreen';
 import HistoryScreen from './screens/farmer/HistoryScreen';
 import PaymentsScreen from './screens/farmer/PaymentsScreen';
+import FarmerProfileScreen from './screens/farmer/FarmerProfileScreen';
 import HelpScreen from './screens/common/HelpScreen';
-import ChatbotScreen from './screens/common/ChatbotScreen';
 import NotificationsScreen from './screens/common/NotificationsScreen';
 import { NotificationProvider } from './notifications/NotificationContext';
 
 // Officer & Trader portals
 import OfficerStack from './navigation/OfficerStack';
 import TraderStack from './navigation/TraderStack';
+import ArhtiyaStack from './navigation/ArhtiyaStack';
 
 const Root = createNativeStackNavigator();
 const AuthNav = createNativeStackNavigator();
@@ -89,8 +90,8 @@ function FarmerStack() {
       <FarmerNav.Screen name="TokenDetail" component={TokenDetailScreen} />
       <FarmerNav.Screen name="History" component={HistoryScreen} />
       <FarmerNav.Screen name="Payments" component={PaymentsScreen} />
+      <FarmerNav.Screen name="FarmerProfile" component={FarmerProfileScreen} />
       <FarmerNav.Screen name="Help" component={HelpScreen} />
-      <FarmerNav.Screen name="Chatbot" component={ChatbotScreen} />
       <FarmerNav.Screen name="Notifications" component={NotificationsScreen} />
     </FarmerNav.Navigator>
   );
@@ -156,6 +157,7 @@ function RootApp({ initialRoute }) {
               <Root.Screen name="Farmer" component={FarmerStack} />
               <Root.Screen name="Officer" component={OfficerStack} />
               <Root.Screen name="Trader" component={TraderStack} />
+              <Root.Screen name="Arhtiya" component={ArhtiyaStack} />
             </Root.Navigator>
             <GlobalLanguageModalHost />
           </NotificationProvider>
@@ -187,6 +189,7 @@ export default function App() {
       .then(([, session]) => {
         if (session?.role === 'officer') setInitialRoute('Officer');
         else if (session?.role === 'trader') setInitialRoute('Trader');
+        else if (session?.role === 'arhtiya') setInitialRoute('Arhtiya');
         else if (session?.role === 'farmer') setInitialRoute('Farmer');
       })
       .catch(() => {})

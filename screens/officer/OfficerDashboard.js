@@ -330,6 +330,23 @@ export default function OfficerDashboard({ navigation }) {
           </TouchableOpacity>
         ) : null}
 
+        {/* install55: calendar, sheds, yield table + the SMS outbox */}
+        {isAdmin ? (
+          <TouchableOpacity style={styles.toolRow} onPress={() => navigation.navigate('YardSetup')}>
+            <Ionicons name="business-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('ys_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
+          <TouchableOpacity style={styles.toolRow} onPress={() => navigation.navigate('SmsOutbox')}>
+            <Ionicons name="chatbox-ellipses-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('so_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
         {isAdmin ? (
           <TouchableOpacity
             style={styles.toolRow}

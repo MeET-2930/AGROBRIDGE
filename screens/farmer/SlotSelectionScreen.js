@@ -23,12 +23,14 @@ import {
   Alert,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../components/AppHeader';
 import ScreenTitle from '../../components/ScreenTitle';
 import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
 import { fetchCentreSlots, createBooking, findTransferOptions, bookTransfer } from '../../services/bookings';
+import { scheduleAt } from '../../services/deviceNotify';
 import DateCalendar from '../../components/DateCalendar';
 import { cropClassOf } from '../../services/centres';
 import { getCurrentUserSession } from '../../services/auth';
@@ -53,7 +55,8 @@ import { centreLabel } from '../../services/centres';
 
 export default function SlotSelectionScreen({ navigation, route }) {
   const { tr, lang, trError } = useLang();
-  const { crop, centre, quantity = 10, fromYardIncident = false } = route.params || {};
+  // install55: `forFarmer` = arhtiya booking on a farmer's behalf; `extra` = reg no / ceiling / nominee from the quantity screen
+  const { crop, centre, quantity = 10, fromYardIncident = false, forFarmer = null, extra = {} } = route.params || {};
 
   // Local date, never UTC. See services/dates.js for why.
   const today = todayLocal();
@@ -67,6 +70,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [closedDay, setClosedDay] = useState(null);   // install55: { reason:'weekly'|'holiday', label }
 
   const loadSlots = async () => {
     if (!centre?.id) {
@@ -83,6 +87,7 @@ export default function SlotSelectionScreen({ navigation, route }) {
       const me = await getCurrentUserSession().catch(() => null);
       const result = await fetchCentreSlots(centre.id, date, { crop: crop?.id, quintals: quantity, farmerId: me?.uid || null });
       const all = result?.slots || [];
+      setClosedDay(result?.closedDay || null);
 
       let usable = all;
 
@@ -161,10 +166,11 @@ export default function SlotSelectionScreen({ navigation, route }) {
 
     setSubmitting(true);
     try {
+      const who = forFarmer || session;   // install55: arhtiya books for his farmer
       const booking = await createBooking({
-        farmerId: session.uid,
-        farmerName: session.name,
-        farmerPhone: session.phone,
+        farmerId: who.uid,
+        farmerName: who.name,
+        farmerPhone: who.phone,
         centreId: centre.id,
         crop: crop.id,
         cropName: crop.name,
@@ -172,7 +178,20 @@ export default function SlotSelectionScreen({ navigation, route }) {
         date,
         slotTime: selected.slotTime,
         slotWindow: selected.runLabel || selected.windowLabel,
+        bookedVia: forFarmer ? 'arhtiya' : 'app',
+        extra: {
+          ...extra,
+          ...(forFarmer ? { arhtiyaId: session.uid, arhtiyaName: session.businessName || session.name, arhtiyaShedId: session.shedId || null } : {}),
+        },
       });
+
+      // install55: evening-before reminder on THIS phone (7 pm the day before; today's bookings get none).
+      // Works on Android/iOS builds; on the website scheduleAt returns null and nothing breaks.
+      try {
+        const eve = new Date(`${date}T19:00:00`);
+        eve.setDate(eve.getDate() - 1);
+        scheduleAt(eve, { title: tr('rm_eveTitle'), body: tr('rm_eveBody', { t: booking.arriveAt || booking.slotWindow, mandi: centreLabel(centre, lang) }), data: { tokenId: booking.tokenId } });
+      } catch (e) { /* reminders are best-effort */ }
 
       navigation.reset({
         index: 0,
@@ -234,11 +253,17 @@ export default function SlotSelectionScreen({ navigation, route }) {
           />
         ) : slots.length === 0 ? (
           <View style={styles.empty}>
+            <Ionicons name={closedDay ? 'calendar-clear-outline' : 'time-outline'} size={26} color={Colors.subText} />
             <Text style={styles.emptyText}>
-              {date === today
+              {closedDay
+                ? closedDay.reason === 'holiday'
+                  ? tr('ss_holiday', { l: closedDay.label || '' })
+                  : tr('ss_weeklyOff')
+                : date === today
                 ? tr('ss_noneToday')
                 : tr('ss_noneDay')}
             </Text>
+            {closedDay ? <Text style={styles.emptyHint}>{tr('ss_closedHint')}</Text> : null}
           </View>
         ) : (
           <>
@@ -451,6 +476,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  emptyHint: { fontSize: 12, color: Colors.subText, textAlign: 'center', marginTop: 6 },
   emptyText: {
     color: Colors.subText,
     fontWeight: '600',

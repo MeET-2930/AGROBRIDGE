@@ -8,15 +8,16 @@ import Colors from '../../theme/colors';
 import { CROP_LIST } from '../../services/centres';
 import { useLang } from '../../i18n/LanguageContext';
 
-export default function CropSelectionScreen({ navigation }) {
+export default function CropSelectionScreen({ navigation, route }) {
   const { tr } = useLang();
+  const forFarmer = route?.params?.forFarmer || null;   // install55: arhtiya booking for a farmer
   const [selected, setSelected] = useState(CROP_LIST[0]);
 
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader navigation={navigation} showBack audioKey="audio_crop" />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenTitle title={tr('selectCrop')} subtitle={tr('selectCropSub')} />
+        <ScreenTitle title={tr('selectCrop')} subtitle={forFarmer ? tr('qty_forFarmer', { n: forFarmer.name }) : tr('selectCropSub')} />
         {CROP_LIST.map((crop) => {
           const on = selected.id === crop.id;
           return (
@@ -31,7 +32,7 @@ export default function CropSelectionScreen({ navigation }) {
         })}
       </ScrollView>
       <View style={styles.footer}>
-        <PrimaryButton title={tr('continue')} onPress={() => navigation.navigate('CentreSelection', { crop: selected })} />
+        <PrimaryButton title={tr('continue')} onPress={() => navigation.navigate('CentreSelection', { crop: selected, forFarmer })} />
       </View>
     </SafeAreaView>
   );

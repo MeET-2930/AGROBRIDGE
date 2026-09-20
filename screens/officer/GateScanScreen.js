@@ -42,6 +42,7 @@ export default function GateScanScreen({ navigation, route }) {
   const [vehicles, setVehicles] = useState([{ serial: 1, plate: '' }]);
   const [busy, setBusy] = useState(false);
   const [how, setHow] = useState('manual');
+  const [presenter, setPresenter] = useState('self');   // install55: 'self' | nominee name | 'arhtiya'
   const locked = useRef(false);
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export default function GateScanScreen({ navigation, route }) {
     }
     setBusy(true);
     try {
-      const done = await markGateEntry(match.tokenId, vehicles[0].plate, how, vehicles);
+      const done = await markGateEntry(match.tokenId, vehicles[0].plate, how, vehicles, presenter);
       const laneLine = done?.laneAssigned ? `\n\n${tr('gs_sendToLane', { lane: done.laneAssigned })}` : '';
       Alert.alert(tr('gs_admitted'), `${match.farmerName} • #${yardRef(match)} • ${tr('gs_nVehicles', { n: vehicles.length })}${laneLine}`, [
         { text: tr('gs_nextScan'), onPress: reset },
@@ -291,6 +292,21 @@ export default function GateScanScreen({ navigation, route }) {
           })}
           <Text style={styles.plateHint}>{tr('gs_plateHint')}</Text>
 
+          {/* install55: who is standing at the gate (farmer, a nominee, or the arhtiya's man) */}
+          <Text style={styles.presTitle}>{tr('gs_whoCame')}</Text>
+          <View style={styles.presRow}>
+            {[
+              { id: 'self', label: tr('gs_whoSelf') },
+              ...(match.nomineeUsed ? [{ id: match.nomineeUsed, label: `${tr('gs_whoNominee')}: ${match.nomineeUsed}` }] : []),
+              ...(match.arhtiyaId ? [{ id: 'arhtiya', label: `${tr('gs_whoArhtiya')}: ${match.arhtiyaName || ''}` }] : []),
+              { id: 'other', label: tr('gs_whoOther') },
+            ].map((o) => (
+              <TouchableOpacity key={o.id} style={[styles.presChip, presenter === o.id && styles.presChipOn]} onPress={() => setPresenter(o.id)}>
+                <Text style={[styles.presChipText, presenter === o.id && { color: Colors.white }]}>{o.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <PrimaryButton
             title={tr('gs_admit')}
             loading={busy}
@@ -307,6 +323,11 @@ export default function GateScanScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  presTitle: { fontSize: 14, fontWeight: '700', color: Colors.navy, marginTop: 14, marginBottom: 6 },
+  presRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  presChip: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: Colors.white },
+  presChipOn: { backgroundColor: Colors.secondary, borderColor: Colors.secondary },
+  presChipText: { fontSize: 13, fontWeight: '700', color: Colors.navy },
   container: { flex: 1, backgroundColor: Colors.background },
   expectBar: {
     backgroundColor: Colors.navy,

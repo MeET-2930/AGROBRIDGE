@@ -52,7 +52,7 @@ export default function RegisterScreen({ navigation, route }) {
   const [centresLoading, setCentresLoading] = useState(false);
 
   useEffect(() => {
-    if (role !== 'officer' && role !== 'trader') return;
+    if (role !== 'officer' && role !== 'trader' && role !== 'arhtiya') return;
     let alive = true;
     setCentresLoading(true);
     fetchCentres()
@@ -74,7 +74,7 @@ export default function RegisterScreen({ navigation, route }) {
     (role !== 'officer' ||
       (employeeId.trim().length > 0 && centreId.length > 0 &&
         (officerDuty !== 'admin' || adminCode.trim().length > 0))) &&
-    (role !== 'trader' ||
+    ((role !== 'trader' && role !== 'arhtiya') ||
       (licenseNumber.trim().length > 0 && businessName.trim().length > 0 && centreId.length > 0));
 
   const CentrePicker = ({ helpKey }) => (
@@ -206,8 +206,9 @@ export default function RegisterScreen({ navigation, route }) {
           </>
         )}
 
-        {role === 'trader' && (
+        {(role === 'trader' || role === 'arhtiya') && (
           <>
+            {role === 'arhtiya' ? <Text style={styles.help}>{tr('reg_arhtiyaHelp')}</Text> : null}
             <Text style={styles.label}>{tr('reg_license')}</Text>
             <TextInput style={styles.input} value={licenseNumber} onChangeText={setLicenseNumber}
               placeholder={tr('reg_licensePh')} placeholderTextColor="#999" />

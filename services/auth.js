@@ -6,6 +6,10 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
+  getDocs,
+  query,
+  collection,
+  where,
 } from 'firebase/firestore';
 import { tErr } from './i18nError';
 import { MANDI_ADMIN_CODE } from './config';
@@ -120,6 +124,17 @@ function buildSession(uid, userData) {
 
     licenseNumber: userData.licenseNumber || '',
     businessName: userData.businessName || '',
+
+    // install55: farmer govt-rail profile (all optional, filled from the MFMB demo fetch)
+    farmerRegNo: userData.farmerRegNo || '',
+    regSource: userData.regSource || '',
+    registeredAcres: userData.registeredAcres || {},
+    nominees: Array.isArray(userData.nominees) ? userData.nominees : [],
+    bankLast4: userData.bankLast4 || '',
+    arhtiyaId: userData.arhtiyaId || '',
+    arhtiyaName: userData.arhtiyaName || '',
+    // install55: arhtiya (commission agent) - reuses licence/firm/centre + own shed
+    shedId: userData.shedId || '',
   };
 }
 
@@ -212,11 +227,13 @@ export async function registerUser({
       }
     }
 
-    if (role === 'trader' && (!licenseNumber?.trim() || !businessName?.trim())) {
+    // install55: arhtiya = licensed commission agent at ONE mandi (same fields as the old trader role)
+    const licensed = role === 'trader' || role === 'arhtiya';
+    if (licensed && (!licenseNumber?.trim() || !businessName?.trim())) {
       throw tErr('err.traderFields');
     }
 
-    if (role === 'trader' && !centreId?.trim()) {
+    if (licensed && !centreId?.trim()) {
       throw tErr('err.traderMandi');
     }
 
@@ -228,17 +245,18 @@ export async function registerUser({
       employeeId: role === 'officer' ? employeeId.trim() : null,
       officerDuty: role === 'officer' ? officerDuty : null,
       // Officers are posted at a mandi; traders hold a licence for one.
-      centreId: role === 'officer' || role === 'trader' ? centreId || null : null,
+      centreId: role === 'officer' || licensed ? centreId || null : null,
       centreName:
-        role === 'officer' || role === 'trader' ? centreName || null : null,
+        role === 'officer' || licensed ? centreName || null : null,
 
       // install45: Aadhaar e-KYC (mock) - masked number only
       govIdNumber: govIdNumber || null,
       govIdType: govIdType || null,
       govIdVerifiedAt: govIdVerifiedAt || null,
 
-      licenseNumber: role === 'trader' ? licenseNumber.trim() : null,
-      businessName: role === 'trader' ? businessName.trim() : null,
+      licenseNumber: licensed ? licenseNumber.trim() : null,
+      businessName: licensed ? businessName.trim() : null,
+      shedId: null,
 
       createdAt: serverTimestamp(),
       isVerified: false,
@@ -264,6 +282,63 @@ export async function updateTraderCentre({ centreId, centreName }) {
   const patch = { centreId, centreName: centreName || '' };
   await updateDoc(doc(db, 'users', currentUserSession.uid), patch);
   return saveSession({ ...currentUserSession, ...patch });
+}
+
+/* ===============================================================
+ * install55: farmer profile (govt rail) + arhtiya link
+ * =============================================================== */
+
+/** Save what the MFMB (demo) fetch returned, or a manually typed reg no. */
+export async function updateFarmerProfile({ farmerRegNo, regSource = 'manual', registeredAcres = null, bankLast4 = '', nominees = null }) {
+  if (!currentUserSession?.uid) throw tErr('loginAgain');
+  const patch = {};
+  if (farmerRegNo != null) patch.farmerRegNo = String(farmerRegNo).trim().toUpperCase();
+  if (regSource) patch.regSource = regSource;
+  if (registeredAcres) patch.registeredAcres = registeredAcres;
+  if (bankLast4) patch.bankLast4 = String(bankLast4).slice(-4);
+  if (Array.isArray(nominees)) patch.nominees = nominees.filter((n) => n && n.name).slice(0, 3).map((n) => ({ name: String(n.name).trim(), relation: n.relation || '', phone: String(n.phone || '').replace(/\D/g, '').slice(-10) }));
+  await updateDoc(doc(db, 'users', currentUserSession.uid), patch);
+  return saveSession({ ...currentUserSession, ...patch });
+}
+
+/** Farmer links (or unlinks) "my arhtiya" by the arhtiya's phone number. */
+export async function linkArhtiya(arhtiyaPhone) {
+  if (!currentUserSession?.uid) throw tErr('loginAgain');
+  if (!arhtiyaPhone) {
+    await updateDoc(doc(db, 'users', currentUserSession.uid), { arhtiyaId: null, arhtiyaName: null });
+    return saveSession({ ...currentUserSession, arhtiyaId: '', arhtiyaName: '' });
+  }
+  const id = normalizePhone(arhtiyaPhone);
+  const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists() || snap.data().role !== 'arhtiya') throw tErr('err.noArhtiya');
+  const a = snap.data();
+  const patch = { arhtiyaId: id, arhtiyaName: a.businessName || a.name || id };
+  await updateDoc(doc(db, 'users', currentUserSession.uid), patch);
+  return saveSession({ ...currentUserSession, ...patch });
+}
+
+/** Arhtiya: every farmer who linked me. */
+export async function fetchMyFarmers() {
+  if (!currentUserSession?.uid || currentUserSession.role !== 'arhtiya') throw tErr('loginAgain');
+  const snap = await getDocs(query(collection(db, 'users'), where('arhtiyaId', '==', currentUserSession.uid)));
+  return snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+/** Arhtiya: link a farmer to myself by phone (the farmer sees it on his dashboard and may unlink). */
+export async function addFarmerToArhtiya(farmerPhone) {
+  if (!currentUserSession?.uid || currentUserSession.role !== 'arhtiya') throw tErr('loginAgain');
+  const id = normalizePhone(farmerPhone);
+  const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists() || snap.data().role !== 'farmer') throw tErr('err.noFarmer');
+  await updateDoc(doc(db, 'users', id), { arhtiyaId: currentUserSession.uid, arhtiyaName: currentUserSession.businessName || currentUserSession.name });
+  return { uid: id, ...snap.data() };
+}
+
+/** Arhtiya: which shed / dhera is mine (heaps of my farmers go there). */
+export async function updateArhtiyaShed(shedId) {
+  if (!currentUserSession?.uid) throw tErr('loginAgain');
+  await updateDoc(doc(db, 'users', currentUserSession.uid), { shedId: shedId || null });
+  return saveSession({ ...currentUserSession, shedId: shedId || '' });
 }
 
 /**

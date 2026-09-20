@@ -16,7 +16,8 @@ import PrimaryButton from '../../components/PrimaryButton';
 import Colors from '../../theme/colors';
 
 import { QUALITY_GRADES, cropLabel } from '../../services/centres';
-import { recordAssay, yardRef } from '../../services/bookings';
+import { recordAssay, yardRef, REJECT_REASONS } from '../../services/bookings';
+import { faqFor } from '../../services/govRail';
 
 import { useLang } from '../../i18n/LanguageContext';
 /*
@@ -34,6 +35,14 @@ export default function AssayScreen({ navigation, route }) {
   const [grade, setGrade] = useState('FAQ');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState('moisture');   // install55: why rejected
+
+  // install55: FAQ limits for this crop -> auto-suggest the reject reason
+  const faq = faqFor(token?.crop);
+  const m0 = parseFloat(moisture); const f0 = parseFloat(foreign);
+  const overMoist = !Number.isNaN(m0) && m0 > faq.moistureMax;
+  const overFm = !Number.isNaN(f0) && f0 > faq.foreignMax;
+  const suggested = overMoist ? 'moisture' : overFm ? 'foreignMatter' : null;
 
   const submit = async (rejected) => {
     const m = parseFloat(moisture);
@@ -58,6 +67,7 @@ export default function AssayScreen({ navigation, route }) {
         grade: rejected ? 'REJECTED' : grade,
         notes,
         rejected,
+        rejectReason: rejected ? (suggested || reason) : null,
       });
 
       Alert.alert(
@@ -73,7 +83,7 @@ export default function AssayScreen({ navigation, route }) {
   };
 
   const confirmReject = () => {
-    Alert.alert(tr('as_rejectQ'), tr('as_rejectQSub'), [
+    Alert.alert(tr('as_rejectQ'), `${tr('as_rejectQSub')}\n\n${tr('as_reasonLine', { r: tr(`rej_${suggested || reason}`) })}`, [
       { text: tr('cancel'), style: 'cancel' },
       { text: tr('as_yesReject'), style: 'destructive', onPress: () => submit(true) },
     ]);
@@ -107,8 +117,8 @@ export default function AssayScreen({ navigation, route }) {
           placeholder="12"
           placeholderTextColor="#999"
         />
-        <Text style={styles.hint}>
-          {tr('as_moistureHint')}
+        <Text style={[styles.hint, overMoist && { color: Colors.error, fontWeight: '700' }]}>
+          {tr('as_faqLine', { m: faq.moistureMax, f: faq.foreignMax })}{overMoist ? ` • ${tr('as_overFaq')}` : ''}
         </Text>
 
         <Text style={styles.label}>{tr('as_foreign')}</Text>
@@ -140,6 +150,22 @@ export default function AssayScreen({ navigation, route }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {overFm ? <Text style={[styles.hint, { color: Colors.error, fontWeight: '700' }]}>{tr('as_overFaq')}</Text> : null}
+
+        {/* install55: reject reason - the farmer's notification tells him exactly what to fix */}
+        <Text style={styles.label}>{tr('as_reason')}</Text>
+        <View style={styles.grades}>
+          {REJECT_REASONS.map((r) => {
+            const on = (suggested || reason) === r;
+            return (
+              <TouchableOpacity key={r} onPress={() => setReason(r)} style={[styles.grade, on && styles.gradeOn]}>
+                <Text style={[styles.gradeText, on && styles.gradeTextOn]}>{tr(`rej_${r}`)}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={styles.hint}>{tr('as_reasonHint')}</Text>
 
         <Text style={styles.label}>{tr('as_notes')}</Text>
         <TextInput

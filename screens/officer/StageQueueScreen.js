@@ -8,6 +8,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Modal,
+  Pressable,
 } from 'react-native';
 
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +35,14 @@ import {
   passLabel as passLabelOf,
   transferState,
   expireTransferPasses,
+  markHeaped,
+  markBagged,
+  markLifted,
+  markCredited,
+  setAssayRound,
+  subscribeToCentre,
+  stageOf,
+  STATUS,
 } from '../../services/bookings';
 
 import { getCurrentUserSession } from '../../services/auth';
@@ -54,6 +65,28 @@ export default function StageQueueScreen({ navigation, route }) {
   const [lateReqs, setLateReqs] = useState([]);
   const [busyId, setBusyId] = useState(null);
   const centreRef = useRef(null);
+  // install55: optional steps (heap / bag / lift / credited) + inspector round + paid list for cashier
+  const [centre, setCentre] = useState(null);
+  const unsubCentre = useRef(null);
+  const [ask, setAsk] = useState(null);          // { kind:'shed'|'bags'|'round'|'utr', token }
+  const [askText, setAskText] = useState('');
+  const [showDone, setShowDone] = useState(false);
+
+  const runOptional = async (kind, token, value) => {
+    setBusyId(token?.tokenId || kind);
+    try {
+      if (kind === 'shed') await markHeaped(token.tokenId, value);
+      else if (kind === 'bags') await markBagged(token.tokenId, value);
+      else if (kind === 'lift') await markLifted(token.tokenId);
+      else if (kind === 'utr') await markCredited(token.tokenId, value);
+      else if (kind === 'round') await setAssayRound(centreRef.current, value);
+      setAsk(null); setAskText('');
+    } catch (e) {
+      Alert.alert(tr('error'), trError(e, 'notRecorded'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   // install49: officer presses "Re-book" on a late farmer's request.
   // System looks at the WHOLE remaining day; if nothing fits, asks the
@@ -112,6 +145,7 @@ export default function StageQueueScreen({ navigation, route }) {
         }
 
         centreRef.current = user.centreId;
+        unsubCentre.current = subscribeToCentre(user.centreId, (c) => alive && setCentre(c));
         unsub.current = subscribeToTodaysQueue(user.centreId, null, (list) => {
           if (alive) setRows(list);
           // install49: refresh the "I'm late, re-book me" requests box
@@ -132,6 +166,10 @@ export default function StageQueueScreen({ navigation, route }) {
           unsub.current();
           unsub.current = null;
         }
+        if (unsubCentre.current) {
+          unsubCentre.current();
+          unsubCentre.current = null;
+        }
       };
     }, [])
   );
@@ -146,6 +184,9 @@ export default function StageQueueScreen({ navigation, route }) {
   }
 
   const list = rows.filter((r) => stage.statuses.includes(r.status));
+  // install55: cashier / admin also see today's PAID lots to mark lifted / credited
+  const doneList = stage.id === 'payment' ? rows.filter((r) => r.status === STATUS.PAID) : [];
+  const sheds = Array.isArray(centre?.sheds) ? centre.sheds : [];
 
   const noShow = (tokenId) => {
     Alert.alert(tr('noShowQ'), tr('noShowSub'), [
@@ -198,6 +239,17 @@ export default function StageQueueScreen({ navigation, route }) {
               {tr('sq_scanBtn')}
             </Text>
             <Ionicons name="arrow-forward" size={18} color={Colors.white} />
+          </TouchableOpacity>
+        ) : null}
+
+        {stage.id === 'assay' ? (
+          <TouchableOpacity style={styles.roundBox} onPress={() => { setAskText(centre?.assayRound?.at || ''); setAsk({ kind: 'round' }); }}>
+            <Ionicons name="walk-outline" size={20} color={Colors.secondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.roundTitle}>{tr('sq_roundTitle')}</Text>
+              <Text style={styles.roundSub}>{centre?.assayRound?.at ? tr('sq_roundAt', { t: centre.assayRound.at }) : tr('sq_roundNone')}</Text>
+            </View>
+            <Ionicons name="create-outline" size={18} color={Colors.subText} />
           </TouchableOpacity>
         ) : null}
 
@@ -318,6 +370,26 @@ export default function StageQueueScreen({ navigation, route }) {
                 </Text>
               ) : null}
 
+              {/* install55: fine stage + optional steps */}
+              <Text style={styles.meta}>
+                {tr('sq_stageLine', { s: tr(`fs_${stageOf(token)}`) })}
+                {token.shedId ? ` • ${tr('sq_shed', { s: token.shedId })}` : ''}
+                {token.bags ? ` • ${tr('sq_bags', { n: token.bags })}` : ''}
+                {token.arhtiyaName ? ` • ${tr('sq_viaArhtiya', { a: token.arhtiyaName })}` : ''}
+              </Text>
+              {stage.id === 'assay' && !token.heapedAt ? (
+                <TouchableOpacity style={styles.optBtn} onPress={() => (sheds.length ? setAsk({ kind: 'shed', token }) : runOptional('shed', token, token.arhtiyaShedId || 'YARD'))}>
+                  <Ionicons name="layers-outline" size={16} color={Colors.secondary} />
+                  <Text style={styles.optText}>{tr('sq_markHeaped')}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {stage.id === 'weighing' && !token.baggedAt ? (
+                <TouchableOpacity style={styles.optBtn} onPress={() => { setAskText(''); setAsk({ kind: 'bags', token }); }}>
+                  <Ionicons name="cube-outline" size={16} color={Colors.secondary} />
+                  <Text style={styles.optText}>{tr('sq_markBagged')}</Text>
+                </TouchableOpacity>
+              ) : null}
+
               <View style={styles.actions}>
                 <TouchableOpacity
                   style={styles.primary}
@@ -336,13 +408,92 @@ export default function StageQueueScreen({ navigation, route }) {
             </View>
           ))
         )}
+
+        {doneList.length > 0 ? (
+          <View style={{ marginTop: 18 }}>
+            <TouchableOpacity style={styles.doneHead} onPress={() => setShowDone((v) => !v)}>
+              <Text style={styles.doneTitle}>{tr('sq_paidToday', { n: doneList.length })}</Text>
+              <Ionicons name={showDone ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subText} />
+            </TouchableOpacity>
+            {showDone ? doneList.map((token) => (
+              <View key={token.tokenId} style={styles.card}>
+                <View style={styles.top}>
+                  <Text style={styles.token}>#{yardRef(token)}</Text>
+                  <Text style={styles.slot}>{tr(`fs_${stageOf(token)}`)}</Text>
+                </View>
+                <Text style={styles.name}>{token.farmerName}</Text>
+                <Text style={styles.meta}>{tr('sq_jformLine', { j: token.jformNo || '—', u: token.utr || '—' })}</Text>
+                <View style={styles.actions}>
+                  {!token.liftedAt ? (
+                    <TouchableOpacity style={styles.optBtn} disabled={busyId === token.tokenId} onPress={() => runOptional('lift', token)}>
+                      <Ionicons name="bus-outline" size={16} color={Colors.secondary} />
+                      <Text style={styles.optText}>{tr('sq_markLifted')}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {!token.creditedAt ? (
+                    <TouchableOpacity style={styles.optBtn} disabled={busyId === token.tokenId} onPress={() => { setAskText(token.utr || ''); setAsk({ kind: 'utr', token }); }}>
+                      <Ionicons name="checkmark-done-outline" size={16} color={Colors.secondary} />
+                      <Text style={styles.optText}>{tr('sq_markCredited')}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            )) : null}
+          </View>
+        ) : null}
       </ScrollView>
 
+
+      {/* install55: small input pop-up for shed / bags / round time / UTR */}
+      <Modal visible={Boolean(ask)} transparent animationType="fade">
+        <Pressable style={styles.overlay} onPress={() => setAsk(null)}>
+          <Pressable style={styles.modal} onPress={() => {}}>
+            <Text style={styles.modalTitle}>
+              {ask?.kind === 'shed' ? tr('sq_pickShed') : ask?.kind === 'bags' ? tr('sq_askBags') : ask?.kind === 'round' ? tr('sq_askRound') : tr('sq_askUtr')}
+            </Text>
+            {ask?.kind === 'shed' ? (
+              sheds.map((sh) => (
+                <TouchableOpacity key={sh.id} style={styles.shedRow} onPress={() => runOptional('shed', ask.token, sh.id)}>
+                  <Text style={styles.shedName}>{sh.name || sh.id}</Text>
+                  <Text style={styles.meta}>{Math.round(Number(centre?.shedUsedQ?.[sh.id]) || 0)} / {sh.floorCapacityQ} {tr('quintalShort')}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <>
+                <TextInput
+                  style={styles.modalInput}
+                  value={askText}
+                  onChangeText={setAskText}
+                  keyboardType={ask?.kind === 'bags' ? 'numeric' : 'default'}
+                  placeholder={ask?.kind === 'bags' ? '120' : ask?.kind === 'round' ? '11:30' : 'UTR / PFMS ref'}
+                  placeholderTextColor="#999"
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity style={styles.primary} onPress={() => runOptional(ask.kind, ask.token, askText)}>
+                  <Text style={styles.primaryText}>{tr('save')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  roundBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#E8F5E9', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#A5D6A7' },
+  roundTitle: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
+  roundSub: { color: Colors.subText, fontSize: 13, marginTop: 2 },
+  optBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderWidth: 1.5, borderColor: Colors.secondary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 8, marginRight: 8 },
+  optText: { color: Colors.secondary, fontWeight: '800', fontSize: 13 },
+  doneHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  doneTitle: { fontWeight: '800', color: Colors.navy, fontSize: 15 },
+  modal: { width: '85%', backgroundColor: Colors.white, borderRadius: 16, padding: 20 },
+  modalTitle: { fontWeight: '800', color: Colors.navy, fontSize: 16, marginBottom: 12 },
+  modalInput: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: 10, height: 48, paddingHorizontal: 12, fontSize: 16, color: Colors.text, marginBottom: 12, backgroundColor: Colors.white },
+  shedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  shedName: { fontWeight: '800', color: Colors.navy, fontSize: 15 },
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 18, paddingBottom: 30 },
   empty: { textAlign: 'center', marginTop: 40, color: Colors.subText },

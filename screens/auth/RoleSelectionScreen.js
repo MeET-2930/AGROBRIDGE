@@ -18,8 +18,10 @@ export default function RoleSelectionScreen({ navigation }) {
           onPress={() => navigation.navigate('UserStatus', { role: 'farmer' })} />
         <PrimaryCard title={tr('roleOfficer')} subtitle={tr('roleOfficerSub')} image={ROLE_ICON.officer}
           onPress={() => navigation.navigate('UserStatus', { role: 'officer' })} />
-        <PrimaryCard title={tr('roleTrader')} subtitle={tr('roleTraderSub')} image={ROLE_ICON.trader}
-          onPress={() => navigation.navigate('UserStatus', { role: 'trader' })} />
+        {/* install55: the trader tile now registers an ARHTIYA (commission agent).
+            Trader auction screens still exist for old accounts; no new traders. */}
+        <PrimaryCard title={tr('roleArhtiya')} subtitle={tr('roleArhtiyaSub')} image={ROLE_ICON.trader}
+          onPress={() => navigation.navigate('UserStatus', { role: 'arhtiya' })} />
       </ScrollView>
     </SafeAreaView>
   );

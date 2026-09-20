@@ -202,3 +202,28 @@ Capacity engine → **"Spare room right now"** card: spare this hour / later, ut
 
 ### Honest notes
 Spare depends on `arrived` being stamped at gate scan — it is. Transfers assume the state allows selling at another mandi in the district (Haryana did during COVID; e-Kharid passes are otherwise mandi-bound — an integration point, not a technical limit). All seeded centres share the default cluster, so the demo works out of the box.
+
+## 9. install55 — The real yard: stage chain, government rails (mock), calendar, sheds, arhtiya, SMS text
+
+### Why
+Everything up to install54 modelled the mandi as *gate → assay → weigh → pay*. A real procurement centre in Haryana/Punjab/MP is: MFMB/Anaaj-Kharid registration → schedule → gate (pass + plate + who came) → heap at a shed / arhtiya's dhera → inspector rounds (FAQ moisture wheat 12 / paddy 17 / mustard 8) → acceptance at MSP → bagging → weighing (I-form) → J-form → lifting (48–72 h) → DBT credited (held until lifted). Farmers wait longest in the steps we did not model — heap-to-assay and J-form-to-money. install55 records those steps and the state-system identifiers **without creating any government record or moving money**.
+
+### What changed
+| Area | Detail |
+|---|---|
+| Stage chain | `stageOf(booking)`: `booked → in-gate → [heaped] → assay → accepted → [bagged] → weighing → j-form → lifted → credited`; optional steps are flags (`heapedAt/shedId`, `baggedAt/bags`, `liftedAt`, `creditedAt`) so queue accounting on `status` is untouched. `rejected` carries `rejectReason ∈ {moisture, foreignMatter, quality, eligibility}` and the farmer's notice says *what to fix*. |
+| Government rail adapter | `services/govRail.js` — mock today (`RAIL_MODE='demo'`, labelled DEMO everywhere, deterministic fake data). `getFarmerRecord(regNo)` (MFMB/Anaaj/e-Uparjan), `wrapInstrument()` (e-NAM gate/assay/weighment ids with `source:'manual'`), `getJFormStatus()`, `transferAllowed()`. Booking fields: `farmerRegNo, regSource, nomineeUsed, presentedBy, enamGateEntryId, enamAssayId, enamWeighmentId, shedId, bags, jformNo, jformAt, utr, liftedAt, creditedAt`. |
+| Calendar | `closedDays` (default Sunday), `holidays[]`, `hoursOverride{date:{start,end}}` on the centre. `fetchCentreSlots` returns `closedDay` and no slots; `createBooking` throws `err.dayClosed`. Admin: Officer → *Yard setup*. |
+| Sheds | `sheds[{id,name,floorCapacityQ}]` + `shedUsedQ{}`; `markHeaped` adds, reject/lift subtracts. Arhtiya's shed pre-fills. |
+| R8 area ceiling | `areaCeilingQuintals = acres × yield(q/acre) × 1.2`; admin-editable `yieldTable`. **Warning only, never a block** (`ceilingWarned` stored for the inspector). |
+| Pre-arrival | Per-crop checklist on the pass; evening-before local reminder (`scheduleAt`, 19:00 day-1, best-effort); *"grain still wet"* → `cancelWet` (free, no 48-h rule, no no-show). |
+| Nominees | Up to 3 on the farmer profile; chosen at booking; gate taps who presented. |
+| SMS | `smsText(item, lang)` ≤ 160 chars for every farmer notification → `smsOutbox` doc `status:'queued (no gateway)'`; admin *SMS outbox* screen shows length per message. Measured: booking SMS 105 (en) – 126 (hi/pa) chars. |
+| Arhtiya role | `role:'arhtiya'` (licence, firm, mandi, shed). Farmer links by phone; arhtiya dashboard mirrors the farmer layout; *Book for farmer* runs the **same planner** with `bookedVia:'arhtiya'`; per-arhtiya cap **25 % of the day's normal intake** (`queue.arhtiyaQ`). |
+| Lifting | install52 `recordLifted(q)` now also marks the oldest paid lots `liftedAt` FIFO (`autoLiftOldest`); cashier can mark manually; *credited* typed with UTR. |
+
+### What it deliberately does NOT do
+No real API calls (adapter only), no assay-round-as-capacity, no walk-in demand model (Model D), no offline gate (install57), no telemetry (install56). The 25 % arhtiya share and the ×1.2 tolerance are policy defaults an admin can revisit.
+
+### Test accounts
+Officers 9000000001–05, farmers 9100000001–09 (01–03 linked to arhtiya 9200000001), **arhtiyas 9200000001–03**, OTP 1234. `node demo.js --users` re-seeds them and gives Gurugram three sheds + Sunday off + 2 Oct holiday.

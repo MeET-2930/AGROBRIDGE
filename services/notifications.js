@@ -33,6 +33,8 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { translate } from '../i18n/translations';
@@ -137,10 +139,51 @@ export async function postToExpoPush(payload) {
   return res.json().catch(() => null);
 }
 
+/* ===============================================================
+ * install55: SMS OUTBOX  (no gateway yet - see BLAZE_LATER.md)
+ * Every farmer-facing notification also becomes one <=160-char SMS in
+ * the `smsOutbox` collection with status 'queued (no gateway)'. When
+ * the college funds DLT + a gateway, a 40-line Cloud Function drains
+ * this collection. Admin sees it in Officer -> SMS outbox.
+ * =============================================================== */
+export const SMS_MAX = 160;
+
+/** Plain, short, keypad-phone friendly text for one notification item. */
+export function smsText(item, lang = 'hi') {
+  const title = translate(item.titleKey, lang, item.params) || '';
+  const body = translate(item.bodyKey, lang, item.params) || '';
+  let text = `AgroBridge: ${title}. ${body}`.replace(/\s+/g, ' ').trim();
+  if (text.length > SMS_MAX) text = `${text.slice(0, SMS_MAX - 1)}…`;
+  return text;
+}
+
+async function queueSms(uid, item, userData) {
+  try {
+    const lang = userData?.lang || 'hi';
+    const phone = userData?.phone || uid;
+    const id = `${item.id}_${uid}`;
+    await setDoc(doc(db, 'smsOutbox', id), {
+      id, to: phone, uid, lang, text: smsText(item, lang), chars: smsText(item, lang).length,
+      status: 'queued (no gateway)', gateway: null, createdAt: item.at, sentAt: null,
+      centreId: item.params?.centreId || null, kind: item.titleKey,
+    });
+  } catch (e) {
+    console.log('sms queue skipped:', e?.message);
+  }
+}
+
+export function subscribeSmsOutbox(callback, max = 100) {
+  const q = query(collection(db, 'smsOutbox'), orderBy('createdAt', 'desc'), limit(max));
+  return onSnapshot(q, (snap) => callback(snap.docs.map((d) => d.data())), () => callback([]));
+}
+
 async function pushToUid(uid, item) {
   try {
     const snap = await getDoc(doc(db, 'users', uid));
-    if (snap.exists()) await pushToUsers([snap.data()], item);
+    const u = snap.exists() ? snap.data() : null;
+    if (u) await pushToUsers([u], item);
+    // install55: farmers (and arhtiyas) also get the SMS twin queued
+    if (!u || u.role === 'farmer' || u.role === 'arhtiya') await queueSms(uid, item, u);
   } catch (e) { /* ignore */ }
 }
 

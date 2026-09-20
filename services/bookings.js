@@ -44,6 +44,7 @@ import { fetchCentreById, fetchCentres, normalizePlate, cropClassOf } from './ce
 import {
   CAPACITY_DEFAULTS, centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour, loadMinutesFor,
 } from '../engine/capacity';
+import { wrapInstrument } from './govRail';
 import { correctionRatio, trainCorrection } from '../engine/models/correction';
 import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
 import { effectiveThroughput, learnThroughput } from '../engine/models/throughput';
@@ -78,6 +79,27 @@ export const STATUS = {
   MISSED: 'missed',      // install42: slot hour passed without entry; room released
   CANCELLED: 'cancelled',
 };
+
+/*
+ * install55: THE REAL YARD CHAIN
+ *   booked -> in-gate -> [heaped] -> assay -> price-fixed(accepted) -> [bagged]
+ *   -> weighing -> payment-processing -> paid(J-form) -> [lifted] -> [credited]
+ * Optional steps in [ ] are FLAGS on the booking (heapedAt/shedId, baggedAt/bags,
+ * liftedAt, creditedAt) so none of the queue accounting that keys on `status`
+ * changes. `stageOf(booking)` returns the fine-grained stage for the farmer view.
+ */
+export const REJECT_REASONS = ['moisture', 'foreignMatter', 'quality', 'eligibility'];
+export const FINE_STAGES = ['booked', 'in-gate', 'heaped', 'assay', 'accepted', 'bagged', 'weighing', 'j-form', 'lifted', 'credited'];
+export function stageOf(b) {
+  if (!b) return 'booked';
+  if (b.status === STATUS.PAID) return b.creditedAt ? 'credited' : b.liftedAt ? 'lifted' : 'j-form';
+  if (b.status === STATUS.PAYMENT_PENDING) return 'weighing';
+  if (b.status === STATUS.WEIGHING) return 'weighing';
+  if (b.status === STATUS.PRICE_FIXED) return b.baggedAt ? 'bagged' : 'accepted';
+  if (b.status === STATUS.ASSAY) return 'assay';
+  if (b.status === STATUS.IN_GATE) return b.heapedAt ? 'heaped' : 'in-gate';
+  return b.status;
+}
 
 // Statuses that mean the farmer is physically inside the mandi.
 export const INSIDE_STATUSES = [
@@ -163,6 +185,84 @@ export {
  * mandi that never touches the screen still benefits.
  * =============================================================== */
 export const ENGINE_DEFAULTS = { useCorrection: true, useNoShow: true, throughputMode: 'set' };
+
+
+/* ===============================================================
+ * install55: CENTRE CALENDAR + SHEDS
+ * =============================================================== */
+export const CALENDAR_DEFAULTS = { closedDays: [0], holidays: [], hoursOverride: {} };  // 0 = Sunday
+
+/** Is this centre open on dateStr? -> { open, reason:'sunday'|'holiday'|null, hours } */
+export function dayStatus(centre, dateStr) {
+  const d = parseLocalDate(dateStr);
+  const closedDays = Array.isArray(centre?.closedDays) ? centre.closedDays : CALENDAR_DEFAULTS.closedDays;
+  const holidays = Array.isArray(centre?.holidays) ? centre.holidays : [];
+  const hol = holidays.find((h) => (typeof h === 'string' ? h : h?.date) === dateStr);
+  if (hol) return { open: false, reason: 'holiday', label: typeof hol === 'object' ? hol.label || '' : '', hours: null };
+  if (closedDays.includes(d.getDay())) return { open: false, reason: 'weekly', label: '', hours: null };
+  const ov = centre?.hoursOverride?.[dateStr];
+  return { open: true, reason: null, label: '', hours: ov ? { start: ov.start, end: ov.end } : null };
+}
+
+/** Centre with that day's operating hours applied (override or default). */
+export function centreForDay(centre, dateStr) {
+  const st = dayStatus(centre, dateStr);
+  if (!st.hours) return centre;
+  return { ...centre, operatingStartTime: st.hours.start || centre.operatingStartTime, operatingEndTime: st.hours.end || centre.operatingEndTime };
+}
+
+export async function saveCalendar(centreId, { closedDays, holidays, hoursOverride }) {
+  const patch = { updatedAt: serverTimestamp() };
+  if (closedDays) patch.closedDays = closedDays.map(Number);
+  if (holidays) patch.holidays = holidays;
+  if (hoursOverride) patch.hoursOverride = hoursOverride;
+  await updateDoc(doc(db, 'centres', centreId), patch);
+}
+
+/** sheds: [{ id, name, floorCapacityQ }]; shedUsedQ: { [id]: quintals lying there } */
+export async function saveSheds(centreId, sheds) {
+  await updateDoc(doc(db, 'centres', centreId), { sheds: sheds.map((s, i) => ({ id: s.id || `S${i + 1}`, name: s.name || `Shed ${i + 1}`, floorCapacityQ: Number(s.floorCapacityQ) || 0 })), updatedAt: serverTimestamp() });
+}
+export function shedFill(centre) {
+  return (centre?.sheds || []).map((s) => {
+    const used = Number(centre?.shedUsedQ?.[s.id]) || 0;
+    return { ...s, usedQ: used, percent: s.floorCapacityQ ? Math.min(100, Math.round((used / s.floorCapacityQ) * 100)) : 0 };
+  });
+}
+async function bumpShed(centreId, shedId, deltaQ) {
+  if (!centreId || !shedId || !deltaQ) return;
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, 'centres', centreId);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const used = { ...(snap.data().shedUsedQ || {}) };
+    used[shedId] = Math.max(0, round1((Number(used[shedId]) || 0) + deltaQ));
+    tx.update(ref, { shedUsedQ: used });
+  });
+}
+
+/** Assay officer: when does the inspector walk the heaps next? Shown to farmers who are inside. */
+export async function setAssayRound(centreId, timeLabel, note = '') {
+  await updateDoc(doc(db, 'centres', centreId), { assayRound: { at: timeLabel || '', note: note || '', setAt: new Date().toISOString() }, updatedAt: serverTimestamp() });
+}
+
+/** Admin-editable yield table (q/acre) for the area ceiling warning. */
+export async function saveYieldTable(centreId, yields) {
+  const clean = {};
+  Object.keys(yields || {}).forEach((k) => { const v = Number(yields[k]); if (v > 0) clean[k] = v; });
+  await updateDoc(doc(db, 'centres', centreId), { yieldTable: clean, updatedAt: serverTimestamp() });
+}
+
+/* ===============================================================
+ * install55: PRE-ARRIVAL CHECKLIST (per crop)
+ * =============================================================== */
+export const CHECKLIST = {
+  wheat:   ['ck_dry', 'ck_clean', 'ck_regNo', 'ck_bank', 'ck_plate', 'ck_tarp'],
+  paddy:   ['ck_dryPaddy', 'ck_clean', 'ck_regNo', 'ck_bank', 'ck_plate', 'ck_tarp'],
+  mustard: ['ck_dryMustard', 'ck_clean', 'ck_regNo', 'ck_bank', 'ck_plate', 'ck_tarp'],
+  default: ['ck_dry', 'ck_clean', 'ck_regNo', 'ck_bank', 'ck_plate'],
+};
+export function checklistFor(crop) { return CHECKLIST[String(crop || '').toLowerCase()] || CHECKLIST.default; }
 
 export function engineSettings(centre) {
   return { ...ENGINE_DEFAULTS, ...(centre?.engine || {}) };
@@ -484,6 +584,7 @@ export async function recordLifted(centreId, quintals) {
   const next = { ...cur, floorUsedQ: Math.max(0, Math.round(cur.floorUsedQ - q)), liftedTodayQ: q, liftedHistory: hist, updatedAt: new Date().toISOString() };
   await updateDoc(doc(db, 'centres', centreId), { yard: next });
   await syncYardIncident(centreId, next);
+  autoLiftOldest(centreId, q).catch(() => {});   // install55: oldest paid lots become 'lifted'
   return next;
 }
 
@@ -720,11 +821,17 @@ function tokenLabel(position) {
  * queue document the transaction checks.
  */
 export async function fetchCentreSlots(centreId, dateStr, { crop = '', quintals = 10, farmerId = null } = {}) {
-  const centre = await fetchCentreById(centreId);
+  const centreRaw = await fetchCentreById(centreId);
 
-  if (!centre) {
+  if (!centreRaw) {
     throw tErr('err.mandiNotFound');
   }
+  // install55: calendar - closed day returns no slots + the reason
+  const day = dayStatus(centreRaw, dateStr);
+  if (!day.open) {
+    return { centre: centreRaw, date: dateStr, slots: [], firstFit: null, tooBig: false, closedDay: day, capacity: null, engine: {}, yard: {} };
+  }
+  const centre = centreForDay(centreRaw, dateStr);
 
   const queueSnap = await getDoc(queueRef(centreId, dateStr));
   const queue = queueSnap.exists() ? queueSnap.data() : {};
@@ -762,7 +869,7 @@ export async function fetchCentreSlots(centreId, dateStr, { crop = '', quintals 
   const firstFit = slots.find((s) => s.fits) || null;
 
   return {
-    centre, date: dateStr, slots, firstFit, tooBig, capacity: effectiveCapacity(centre, crop, list[0]), engine: audit,
+    centre, date: dateStr, slots, firstFit, tooBig, closedDay: null, capacity: effectiveCapacity(centre, crop, list[0]), engine: audit,
     yard: { factor: Math.round(dayFactor * 100) / 100, floorUsedPercent: yp.factors.floorUsedPercent, labourFactor: yp.factors.labourFactor, incidentActive: Boolean(yp.incident?.active), recoveryDays: yp.projection.recoveryDays, reasons: yp.reasons },
   };
 }
@@ -844,8 +951,9 @@ export async function createBooking({
   date,
   slotTime,
   slotWindow,
-  bookedVia = 'app', // 'app' | 'ivr' | 'gate'
+  bookedVia = 'app', // 'app' | 'ivr' | 'gate' | 'arhtiya'
   extra = {},        // install53: { walkIn, transferFrom, transferValidUntil, spareUsed }
+                     // install55: { arhtiyaId, arhtiyaName, arhtiyaShedId, farmerRegNo, regSource, ceilingQ, ceilingWarned, nomineeUsed }
 }) {
   if (!farmerId) throw new Error('Farmer ID is required');
   if (!centreId) throw new Error('Mandi centre is required');
@@ -855,11 +963,18 @@ export async function createBooking({
   const quintals = Math.max(1, parseFloat(approxQuantityQuintals) || 0);
 
   // Centre master data is static, so read it outside the transaction.
-  const centre = await fetchCentreById(centreId);
+  const centreRaw = await fetchCentreById(centreId);
 
-  if (!centre) {
+  if (!centreRaw) {
     throw tErr('err.mandiNotFound');
   }
+  // install55: closed day / holiday / per-day hours
+  const day = dayStatus(centreRaw, date);
+  if (!day.open) throw tErr('err.dayClosed');
+  const centre = centreForDay(centreRaw, date);
+  // install55: arhtiya may not fill more than 25 % of a day for his own farmers
+  const arhtiyaId = bookedVia === 'arhtiya' ? extra.arhtiyaId || null : null;
+  const arhtiyaCapQ = arhtiyaId ? Math.max(1, Math.round(normalDayIntake(centre, crop) * ARHTIYA_DAY_SHARE)) : null;
 
   // install41: at most 2 live tokens per farmer per mandi.
   const active = await fetchActiveFarmerBookings(farmerId);
@@ -901,6 +1016,14 @@ export async function createBooking({
 
     const counters = applyPlan(queue, plan, quintals);
     const loadByPosition = { ...(queue.loadByPosition || {}) };
+
+    // install55: 25 % day share per arhtiya
+    const arhtiyaQ = { ...(queue.arhtiyaQ || {}) };
+    if (arhtiyaId) {
+      const soFar = Number(arhtiyaQ[arhtiyaId]) || 0;
+      if (soFar + quintals > arhtiyaCapQ) throw tErr('err.arhtiyaShare', { q: arhtiyaCapQ });
+      arhtiyaQ[arhtiyaId] = round1(soFar + quintals);
+    }
 
     const position = (Number(queue.lastIssuedPosition) || 0) + 1;
     const tokenNumber = tokenLabel(position);
@@ -960,6 +1083,24 @@ export async function createBooking({
       transferFrom: extra.transferFrom || null,
       transferFromName: extra.transferFromName || null,
       transferValidUntil: extra.transferValidUntil || null,
+
+      // install55: government-rail identifiers (filled as the lot moves; null = not yet)
+      farmerRegNo: extra.farmerRegNo || null,     // MFMB / Anaaj Kharid / e-Uparjan registration no.
+      regSource: extra.regSource || null,         // 'mfmb' | 'anaaj' | 'uparjan' | 'manual'
+      ceilingQ: extra.ceilingQ ?? null,           // area-based ceiling shown at booking (warning only)
+      ceilingWarned: Boolean(extra.ceilingWarned),
+      nomineeUsed: extra.nomineeUsed || null,     // name of nominee expected at the gate (null = farmer himself)
+      presentedBy: null,                          // gate taps who actually came
+      arhtiyaId,
+      arhtiyaName: arhtiyaId ? extra.arhtiyaName || '' : null,
+      arhtiyaShedId: arhtiyaId ? extra.arhtiyaShedId || null : null,
+      enamLotId: null, enamGateEntryId: null, enamAssayId: null, enamWeighmentId: null,
+      shedId: null, heapedAt: null,
+      bags: null, baggedAt: null,
+      rejectReason: null,
+      jformNo: null, jformAt: null, utr: null,
+      liftedAt: null, creditedAt: null,
+      checklist: checklistFor(crop),
 
       status: STATUS.BOOKED,
 
@@ -1024,6 +1165,7 @@ export async function createBooking({
         insidePositions: queue.insidePositions || [],
         ...counters,
         loadByPosition,
+        arhtiyaQ,
         updatedAt: serverTimestamp(),
       },
       { merge: true }
@@ -1036,11 +1178,13 @@ export async function createBooking({
   const bp = { token: booking.tokenNumber, mandi: booking.centreName, date: booking.date, time: booking.arriveAt || booking.slotWindow, crop: booking.crop || booking.cropName, qty: booking.approxQuantityQuintals, farmer: booking.farmerName || booking.farmerPhone };
   notifyUser(booking.farmerId, makeItem('nt_booked_t', 'nt_booked_b', bp, routes.farmerToken(booking.tokenId)));
   notifyCentreOfficers(booking.centreId, ['gate'], makeItem('nt_off_newToken_t', 'nt_off_newToken_b', bp, routes.officerStage('gate')));
+  if (arhtiyaId) notifyUser(arhtiyaId, makeItem('nt_arh_booked_t', 'nt_arh_booked_b', bp, routes.farmerToken(booking.tokenId)));
 
   return booking;
 }
 
 export const MAX_ACTIVE_TOKENS_PER_CENTRE = 2;
+export const ARHTIYA_DAY_SHARE = 0.25;   // install55
 
 /* ===============================================================
  * LIVE QUEUE  (what the farmer subscribes to)
@@ -1388,6 +1532,7 @@ async function afterStageNotify(b, patch) {
     token: b.tokenNumber, mandi: b.centreName, farmer: b.farmerName || b.farmerPhone || '',
     crop: b.crop || b.cropName, grade: b.grade || 'FAQ', rate: b.ratePerQuintal || '', qty: b.actualQuantity || b.approxQuantityQuintals || '',
     lane: b.laneAssigned || '', amount: b.netPayable || '', buyer: typeof b.buyerName === 'string' ? b.buyerName : '',
+    reason: b.rejectReason || '', moisture: b.moisturePercent ?? '', fm: b.foreignMatterPercent ?? '', jform: b.jformNo || '',
   };
   const farmer = (t, body, route) => notifyUser(b.farmerId, makeItem(t, body, p, route || routes.farmerToken(b.tokenId)));
   const officers = (duties, t, body, stage) => notifyCentreOfficers(b.centreId, duties, makeItem(t, body, p, routes.officerStage(stage)));
@@ -1401,7 +1546,7 @@ async function afterStageNotify(b, patch) {
       await farmer('nt_assay_t', 'nt_assay_b');
       break;
     case STATUS.REJECTED:
-      await farmer('nt_rejected_t', 'nt_rejected_b');
+      await farmer('nt_rejected_t', b.rejectReason ? `nt_rej_${b.rejectReason}_b` : 'nt_rejected_b');
       break;
     case STATUS.PRICE_FIXED:
       await farmer('nt_price_t', 'nt_price_b');
@@ -1430,7 +1575,8 @@ export async function markGateEntry(
   tokenId,
   vehicleNumber = '',
   verifiedBy = 'manual', // 'qr' | 'code' | 'manual'
-  vehicles = null        // install43: [{ serial: 1, plate: 'HR26AB1234' }, ...]
+  vehicles = null,       // install43: [{ serial: 1, plate: 'HR26AB1234' }, ...]
+  presentedBy = 'self'   // install55: 'self' | nominee name | 'arhtiya'
 ) {
   const booking = await assertOfficerFor(tokenId, DUTY_FOR_STAGE.gate);
 
@@ -1482,6 +1628,8 @@ export async function markGateEntry(
     vehicleNumber: plates[0],
     vehicles: list.map((v) => ({ ...v, grossWeightQuintals: null, tareWeightQuintals: null, netQuintals: null })),
     vehicleCount: list.length,
+    presentedBy: presentedBy || 'self',
+    enamGateEntryId: wrapInstrument('gateEntry', { id: `GE-${Date.now().toString(36).toUpperCase()}` }),
   };
 
   const result = await advanceStage(tokenId, patch, { entering: true });
@@ -1589,7 +1737,7 @@ export const markAppeared = markGateEntry;
  */
 export async function recordAssay(
   tokenId,
-  { moisturePercent, foreignMatterPercent, grade, notes = '', rejected = false }
+  { moisturePercent, foreignMatterPercent, grade, notes = '', rejected = false, rejectReason = null }
 ) {
   await assertOfficerFor(tokenId, DUTY_FOR_STAGE.assay);
   const patch = {
@@ -1599,9 +1747,102 @@ export async function recordAssay(
     foreignMatterPercent: parseFloat(foreignMatterPercent) || 0,
     grade: grade || 'FAQ',
     assayNotes: notes || '',
+    rejectReason: rejected ? (REJECT_REASONS.includes(rejectReason) ? rejectReason : 'quality') : null,
+    enamAssayId: wrapInstrument('assay', { id: `AS-${Date.now().toString(36).toUpperCase()}` }),
   };
 
-  return advanceStage(tokenId, patch);
+  const res = await advanceStage(tokenId, patch);
+  // a rejected heap leaves the shed floor
+  if (rejected && res.shedId) bumpShed(res.centreId, res.shedId, -(Number(res.approxQuantityQuintals) || 0)).catch(() => {});
+  return res;
+}
+
+/**
+ * install55: heap unloaded at a shed / arhtiya dhera (optional step between
+ * gate and assay). Gate or assay staff may record it. Floor accounting per shed.
+ */
+export async function markHeaped(tokenId, shedId) {
+  const booking = await assertOfficerFor(tokenId, [...DUTY_FOR_STAGE.gate, ...DUTY_FOR_STAGE.assay]);
+  if (booking.status !== STATUS.IN_GATE) throw tErr('err.wrongStage');
+  const ref = doc(db, 'bookings', tokenId);
+  const patch = { heapedAt: new Date().toISOString(), shedId: shedId || booking.arhtiyaShedId || null };
+  await updateDoc(ref, patch);
+  if (patch.shedId) bumpShed(booking.centreId, patch.shedId, Number(booking.approxQuantityQuintals) || 0).catch(() => {});
+  const b = { ...booking, ...patch };
+  notifyUser(b.farmerId, makeItem('nt_heaped_t', 'nt_heaped_b', { shed: patch.shedId || '-', mandi: b.centreName }, routes.farmerToken(tokenId))).catch(() => {});
+  return b;
+}
+
+/** install55: bagging done (optional, after acceptance, before weighing). */
+export async function markBagged(tokenId, bags) {
+  const booking = await assertOfficerFor(tokenId, [...DUTY_FOR_STAGE.weighing, ...DUTY_FOR_STAGE.assay]);
+  if (booking.status !== STATUS.PRICE_FIXED) throw tErr('err.wrongStage');
+  const patch = { baggedAt: new Date().toISOString(), bags: Math.max(0, parseInt(bags, 10) || 0) };
+  await updateDoc(doc(db, 'bookings', tokenId), patch);
+  return { ...booking, ...patch };
+}
+
+/** install55: manual "lifted" (truck took the lot to the warehouse). */
+export async function markLifted(tokenId) {
+  const booking = await assertOfficerFor(tokenId, [...DUTY_FOR_STAGE.payment, ...DUTY_FOR_STAGE.gate]);
+  if (booking.status !== STATUS.PAID || booking.liftedAt) return booking;
+  const patch = { liftedAt: new Date().toISOString() };
+  await updateDoc(doc(db, 'bookings', tokenId), patch);
+  if (booking.shedId) bumpShed(booking.centreId, booking.shedId, -(Number(booking.actualQuantity || booking.approxQuantityQuintals) || 0)).catch(() => {});
+  notifyUser(booking.farmerId, makeItem('nt_lifted_t', 'nt_lifted_b', { mandi: booking.centreName }, routes.farmerToken(tokenId))).catch(() => {});
+  return { ...booking, ...patch };
+}
+
+/** install55: DBT landed (cashier confirms, or the payment rail webhook in a live yard). */
+export async function markCredited(tokenId, utr = '') {
+  const booking = await assertOfficerFor(tokenId, DUTY_FOR_STAGE.payment);
+  if (booking.status !== STATUS.PAID) throw tErr('err.wrongStage');
+  const patch = { creditedAt: new Date().toISOString(), utr: utr || booking.utr || null };
+  await updateDoc(doc(db, 'bookings', tokenId), patch);
+  notifyUser(booking.farmerId, makeItem('nt_credited_t', 'nt_credited_b', { amount: booking.netPayable || '', bank: booking.bankLast4 || '' }, routes.farmerPayments())).catch(() => {});
+  return { ...booking, ...patch };
+}
+
+/**
+ * install55: oldest paid-but-not-lifted lots at this centre get `liftedAt`
+ * when a lifting truck is booked (install52 recordLifted). FIFO up to `quintals`.
+ */
+export async function autoLiftOldest(centreId, quintals) {
+  let left = Number(quintals) || 0;
+  if (!centreId || left <= 0) return 0;
+  const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId), where('status', '==', STATUS.PAID)));
+  const rows = snap.docs.map((d) => d.data()).filter((b) => !b.liftedAt).sort((a, b) => String(a.paidAt).localeCompare(String(b.paidAt)));
+  let n = 0;
+  for (const b of rows) {
+    const q = Number(b.actualQuantity || b.approxQuantityQuintals) || 0;
+    if (q > left) break;
+    left -= q; n += 1;
+    await updateDoc(doc(db, 'bookings', b.tokenId), { liftedAt: new Date().toISOString() });
+    if (b.shedId) bumpShed(centreId, b.shedId, -q).catch(() => {});
+    notifyUser(b.farmerId, makeItem('nt_lifted_t', 'nt_lifted_b', { mandi: b.centreName }, routes.farmerToken(b.tokenId))).catch(() => {});
+  }
+  return n;
+}
+
+/** install55: farmer says "my grain is still wet" -> free re-book, no 48-h rule, no no-show. */
+export async function cancelWet(tokenId) {
+  if (!tokenId) throw new Error('Token ID is required');
+  const bookingRef = doc(db, 'bookings', tokenId);
+  return runTransaction(db, async (tx) => {
+    const bSnap = await tx.get(bookingRef);
+    if (!bSnap.exists()) throw tErr('err.tokenNotFound');
+    const booking = bSnap.data();
+    if (booking.status !== STATUS.BOOKED) throw tErr('err.cannotCancel');
+    const qRef = queueRef(booking.centreId, booking.date);
+    const qSnap = await tx.get(qRef);
+    tx.update(bookingRef, { status: STATUS.CANCELLED, cancelledAt: new Date().toISOString(), cancelReason: 'wet', yardIncidentCancel: true });
+    if (qSnap.exists()) {
+      const data = qSnap.data();
+      const position = Number(booking.positionAssigned) || 0;
+      tx.update(qRef, { ...releaseLoad(data, booking), openPositions: (data.openPositions || []).filter((p) => p !== position), updatedAt: serverTimestamp() });
+    }
+    return true;
+  });
 }
 
 /**
@@ -1698,6 +1939,7 @@ export async function recordWeighing(
   const patch = {
     status: STATUS.PAYMENT_PENDING,
     weighedAt: new Date().toISOString(),
+    enamWeighmentId: wrapInstrument('weighment', { id: `WM-${Date.now().toString(36).toUpperCase()}` }),
     grossWeightQuintals: gross,
     tareWeightQuintals: tare,
     actualQuantity: net,
@@ -1742,7 +1984,7 @@ export async function recordWeighing(
  */
 export async function markPaid(
   tokenId,
-  { actualQuantity, ratePerQuintal, grade, paymentBasis, parchi, cashierName }
+  { actualQuantity, ratePerQuintal, grade, paymentBasis, parchi, cashierName, jformNo = '', utr = '' }
 ) {
   if (!tokenId) throw new Error('Token ID is required');
   await assertOfficerFor(tokenId, DUTY_FOR_STAGE.payment);
@@ -1823,6 +2065,12 @@ export async function markPaid(
     paymentBasis: basis,
     cashierName: cashierName || null,
     parchi: parchiRecord,
+
+    // install55: what the state system issued (typed by the cashier; a live
+    // e-Kharid feed would fill the same two fields)
+    jformNo: String(jformNo || '').trim() || `J-DEMO-${Date.now().toString().slice(-6)}`,
+    jformAt: new Date().toISOString(),
+    utr: String(utr || '').trim() || null,
   };
 
   return advanceStage(tokenId, patch);

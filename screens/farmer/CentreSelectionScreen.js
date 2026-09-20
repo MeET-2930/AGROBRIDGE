@@ -15,7 +15,7 @@ import { useLang } from '../../i18n/LanguageContext';
 
 export default function CentreSelectionScreen({ navigation, route }) {
   const { tr, lang, trError } = useLang();
-  const { crop } = route.params || {};
+  const { crop, forFarmer = null } = route.params || {};   // install55
 
   const [centres, setCentres] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -191,7 +191,7 @@ export default function CentreSelectionScreen({ navigation, route }) {
         <PrimaryButton
           title={tr('continue')}
           disabled={!selected || loading}
-          onPress={() => navigation.navigate('Quantity', { crop, centre: selected })}
+          onPress={() => navigation.navigate('Quantity', { crop, centre: selected, forFarmer })}
         />
       </View>
     </SafeAreaView>

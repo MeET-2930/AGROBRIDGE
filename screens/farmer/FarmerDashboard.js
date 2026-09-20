@@ -314,9 +314,9 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('chat_withAssistant')}
-            icon="chatbubbles-outline"
-            onPress={() => navigation.navigate('Chatbot')}
+            title={tr('help')}
+            icon="help-circle-outline"
+            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
           />
 
           {IVR_BASE_URL ? (
@@ -342,6 +342,15 @@ export default function FarmerDashboard({ navigation }) {
             <Text style={styles.profilePhone}>
               +91 {session?.phone || ''}
             </Text>
+
+            {/* install55: registration no., nominees, my arhtiya */}
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => { setProfileOpen(false); navigation.navigate('FarmerProfile'); }}
+            >
+              <Ionicons name="id-card-outline" size={18} color={Colors.secondary} />
+              <Text style={styles.profileLinkText}>{tr('fp_title')}</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.profileLink}
