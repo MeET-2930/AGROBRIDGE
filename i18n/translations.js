@@ -1726,6 +1726,23 @@ export const t = {
   ar_nextDayResult: r('अगले दिनों में: {b} बुक, {f} अब भी नहीं', 'On following days: {b} booked, {f} still not', 'ਅਗਲੇ ਦਿਨਾਂ ਵਿੱਚ: {b} ਬੁੱਕ, {f} ਅਜੇ ਵੀ ਨਹੀਂ', 'पुढील दिवसांत: {b} बुक, {f} अजूनही नाही'),
   ar_noRoom7: r('7 दिन में जगह नहीं', 'No room within 7 days', '7 ਦਿਨਾਂ ਵਿੱਚ ਥਾਂ ਨਹੀਂ', '7 दिवसांत जागा नाही'),
 
+
+  /* =============================== install59: lifting at gate, auto credit, traders =============================== */
+  sq_liftTitle: r('उठान के लिए तैयार: {n} ढेरियाँ (भुगतान हो चुका)', 'Ready for lifting: {n} paid lots', 'ਚੁਕਾਈ ਲਈ ਤਿਆਰ: {n} ਢੇਰੀਆਂ', 'उचलीसाठी तयार: {n} ढीग'),
+  sq_liftSub: r('ट्रक गेट से बाहर जाते समय: ट्रक नंबर लिखें, जो ढेरियाँ उसमें लदी हैं उन पर टिक करें, "बाहर गया" दबाएँ। फड़ खाली होगा और किसान को सूचना जाएगी।', 'When a truck leaves through the gate: type its plate, tick the lots it carries, tap "Truck left". Floor is freed and the farmer is told.', 'ਟਰੱਕ ਗੇਟ ਤੋਂ ਬਾਹਰ ਜਾਂਦੇ ਸਮੇਂ: ਨੰਬਰ ਲਿਖੋ, ਢੇਰੀਆਂ ਤੇ ਟਿਕ ਕਰੋ, "ਬਾਹਰ ਗਿਆ" ਦਬਾਓ।', 'ट्रक गेटमधून बाहेर जाताना: नंबर लिहा, ढीगांवर टिक करा, "बाहेर गेला" दाबा.'),
+  sq_liftPlate: r('ट्रक नंबर (जैसे HR55AB1234)', 'Truck plate (e.g. HR55AB1234)', 'ਟਰੱਕ ਨੰਬਰ', 'ट्रक नंबर'),
+  sq_liftGo: r('ट्रक बाहर गया ({n} ढेरियाँ)', 'Truck left ({n} lots)', 'ਟਰੱਕ ਬਾਹਰ ਗਿਆ ({n})', 'ट्रक बाहेर गेला ({n})'),
+  sq_liftDone: r('उठान दर्ज', 'Lifting recorded', 'ਚੁਕਾਈ ਦਰਜ', 'उचल नोंदवली'),
+  sq_liftDoneSub: r('{n} ढेरियाँ ट्रक {p} में गईं। किसानों को सूचना भेज दी गई।', '{n} lots left in truck {p}. Farmers have been told.', '{n} ਢੇਰੀਆਂ ਟਰੱਕ {p} ਵਿੱਚ ਗਈਆਂ।', '{n} ढीग ट्रक {p} मध्ये गेले.'),
+  sq_liftedAt: r('उठान {t} बजे', 'Lifted {t}', 'ਚੁਕਾਈ {t}', 'उचल {t}'),
+  sq_awaitLift: r('उठान बाकी (गेट दर्ज करेगा)', 'Awaiting lifting (gate records it)', 'ਚੁਕਾਈ ਬਾਕੀ (ਗੇਟ ਦਰਜ ਕਰੇਗਾ)', 'उचल बाकी (गेट नोंदवेल)'),
+  sq_creditedAuto: r('बैंक ने पुष्टि की', 'Bank confirmed', 'ਬੈਂਕ ਨੇ ਪੁਸ਼ਟੀ ਕੀਤੀ', 'बँकेने पुष्टी केली'),
+  sq_creditPending: r('बैंक पुष्टि बाकी (अपने आप)', 'Bank confirmation pending (automatic)', 'ਬੈਂਕ ਪੁਸ਼ਟੀ ਬਾਕੀ (ਆਪਣੇ ਆਪ)', 'बँक पुष्टी बाकी (आपोआप)'),
+  sq_bagsShort: r('बोरी', 'bags', 'ਬੋਰੀ', 'पोती'),
+  yd_forceCredit: r('बैंक पुष्टि अभी लागू करें (डेमो)', 'Apply bank confirmations now (demo)', 'ਬੈਂਕ ਪੁਸ਼ਟੀ ਹੁਣੇ ਲਾਗੂ ਕਰੋ (ਡੈਮੋ)', 'बँक पुष्टी आता लागू करा (डेमो)'),
+  yd_forceCreditSub: r('आम तौर पर भुगतान के 2 मिनट बाद (डेमो) अपने आप होता है; असली PFMS 48-72 घंटे। यह बटन सिर्फ़ डेमो के लिए।', 'Normally automatic 2 min after Mark paid (demo); real PFMS 48-72 h. This button is for demos only.', 'ਆਮ ਤੌਰ ਤੇ ਆਪਣੇ ਆਪ 2 ਮਿੰਟ ਬਾਅਦ; ਇਹ ਬਟਨ ਸਿਰਫ਼ ਡੈਮੋ ਲਈ।', 'सामान्यतः 2 मिनिटांनी आपोआप; हे बटण फक्त डेमोसाठी.'),
+  td_bankMock: r('बैंक पुष्टि - डेमो; असली DBT 48-72 घंटे', 'bank confirmation - demo; real DBT 48-72 h', 'ਬੈਂਕ ਪੁਸ਼ਟੀ - ਡੈਮੋ', 'बँक पुष्टी - डेमो'),
+
 };
 
 /* ------------------------------------------------------------------ */

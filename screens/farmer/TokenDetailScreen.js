@@ -23,6 +23,7 @@ import Colors from '../../theme/colors';
 
 import {
   subscribeToBooking,
+  settleCreditFor,
   subscribeToTodaysQueue,
   laneAhead,
   passLabel,
@@ -138,6 +139,8 @@ export default function TokenDetailScreen({ navigation, route }) {
 
     const unsubBooking = subscribeToBooking(tokenId, (fresh) => {
       setToken(fresh);
+      // install59: bank confirmation (mock PFMS) is applied when due - no officer button
+      if (fresh && fresh.status === 'paid' && !fresh.creditedAt && fresh.creditDueAt) settleCreditFor(fresh).catch(() => {});
       setLoading(false);
 
       // Attach the queue listener once we know the centre and date.
@@ -853,7 +856,7 @@ export default function TokenDetailScreen({ navigation, route }) {
             <Row label={tr('td_receiptNo')} value={token.receiptId} />
             <Row label={tr('td_jform')} value={token.jformNo || '—'} />
             <Row label={tr('td_lifted')} value={token.liftedAt ? String(token.liftedAt).slice(0, 16).replace('T', ' ') : tr('td_liftedPending')} />
-            <Row label={tr('td_credited')} value={token.creditedAt ? `${tr('td_creditedYes')}${token.utr ? ' • UTR ' + token.utr : ''}` : tr('td_creditedPending')} />
+            <Row label={tr('td_credited')} value={token.creditedAt ? `${tr('td_creditedYes')}${token.utr ? ' • UTR ' + token.utr : ''}${token.creditSource === 'mock-pfms' ? ` (${tr('td_bankMock')})` : ''}` : tr('td_creditedPending')} />
             <Row label={tr('quantity')} value={`${token.actualQuantity} ${tr('quintal')}`} />
             <Row label={tr('rate')} value={`₹${token.ratePerQuintal} ${tr('perQuintal')}`} />
             <Row label={tr('td_total')} value={`₹${token.grossAmount}`} />

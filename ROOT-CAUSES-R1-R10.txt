@@ -1,0 +1,69 @@
+AGROBRIDGE - ROOT CAUSES OF MANDI CONGESTION AND WHAT WE DID (main points)
+===========================================================================
+(status: DONE = in the app now; PLANNED = designed, not built yet)
+
+R1  Turns are rationed by quota, not by capacity.  Passes/SMS are issued per day with no link to how much
+    the yard can actually process, so more farmers arrive than can be served.
+    -> DONE: quintal-per-hour capacity model per mandi (lanes x labour x floor), one model for all sizes;
+       bookings only offered against real remaining capacity; Firestore transactions so two farmers cannot
+       take the same room. Big loads use consecutive windows (1+3), never moving anyone.
+
+R2  Farmers guess their quantity wrong, so "40 quintal booked" becomes 55 on the scale and the hour overflows.
+    -> DONE: Model A (quantity correction) learns per mandi/crop the ratio actual/booked from the weigh step
+       and inflates future bookings accordingly. Tolerance exceedance = note, no penalty.
+
+R3  Real throughput differs by mandi, crop, day and hour; a fixed number is always wrong.
+    -> DONE: Model B (throughput) learns effective quintals/hour from gate->pay timestamps on busy hours
+       (censored so idle hours do not drag it down); feeds tomorrow's capacity.
+
+R4  No-shows and late-comers leave hours empty while others were refused.
+    -> DONE: Model C (no-show probability from lead time, hour, history, booked-via) lets the planner
+       overbook a little where no-shows are likely; leftover room goes to walk-ins / cross-centre transfers.
+
+R5  Everybody arrives early / the night before because the turn is not trusted and early arrival helps.
+    -> DONE: pass = date + hour + code only; come-first-go-first WITHIN the booked hour, no early admission,
+       missed hour = pass expires and is re-booked at the gate by the planner; time light on the dashboard;
+       no token/"ahead of you" outside the gate so there is nothing to gain by standing there.
+
+R6  The floor fills up because lifting (trucks to godown) is slow; then gate passes are stopped after
+    farmers have already arrived.
+    -> DONE: yard model (floor %, sheds/phads) and lifting-truck slots; a "yard factor" shrinks the capacity
+       offered to farmers BEFORE they book. Lifted tap frees floor. Yard-full incident -> farmer chooses
+       Wait (estimated range) or Cancel & re-book with no no-show mark; engine computes recovery slots.
+
+R7  Bags (bardana) and labour run short, so even inspected heaps cannot be weighed.
+    -> DONE: Yard setup records labour gangs, bag stock, lanes per day; these are inputs to the hour
+       capacity, so shortages reduce offered slots instead of creating queues inside.
+
+R8  Quantity beyond registered area / ineligible lots are discovered only at the yard.
+    -> DONE: mock MFMB/e-Kharid adapter (govRail.js) returns registered crop, acres, bank-last-4;
+       area ceiling = acres x yield x 1.2 -> WARNING only, stored for the inspector. Real feed = swap one file.
+       Aadhaar shown as a clearly labelled mock.
+
+R9  Incidents and outages (machine down, portal down, staff missing) stop everything and nobody is told.
+    -> DONE: Delay report by admin -> affected farmers notified and given the Wait / Cancel choice;
+       OFFLINE GATE: cached list, entries queued with real time and provisional lane, "Send now" replays in
+       order, server-rejected entries go to the admin's Gate-conflicts tab (farmer never thrown out).
+    -> PLANNED: installable web app (service worker) so the gate page itself opens without internet.
+
+R10 Nobody sees the whole day: farmer asks the munshi, secretary asks the inspector, public sees nothing;
+    arhtiya (who really schedules farmers in Punjab/Haryana) had no place in any app.
+    -> DONE: real stage chain (gate -> heap -> assay -> price -> weigh -> pay -> credit -> lift) with a
+       timestamp from the person who already does that step; farmer sees each stage, grade AND why, per-truck
+       weights, payment; admin sees "Where is today stuck?" (per-stage waiting / median / bottleneck + action);
+       public board with traffic light and no names; arhtiya role with My farmers, book-for-one and bulk
+       booking (each farmer gets his own pass under the same rules, 25 % day share); SMS text in outbox
+       (real DLT SMS when Blaze is funded); calendar (weekly off, holidays, hours per day).
+       Every stamp comes from the person who physically sees it: lifting is recorded at the GATE per truck
+       (trucks leave through the gate), bank credit is confirmed by a mock PFMS adapter, not a clerk.
+       Trader role: FAQ-failed lots and non-MSP crops go to a transparent e-auction (e-NAM style) instead
+       of a distress sale to whoever is standing there.
+
+CROSS-CUTTING
+    Everything the models need is a side-effect of a tap someone already makes (gate scan, Pass, Weigh, Paid,
+    Lifted) - no forms for the ML. Engine is pure JS, portable to our own server later.
+    We replace only the quota gate pass; MFMB, e-Kharid, J-form and DBT stay the legal record and payment.
+
+STILL IN THE QUEUE (no funding needed unless marked)
+    Installable/offline web app - Gemini chatbot polish - season forecast - on-my-way check-in -
+    real SMS via Blaze+DLT (~Rs 8k) - IVR / WhatsApp (funded) - real-mandi data import.

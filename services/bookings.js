@@ -44,7 +44,7 @@ import { fetchCentreById, fetchCentres, normalizePlate, cropClassOf } from './ce
 import {
   CAPACITY_DEFAULTS, centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour, loadMinutesFor,
 } from '../engine/capacity';
-import { wrapInstrument } from './govRail';
+import { wrapInstrument, bankConfirm, MOCK_CREDIT_MS } from './govRail';
 import { stageTelemetry, publicBoard as buildPublicBoard } from '../engine/telemetry';
 import { correctionRatio, trainCorrection } from '../engine/models/correction';
 import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
@@ -1800,6 +1800,76 @@ export async function markLifted(tokenId) {
 }
 
 /** install55: DBT landed (cashier confirms, or the payment rail webhook in a live yard). */
+/**
+ * install59: apply due bank confirmations (mock PFMS). Called lazily by the
+ * screens that list paid lots; on a real server this is the PFMS webhook.
+ * Returns the number of lots credited.
+ */
+export async function settleDueCredits(centreId) {
+  if (!centreId) return 0;
+  const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId), where('status', '==', STATUS.PAID)));
+  let n = 0;
+  for (const d of snap.docs) {
+    const b = d.data();
+    if (b.creditedAt) continue;
+    const conf = bankConfirm(b);
+    if (!conf) continue;
+    await updateDoc(doc(db, 'bookings', b.tokenId), conf);
+    notifyUser(b.farmerId, makeItem('nt_credited_t', 'nt_credited_b', { amount: b.netPayable || '', bank: b.bankLast4 || '' }, routes.farmerPayments())).catch(() => {});
+    n += 1;
+  }
+  return n;
+}
+
+/** Admin demo recovery: make every pending confirmation due now, then settle. */
+export async function forceDueCredits(centreId) {
+  const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId), where('status', '==', STATUS.PAID)));
+  const past = new Date(Date.now() - 1000).toISOString();
+  for (const d of snap.docs) { const b = d.data(); if (!b.creditedAt) await updateDoc(doc(db, 'bookings', b.tokenId), { creditDueAt: past }); }
+  return settleDueCredits(centreId);
+}
+
+/** install59: same for ONE booking (farmer opening his own pass). */
+export async function settleCreditFor(booking) {
+  if (!booking || booking.status !== STATUS.PAID || booking.creditedAt) return booking;
+  const conf = bankConfirm(booking);
+  if (!conf) return booking;
+  await updateDoc(doc(db, 'bookings', booking.tokenId), conf);
+  return { ...booking, ...conf };
+}
+
+/**
+ * install59: LIFTING is recorded at the GATE, per truck. The gate officer
+ * ticks the paid lots a lifting truck carries out; each gets liftedAt, the
+ * shed is freed, the farmer is told. Admin may do it too.
+ */
+export async function markLiftedByTruck(centreId, tokenIds, truck = {}) {
+  const ids = (tokenIds || []).filter(Boolean);
+  if (!ids.length) return 0;
+  const at = new Date().toISOString();
+  let n = 0;
+  for (const id of ids) {
+    const snap = await getDoc(doc(db, 'bookings', id));
+    if (!snap.exists()) continue;
+    const b = snap.data();
+    if (b.status !== STATUS.PAID || b.liftedAt) continue;
+    await updateDoc(doc(db, 'bookings', id), { liftedAt: at, liftTruck: truck.plate || null, liftSlotId: truck.slotId || null });
+    const q = Number(b.actualQuantity || b.approxQuantityQuintals) || 0;
+    if (b.shedId) bumpShed(centreId, b.shedId, -q).catch(() => {});
+    notifyUser(b.farmerId, makeItem('nt_lifted_t', 'nt_lifted_b', { mandi: b.centreName }, routes.farmerToken(b.tokenId))).catch(() => {});
+    n += 1;
+  }
+  return n;
+}
+
+/** install59: paid-but-not-lifted lots at a centre (for the gate's lifting block). */
+export async function fetchAwaitingLift(centreId) {
+  if (!centreId) return [];
+  const snap = await getDocs(query(collection(db, 'bookings'), where('centreId', '==', centreId), where('status', '==', STATUS.PAID)));
+  return snap.docs.map((d) => d.data()).filter((b) => !b.liftedAt).sort((a, b) => String(a.paidAt).localeCompare(String(b.paidAt)));
+}
+
+/** Admin demo-recovery only: force the bank confirmation now. */
 export async function markCredited(tokenId, utr = '') {
   const booking = await assertOfficerFor(tokenId, DUTY_FOR_STAGE.payment);
   if (booking.status !== STATUS.PAID) throw tErr('err.wrongStage');
@@ -2077,6 +2147,8 @@ export async function markPaid(
     jformNo: String(jformNo || '').trim() || `J-DEMO-${Date.now().toString().slice(-6)}`,
     jformAt: new Date().toISOString(),
     utr: String(utr || '').trim() || null,
+    // install59: bank confirmation is automatic (mock PFMS) - due after MOCK_CREDIT_MS
+    creditDueAt: new Date(Date.now() + MOCK_CREDIT_MS).toISOString(),
   };
 
   return advanceStage(tokenId, patch);

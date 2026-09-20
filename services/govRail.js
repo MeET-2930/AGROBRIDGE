@@ -118,6 +118,22 @@ export async function getJFormStatus(jformNo, jformAt) {
   };
 }
 
+/**
+ * install59: PAYMENT rail (mock PFMS / bank).
+ * Real: PFMS/bank sends a credit confirmation (webhook) with a UTR after the
+ * DBT batch clears (48-72 h). Demo: the confirmation is "due" MOCK_CREDIT_MS
+ * after Mark paid, and settleDueCredits() (bookings.js) applies it lazily
+ * whenever a screen loads paid lots. Nobody in the mandi presses a button.
+ * Swap point: replace bankConfirm() with the webhook handler on our server.
+ */
+export const MOCK_CREDIT_MS = 2 * 60 * 1000;      // demo: 2 minutes (real DBT: 48-72 h)
+export function bankConfirm(booking, nowMs = Date.now()) {
+  const due = booking.creditDueAt ? new Date(booking.creditDueAt).getTime() : NaN;
+  if (!Number.isFinite(due) || nowMs < due) return null;
+  const h = hash(String(booking.tokenId || booking.jformNo || 'x'));
+  return { creditedAt: new Date(due).toISOString(), utr: booking.utr || `PFMS${String(h).padStart(6, '0')}${String(due).slice(-6)}`, creditSource: 'mock-pfms' };
+}
+
 /** District cluster rule: may a pass from A be honoured at B? Demo: same clusterId. */
 export function transferAllowed(fromCentre, toCentre) {
   const ok = (fromCentre?.clusterId || 'default') === (toCentre?.clusterId || 'default');

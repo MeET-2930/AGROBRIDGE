@@ -1,0 +1,136 @@
+AGROBRIDGE - THE PROCUREMENT CENTRE STORY (team pitch note)
+============================================================
+
+Model used: a wheat MSP mandi in Haryana in April (Punjab is almost identical; MP e-Uparjan
+differences are noted at the end). Everything here comes from state procedures, news reports
+and best-practice documents we studied; it is the "normal" case, and individual mandis vary.
+
+
+
+PART A — THE REAL STORY TODAY (NO AGROBRIDGE)
+=============================================
+
+The people on the ground
+
+  Who  |  What they are  |  Who they answer to
+  Farmer  |  grows the crop, owns (or rents) the tractor-trolley  |  himself
+  Arhtiya (commission agent)  |  licensed shopkeeper inside the mandi; has a phad (open floor) in front of his shop; employs a munshi (clerk); gets 2.5 % commission from the government per sale  |  licensed by the Market Committee
+  Market Committee / Mandi Secretary  |  runs the yard: gate, roads, sheds, phads, auction platform, lighting, water, weighbridge at the gate; issues gate passes; licenses arhtiyas, weighmen and labour  |  HSAMB (state agri-marketing board)
+  Procurement agency (FCI, HAFED, HSWC, Food & Supplies Dept.)  |  the buyer. Each mandi is allotted to one or more agencies, often on a day-rota  |  Government of India (FCI) / State (others)
+  Quality Inspector (of the agency)  |  checks the heap against FAQ norms (moisture, foreign matter, damaged grain)  |  the agency
+  Purchase Officer / Purchaser (of the agency)  |  records the purchase at MSP on e-Kharid  |  the agency
+  Weighman (kanta wala)  |  operates the electronic platform scale on the phad  |  licensed by Market Committee; scale certified by Legal Metrology
+  Palledars / mandi labour  |  unload, clean (sieve), heap, fill 50 kg bags, stitch, load trucks  |  labour union; rates fixed by Market Committee
+  Transport contractor  |  trucks that lift bags from the mandi to the godown  |  tendered by the agency
+  Godown (HSWC / FCI / CWC)  |  receives and stacks the bags  |  agency
+  e-Kharid + MFMB  |  state portals: farmer register, gate pass, purchase (J-form), payment (DBT)  |  State Food & Supplies Dept. / NIC
+  Bank / PFMS  |  pays the farmer  |  RBI / GoI
+
+Step 0 — Before the season (Jan–Mar)
+1. Farmer registers on Meri Fasal Mera Byora (MFMB): Aadhaar, mobile, bank account, khasra (field) numbers, crop, acres. Often the arhtiya or a CSC does it for him.
+2. Patwari / Agriculture Dept verifies the crop and acres. This fixes the maximum quantity he can sell at MSP.
+3. Record syncs to e-Kharid (24–48 h lag).
+
+Step 1 — Getting a turn (the "schedule")
+4. The Market Committee, through e-Kharid, issues a gate pass by SMS: mandi, date, sometimes a time slot. During peak (mid-April) these are rationed. Many farmers get the SMS a day before, some never; the arhtiya often decides who goes when.
+5. No SMS → farmer either waits or comes anyway and asks the gate for a temporary pass (no purchase date).
+
+Step 2 — Coming to the mandi
+6. Farmer harvests, hires a tractor-trolley (₹1,500–2,500), loads 40–60 quintal loose, and drives.
+7. Because nobody trusts the slot, most arrive the night before and queue on the road outside the gate. This is the congestion the PS talks about.
+
+Step 3 — The gate (Market Committee)
+8. Gate clerk checks the SMS / QR (2026: also biometric thumb), notes tractor number, and prints a gate-entry slip (the "token"). Regulated by the Market Committee.
+9. Farmer drives to his arhtiya's phad (he already has a relationship — the arhtiya lent him money, sells him seed, etc.).
+
+Step 4 — Unloading and heaping (labour, arhtiya's phad)
+10. Palledars unload; grain lies in an open heap on the floor. Munshi notes farmer name, approx. quantity, gate slip number in the arhtiya's register.
+11. If dirty/wet: labour sieves and spreads it to dry — hours to a day. Farmer waits (sleeps) beside his heap.
+
+Step 5 — Quality check (Agency inspector)
+12. The agency's Quality Inspector walks the phads on rounds (typically 2–3 times a day), pushes a moisture meter into the heap, checks for chaff and shrivelled grain against FAQ norms (wheat ≤ 12 % moisture, ≤ 0.75 % foreign matter, etc.).
+13. Passes → heap is "cleared for purchase". Fails → dry it more / clean it / sell to a private trader below MSP. Nobody schedules these rounds against the heaps; farmer just waits for him to come.
+
+Step 6 — Purchase entry (Agency purchaser + arhtiya)
+14. Purchaser records the heap as bought at MSP (₹2,585/q wheat 2026) on e-Kharid under the arhtiya's login; the arhtiya's munshi does the actual data entry. This produces the "H-form" (purchase record).
+
+Step 7 — Bagging and weighing (labour + weighman, arhtiya's scale)
+15. Agency supplies bardana (jute bags). Palledars fill 50 kg each, stitch.
+16. Weighman weighs bags in stacks on the arhtiya's electronic scale (owned by arhtiya, licensed and stamped by Legal Metrology, weighman licensed by Market Committee). Total quintals go into e-Kharid → I-form (weighment slip).
+17. J-form (sale bill) is generated: farmer, quantity, rate, arhtiya, agency. This is the legal proof of sale.
+
+Step 8 — Payment (Agency → PFMS → bank)
+18. Agency approves the J-form batch; money goes by DBT to the farmer's bank (Haryana: promised 48–72 h; Punjab: arhtiya clicks "pay now" within 48 h, else direct after 72 h). Deductions for cleaning/labour are settled with the arhtiya. In bad years payment is held until the wheat is lifted and reaches the godown.
+19. Farmer gets a bank SMS; no other status.
+
+Step 9 — Lifting (Agency's transport contractor)
+20. Filled bags sit on the phad until the contractor's truck comes (rule: within 72 h; reality: 5–15 days at peak). Palledars load; truck is weighed on the gate weighbridge (Market Committee's dharam kanta); goes to the godown.
+21. Until lifted, the bags occupy the floor, so the next farmers cannot unload → gate passes are stopped → road jams. This is the hidden cause behind most "long waiting".
+
+
+WHERE THE WAITING ACTUALLY COMES FROM
+=====================================
+- Turns rationed by SMS, arriving a day early because the SMS is not trusted (Steps 1–2).
+- One gate, manual/biometric checks, portal outages (Step 3).
+- Inspector rounds not matched to arrivals (Step 5).
+- Floor full because lifting is slow; bardana/labour shortages (Steps 7, 9).
+- Farmer has zero visibility after he unloads; asks the munshi every hour (Steps 4–8).
+
+
+
+PART B — THE SAME STORY WITH AGROBRIDGE
+=======================================
+
+AgroBridge changes none of the roles above. It replaces only the quota gate-pass SMS with a
+capacity-based booked hour, and it gives every step a timestamp so the farmer, the arhtiya and the
+admin see the same picture. Government systems (MFMB, e-Kharid, DBT) are not touched; where their
+data is needed we use a mock adapter that shows exactly where the real feed would plug in.
+
+  Real step  |  Who uses AgroBridge, what he taps  |  What it gives back
+  0 Registration  |  Farmer (or arhtiya for him) registers in the app: mobile + OTP, mock Aadhaar, mock MFMB lookup (`govRail.getFarmerRecord`) that returns registered crop/acres/bank-last-4.  |  Same identity the mandi already uses; the acre-based quantity ceiling is warned (not blocked).
+  1 Getting a turn  |  Farmer: Crop → Mandi → Quantity → Slot screen shows only hours with room (quintal/hour capacity × yard factor × learned corrections). Arhtiya: Book many farmers at once – ticks farmers, quintals, day; each gets his own hour. Walk-in at gate: Now if spare room.  |  Pass = date + hour + 6-digit code/QR, SMS text in the outbox (real SMS once Blaze is funded). No token number outside, no "ahead of you". 2 active passes max per farmer per mandi.
+  2 Coming  |  Nothing to tap. Farmer dashboard shows a time light (green: leave now / amber / red) for his hour.  |  Reason to not come the night before: arriving early gains nothing (come-first-go-first within the hour).
+  3 Gate  |  Market Committee gate clerk: Gate scan — QR or 6-digit code, vehicle count, plates. Works offline (cached list, queued entries, "Send now"). Missed hour → Gate re-book offers the recovery-adjusted next hours; farmer chooses.  |  Entry stamped with real time; lane assigned inside; no displacement of others.
+  4 Heap  |  Arhtiya's munshi / officer on heap duty: Heaped (+ shed/phad number). Optional.  |  Farmer sees "Inside – lane 2 – heap at Shed B".
+  5 Assay  |  Agency Quality Inspector: Assay screen – moisture, foreign matter, grade, note; Pass / Fail. His round time is shown on the public board.  |  Farmer sees grade and why (note); different MSP per grade; fail → re-assay or cancel.
+  6 Purchase entry  |  Purchaser: Price step – rate per grade confirmed. `govRail.wrapInstrument` produces a mock H-form number showing where e-Kharid's real ID goes.  |  Farmer sees expected amount = quintals × grade rate.
+  7 Weigh  |  Weighman/officer on weigh duty: Weighing screen – one entry per vehicle, gross/tare, summed. Bag count, bardana. Mock I-form.  |  Farmer: summary + per-truck detail; tolerance vs. booked quantity noted (no penalty).
+  8 Payment  |  Agency officer: Mark paid – amount, mode, mock J-form, mock DBT reference.  |  Farmer status: Paid → "credited" mock; deductions shown. This is the "payment status tracking" the PS asks for.
+  9 Lifting (gate records per truck)  |  Admin: Lifting-truck slots (install54) – contractor trucks booked against the floor; officer taps Lifted per lot. Floor % drives tomorrow's capacity (yard factor).  |  Floor full → capacity offered to farmers shrinks before they book, instead of stopping gate passes after they have arrived.
+  Incident  |  Admin: Delay report (yard full, machine down). Engine computes recovery.  |  Farmers already booked get a message and choose: wait (estimated range) or cancel & re-book without a no-show mark.
+  Calendar  |  Admin: Yard setup – weekly off, holidays, hours per day, sheds, lanes, agency of the day.  |  Booking screen never offers a closed day.
+  Watching the day  |  Admin: Where is today stuck? (per-stage waiting/median/bottleneck) and Reports (summary + gate conflicts). Everyone: public board on the Welcome screen – traffic light, lots inside, gate-to-pay minutes, floor %, no names.  |  Bottleneck named in one sentence ("open another weighbridge lane").
+
+
+HOW THE INPUTS COME IN — WITHOUT EXTRA WORK FOR ANYONE
+======================================================
+Every number the engine uses is a side-effect of a tap someone already has to make:
+- Gate scan → arrival time, vehicles.
+- Assay Pass → assay time, grade.
+- Weigh → actual quintals (corrects the farmer's guess; trains the correction model).
+- Paid / Lifted → dwell times, floor occupancy.
+- Farmer's own booking → lead time and history (trains the no-show model).
+From these the engine learns per mandi: real quintals/hour (Model B), quantity correction (Model A),
+no-show probability (Model C), and the yard factor. Nobody fills a form for the model.
+
+
+WHAT STAYS EXACTLY AS IT IS
+===========================
+Arhtiya relationship and commission, agency rota, FAQ norms and the inspector's authority,
+Legal-Metrology scales, bardana, labour rates, e-Kharid as the legal record, DBT as the payment.
+AgroBridge is the scheduling and visibility layer; the day it gets a real e-Kharid/MFMB API, the
+mock adapters in services/govRail.js are swapped and the screens do not change.
+
+
+DIFFERENCES IN OTHER STATES (FOR THE PITCH)
+===========================================
+- Punjab (Anaaj Kharid): same roles; arhtiya even more central (he registers the farmer and receives payment first in some years). Our arhtiya bulk booking matches this.
+- MP (e-Uparjan): no arhtiya; farmer books centre + date on the portal himself with a daily farmer cap; payment 7 working days. Our farmer self-booking matches this; arhtiya role simply unused.
+- e-NAM mandis: same stage order (gate entry → assay → auction → weigh → pay); our stage chain lines up module-for-module.
+
+
+WHAT HAPPENS TO GRAIN THE AGENCY WILL NOT BUY
+Lots that fail FAQ (wet, dirty) or crops with no MSP (tomato, onion) cannot go to FCI/HAFED. Today the farmer
+sells them on the spot to whoever offers. In AgroBridge such a lot is opened for a timed e-auction among
+licensed traders (test accounts 9300000001-02); the farmer sees the bids and accepts or rejects. Same
+e-NAM pattern, same yard capacity rules for the trader's trucks.

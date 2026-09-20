@@ -12,7 +12,7 @@
  *   Officers 9000000001 gate | 02 assay | 03 weighbridge | 04 cashier | 05 admin (code AGB-ADMIN-2026)
  *   Farmers  9100000001 .. 9100000009   (already registered + Aadhaar-verified mock, no tokens)
  *   Arhtiyas 9200000001 .. 9200000003   (install55; farmers 01-03 linked to 9200000001)
- *   Need a trader for the auction test? Register one in the app.
+ *   Traders 9300000001-02 (install59): auction for FAQ-failed / non-MSP lots.
  * After running: log out and back in on every phone / browser tab.
  *
  * install41 - capacity is QUINTALS PER HOUR per crop (throughputPerHour), with a
@@ -216,7 +216,14 @@ const arhtiya = (phone, name, businessName, licenseNumber, shedId) => ({
   phone, role: 'arhtiya', name, businessName, licenseNumber, shedId, employeeId: null, officerDuty: null, ...CENTRE,
   govIdType: 'aadhaar', govIdNumber: `XXXX XXXX ${phone.slice(-4)}`, govIdVerifiedAt: new Date().toISOString(), isVerified: true, createdAt: serverTimestamp(),
 });
+// install59: licensed traders - buy what MSP rejects (FAQ-failed lots) and non-MSP crops via e-auction
+const trader = (phone, name, businessName, licenseNumber) => ({
+  phone, role: 'trader', name, businessName, licenseNumber, employeeId: null, officerDuty: null, ...CENTRE,
+  govIdType: 'aadhaar', govIdNumber: `XXXX XXXX ${phone.slice(-4)}`, govIdVerifiedAt: new Date().toISOString(), isVerified: true, createdAt: serverTimestamp(),
+});
 const ACCOUNTS = [
+  trader('9300000001', 'Anil Goyal',   'Goyal Grain Traders',  'HR-TRD-2201'),
+  trader('9300000002', 'Deepak Jain',  'Jain Agro Buyers',     'HR-TRD-2378'),
   arhtiya('9200000001', 'Suresh Garg',  'Garg & Sons Commission Agents', 'HR-ARH-0451', 'S1'),
   arhtiya('9200000002', 'Naresh Bansal', 'Bansal Traders',               'HR-ARH-0782', 'S2'),
   arhtiya('9200000003', 'Kishan Lal',   'Kishan Lal & Co.',              'HR-ARH-1103', ''),
@@ -239,7 +246,7 @@ const ACCOUNTS = [
 
 async function seedAccounts() {
   for (const u of ACCOUNTS) await setDoc(doc(db, 'users', u.phone), u);
-  console.log('  accounts: 5 officers + 9 farmers + 3 arhtiyas written (no traders)');
+  console.log('  accounts: 5 officers + 9 farmers + 3 arhtiyas + 2 traders written');
 }
 
 /* ============================ 4. fake farmers in today's queue ============================ */

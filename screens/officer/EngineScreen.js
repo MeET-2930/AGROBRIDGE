@@ -22,7 +22,7 @@ import { getCurrentUserSession } from '../../services/auth';
 import { CROP_LIST, cropLabel, centreLabel } from '../../services/centres';
 import {
   fetchEngineInsights, saveEngineSettings, setTodayThroughput, setSlotClosed, retrainFromHistory, resetEngineLearning, setPerishableReserve, todayString,
-  saveYardState, recordLifted, declareYardIncident, saveTransferSettings,
+  saveYardState, recordLifted, declareYardIncident, saveTransferSettings, forceDueCredits,
 } from '../../services/bookings';
 
 export default function EngineScreen({ navigation }) {
@@ -253,6 +253,12 @@ export default function EngineScreen({ navigation }) {
                   <Text style={styles.retrainText}>{tr('yd_liftedBtn')}</Text>
                 </TouchableOpacity>
               </View>
+
+              {/* install59: demo recovery - apply bank confirmations now instead of waiting the mock delay */}
+              <TouchableOpacity style={[styles.retrain, { marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 14 }]} disabled={busy} onPress={() => act(async () => { await forceDueCredits(centreId); }, tr('recorded'))}>
+                <Text style={styles.retrainText}>{tr('yd_forceCredit')}</Text>
+              </TouchableOpacity>
+              <Text style={styles.ydLabel}>{tr('yd_forceCreditSub')}</Text>
 
               {/* projection */}
               <Text style={[styles.title, { marginTop: 14, fontSize: 13 }]}>{tr('yd_projTitle')}</Text>

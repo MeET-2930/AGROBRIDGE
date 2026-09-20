@@ -258,3 +258,8 @@ The arhtiya ticks farmers, types quintals, picks a day. Each farmer is booked th
 ## 11. install57 — Gate-conflict tab for the admin (57a) + "next open day" for bulk leftovers (58b)
 - On sync, every rejected offline entry is written to `centres/{id}/gateConflicts/{entryId}` (`reportGateConflict`). Admin → Reports → **Gate conflicts** tab lists them with time, plates, lane, reason; **Reviewed** marks them resolved. The farmer is never removed — it is a review list.
 - Bulk screen: after a bulk result with leftovers, **Try the next open day for the N left** runs `bulkBookNextOpenDay` — walks the following open days (max 7), normal `bulkBookForFarmers` each day, whoever fits is booked there. Still no promise; anyone left after 7 days is shown as such.
+
+## 12. install59 — Lifting at the gate, automatic bank credit, traders back in the seed
+- **Lifting**: removed from the payment queue. Gate list shows "Ready for lifting: N paid lots"; officer types the truck plate, ticks the lots it carries, taps **Truck left** → `markLiftedByTruck` stamps `liftedAt`, frees the shed, notifies farmers. Admin's quintal-total "lifted today" (install52) stays for the yard model.
+- **Credit**: `markPaid` sets `creditDueAt = now + MOCK_CREDIT_MS` (2 min). `govRail.bankConfirm()` is the mock PFMS; `settleDueCredits()` applies due confirmations whenever the payment queue / gate list / farmer's pass loads. Farmer sees "Credited • UTR … (bank confirmation - demo; real DBT 48-72 h)". Admin Engine screen has **Apply bank confirmations now (demo)** for recovery. Real swap point: PFMS webhook on our server.
+- **Traders**: 9300000001-02 seeded (`demo.js`, kept by `resetTestData.js`). Story: FAQ-failed / non-MSP lots → e-auction.

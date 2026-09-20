@@ -37,8 +37,9 @@ import {
   expireTransferPasses,
   markHeaped,
   markBagged,
-  markLifted,
-  markCredited,
+  markLiftedByTruck,
+  fetchAwaitingLift,
+  settleDueCredits,
   setAssayRound,
   subscribeToCentre,
   stageOf,
@@ -50,7 +51,7 @@ import { cacheRows, loadCachedRows, loadPending, syncPending, onOfflineState, ge
 import { markGateEntry, reportGateConflict } from '../../services/bookings';
 
 import { useLang } from '../../i18n/LanguageContext';
-import { cropLabel, gradeLabel } from '../../services/centres';
+import { cropLabel, gradeLabel, normalizePlate } from '../../services/centres';
 /*
  * A focused work list for ONE stage of the pipeline.
  *
@@ -78,6 +79,25 @@ export default function StageQueueScreen({ navigation, route }) {
   const [pending, setPending] = useState([]);
   const [cacheAt, setCacheAt] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  // install59: lifting recorded at the gate, per truck
+  const [awaitLift, setAwaitLift] = useState([]);
+  const [liftPick, setLiftPick] = useState({});
+  const [liftPlate, setLiftPlate] = useState('');
+  const [liftOpen, setLiftOpen] = useState(false);
+  const refreshLift = async (cid) => { if (!cid) return; try { await settleDueCredits(cid); setAwaitLift(await fetchAwaitingLift(cid)); } catch (e) { /* offline */ } };
+  const doLift = async () => {
+    const ids = Object.keys(liftPick).filter((k) => liftPick[k]);
+    if (!ids.length) return;
+    const plate = liftPlate.trim() ? normalizePlate(liftPlate) : '';
+    setBusyId('lift');
+    try {
+      const n = await markLiftedByTruck(centreRef.current, ids, { plate });
+      setLiftPick({}); setLiftPlate('');
+      Alert.alert(tr('sq_liftDone'), tr('sq_liftDoneSub', { n, p: plate || '—' }));
+      await refreshLift(centreRef.current);
+    } catch (e) { Alert.alert(tr('error'), trError(e, 'notRecorded')); }
+    finally { setBusyId(null); }
+  };
 
   const refreshPending = async (cid) => { if (cid) setPending(await loadPending(cid)); };
   const doSync = async () => {
@@ -99,8 +119,6 @@ export default function StageQueueScreen({ navigation, route }) {
     try {
       if (kind === 'shed') await markHeaped(token.tokenId, value);
       else if (kind === 'bags') await markBagged(token.tokenId, value);
-      else if (kind === 'lift') await markLifted(token.tokenId);
-      else if (kind === 'utr') await markCredited(token.tokenId, value);
       else if (kind === 'round') await setAssayRound(centreRef.current, value);
       setAsk(null); setAskText('');
     } catch (e) {
@@ -172,7 +190,9 @@ export default function StageQueueScreen({ navigation, route }) {
           const cached = await loadCachedRows(user.centreId, new Date().toISOString().slice(0, 10));
           if (alive && cached.rows.length && !rows.length) { setRows(cached.rows); setCacheAt(cached.at); }
           refreshPending(user.centreId);
+          refreshLift(user.centreId);
         }
+        if (stage?.id === 'payment') settleDueCredits(user.centreId).catch(() => {});
         unsubCentre.current = subscribeToCentre(user.centreId, (c) => alive && setCentre(c));
         unsub.current = subscribeToTodaysQueue(user.centreId, null, (list) => {
           if (alive) setRows(list);
@@ -260,6 +280,35 @@ export default function StageQueueScreen({ navigation, route }) {
           title={tr(stage.titleKey || stage.title)}
           subtitle={tr('sq_pendingLine', { n: list.length, sub: tr(stage.subtitleKey || stage.subtitle) })}
         />
+
+        {/* install59: lifting trucks leave through the gate - tick the lots a truck carries */}
+        {stage.action === 'gate' && awaitLift.length > 0 ? (
+          <View style={styles.liftBox}>
+            <TouchableOpacity style={styles.doneHead} onPress={() => setLiftOpen((v) => !v)}>
+              <Text style={styles.doneTitle}>{tr('sq_liftTitle', { n: awaitLift.length })}</Text>
+              <Ionicons name={liftOpen ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.subText} />
+            </TouchableOpacity>
+            {liftOpen ? (
+              <>
+                <Text style={styles.liftSub}>{tr('sq_liftSub')}</Text>
+                <TextInput style={styles.liftPlate} placeholder={tr('sq_liftPlate')} autoCapitalize="characters" value={liftPlate} onChangeText={setLiftPlate} />
+                {awaitLift.map((b) => {
+                  const on = Boolean(liftPick[b.tokenId]);
+                  return (
+                    <TouchableOpacity key={b.tokenId} style={styles.liftRow} onPress={() => setLiftPick((p) => ({ ...p, [b.tokenId]: !on }))}>
+                      <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? Colors.secondary : Colors.subText} />
+                      <Text style={styles.liftName}>{b.farmerName} · #{yardRef(b)}</Text>
+                      <Text style={styles.liftQ}>{b.actualQuantity || b.approxQuantityQuintals} {tr('quintalShort')}{b.bags ? ` · ${b.bags} ${tr('sq_bagsShort')}` : ''}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity style={[styles.syncBtn, { alignSelf: 'flex-start', marginTop: 8 }]} disabled={busyId === 'lift' || !Object.values(liftPick).some(Boolean)} onPress={doLift}>
+                  <Text style={{ color: Colors.white, fontWeight: '800' }}>{tr('sq_liftGo', { n: Object.values(liftPick).filter(Boolean).length })}</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* install56: offline banner + pending entries */}
         {stage.action === 'gate' && (!net.online || pending.length > 0) ? (
@@ -480,20 +529,7 @@ export default function StageQueueScreen({ navigation, route }) {
                 </View>
                 <Text style={styles.name}>{token.farmerName}</Text>
                 <Text style={styles.meta}>{tr('sq_jformLine', { j: token.jformNo || '—', u: token.utr || '—' })}</Text>
-                <View style={styles.actions}>
-                  {!token.liftedAt ? (
-                    <TouchableOpacity style={styles.optBtn} disabled={busyId === token.tokenId} onPress={() => runOptional('lift', token)}>
-                      <Ionicons name="bus-outline" size={16} color={Colors.secondary} />
-                      <Text style={styles.optText}>{tr('sq_markLifted')}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  {!token.creditedAt ? (
-                    <TouchableOpacity style={styles.optBtn} disabled={busyId === token.tokenId} onPress={() => { setAskText(token.utr || ''); setAsk({ kind: 'utr', token }); }}>
-                      <Ionicons name="checkmark-done-outline" size={16} color={Colors.secondary} />
-                      <Text style={styles.optText}>{tr('sq_markCredited')}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
+                <Text style={styles.meta}>{token.liftedAt ? tr('sq_liftedAt', { t: String(token.liftedAt).slice(11, 16) }) : tr('sq_awaitLift')}  ·  {token.creditedAt ? tr('sq_creditedAuto') : tr('sq_creditPending')}</Text>
               </View>
             )) : null}
           </View>
@@ -539,6 +575,12 @@ export default function StageQueueScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  liftBox: { backgroundColor: Colors.white, borderColor: Colors.border, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 },
+  liftSub: { color: Colors.subText, fontSize: 12, marginBottom: 8, lineHeight: 17 },
+  liftPlate: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 8, fontSize: 15, fontWeight: '800', color: Colors.navy, marginBottom: 8, backgroundColor: Colors.white },
+  liftRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.border },
+  liftName: { flex: 1, fontSize: 14, fontWeight: '700', color: Colors.navy },
+  liftQ: { fontSize: 12, color: Colors.subText },
   offBox: { backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 1.5, borderRadius: 12, padding: 12, marginBottom: 12 },
   offBoxOk: { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' },
   offTitle: { fontWeight: '900', color: Colors.navy, fontSize: 15 },
