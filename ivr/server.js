@@ -495,6 +495,38 @@ app.post("/chat", async (req, res) => {
 });
 
 // ---------------------------------------------------------------
+// TRANSLATE (display cache for the app's translated chat history)
+// ---------------------------------------------------------------
+
+app.post("/translate", async (req, res) => {
+  try {
+    const {
+      texts,
+      language,
+    } = req.body;
+
+    const result =
+      await chatbot.translateTexts({
+        texts,
+        language,
+      });
+
+    res.json(result);
+  } catch (e) {
+    console.error(
+      "translate error:",
+      e
+    );
+
+    res.status(500).json({
+      error:
+        e.message ||
+        "Translate failed",
+    });
+  }
+});
+
+// ---------------------------------------------------------------
 // Start server
 // ---------------------------------------------------------------
 
