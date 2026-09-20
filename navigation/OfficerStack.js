@@ -16,6 +16,7 @@ import EngineScreen from '../screens/officer/EngineScreen';
 import HourBoardScreen from '../screens/officer/HourBoardScreen';
 import YardSetupScreen from '../screens/officer/YardSetupScreen';
 import SmsOutboxScreen from '../screens/officer/SmsOutboxScreen';
+import TelemetryScreen from '../screens/officer/TelemetryScreen';   // install56
 import HelpScreen from '../screens/common/HelpScreen';
 import NotificationsScreen from '../screens/common/NotificationsScreen';
 
@@ -39,6 +40,7 @@ export default function OfficerStack() {
       <Stack.Screen name="HourBoard" component={HourBoardScreen} />
       <Stack.Screen name="YardSetup" component={YardSetupScreen} />
       <Stack.Screen name="SmsOutbox" component={SmsOutboxScreen} />
+      <Stack.Screen name="Telemetry" component={TelemetryScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>

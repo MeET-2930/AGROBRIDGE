@@ -13,6 +13,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ArhtiyaDashboard from '../screens/arhtiya/ArhtiyaDashboard';
 import MyFarmersScreen from '../screens/arhtiya/MyFarmersScreen';
 import ArhtiyaProfileScreen from '../screens/arhtiya/ArhtiyaProfileScreen';
+import BulkBookScreen from '../screens/arhtiya/BulkBookScreen';   // install56
 
 import CropSelectionScreen from '../screens/farmer/CropSelectionScreen';
 import CentreSelectionScreen from '../screens/farmer/CentreSelectionScreen';
@@ -32,6 +33,7 @@ export default function ArhtiyaStack() {
       <Stack.Screen name="ArhtiyaDashboard" component={ArhtiyaDashboard} />
       <Stack.Screen name="MyFarmers" component={MyFarmersScreen} />
       <Stack.Screen name="ArhtiyaProfile" component={ArhtiyaProfileScreen} />
+      <Stack.Screen name="BulkBook" component={BulkBookScreen} />
       <Stack.Screen name="CropSelection" component={CropSelectionScreen} />
       <Stack.Screen name="CentreSelection" component={CentreSelectionScreen} />
       <Stack.Screen name="Quantity" component={QuantityScreen} />

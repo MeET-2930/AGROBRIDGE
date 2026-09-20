@@ -29,6 +29,9 @@ export default function WelcomeScreen({ navigation }) {
         >
           <Text style={styles.ctaText}>{tr('getStarted')}</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('PublicBoard')} activeOpacity={0.7}>
+          <Text style={styles.boardLink}>{tr('pb_link')}</Text>
+        </TouchableOpacity>
         <Text style={styles.footerTag}>{tr('welcome_footer')}</Text>
       </View>
     </SafeAreaView>
@@ -58,5 +61,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', elevation: 3,
   },
   ctaText: { color: Colors.white, fontSize: 17, fontWeight: '800' },
+  boardLink: { fontSize: 14, color: Colors.secondary, fontWeight: '800', textAlign: 'center', marginTop: 12, textDecorationLine: 'underline' },
   footerTag: { fontSize: 12, color: Colors.subText, textAlign: 'center', marginTop: 12 },
 });

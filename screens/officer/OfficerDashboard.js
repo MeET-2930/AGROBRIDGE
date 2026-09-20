@@ -340,6 +340,14 @@ export default function OfficerDashboard({ navigation }) {
         ) : null}
 
         {isAdmin ? (
+          <TouchableOpacity style={styles.toolRow} onPress={() => navigation.navigate('Telemetry')}>
+            <Ionicons name="pulse-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('tl_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
           <TouchableOpacity style={styles.toolRow} onPress={() => navigation.navigate('SmsOutbox')}>
             <Ionicons name="chatbox-ellipses-outline" size={20} color={Colors.secondary} />
             <Text style={styles.toolText}>{tr('so_title')}</Text>

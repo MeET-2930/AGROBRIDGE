@@ -19,6 +19,7 @@ import Colors from '../../theme/colors';
 import { findByGatePass, markGateEntry, STATUS, slotState, passLabel, yardRef } from '../../services/bookings';
 import { TESTING_MODE } from '../../services/config';
 import { normalizePlate } from '../../services/centres';
+import { withTimeout, queueEntry, loadPending, provisionalLane, getState } from '../../services/offlineGate';
 
 import { useLang } from '../../i18n/LanguageContext';
 import { cropLabel } from '../../services/centres';
@@ -32,6 +33,8 @@ export default function GateScanScreen({ navigation, route }) {
   const { tr, lang, trError } = useLang();
   const rows = route.params?.rows || [];
   const expectTokenId = route.params?.expectTokenId || null;
+  const centreId = route.params?.centreId || rows[0]?.centreId || null;   // install56
+  const lanes = Number(route.params?.lanes) || 2;
   const expected = rows.find((r) => r.tokenId === expectTokenId) || null;
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -138,12 +141,33 @@ export default function GateScanScreen({ navigation, route }) {
     }
     setBusy(true);
     try {
-      const done = await markGateEntry(match.tokenId, vehicles[0].plate, how, vehicles, presenter);
-      const laneLine = done?.laneAssigned ? `\n\n${tr('gs_sendToLane', { lane: done.laneAssigned })}` : '';
-      Alert.alert(tr('gs_admitted'), `${match.farmerName} • #${yardRef(match)} • ${tr('gs_nVehicles', { n: vehicles.length })}${laneLine}`, [
-        { text: tr('gs_nextScan'), onPress: reset },
-        { text: tr('back'), onPress: () => navigation.goBack() },
-      ]);
+      /*
+       * install56: OFFLINE GATE. Try the real write with a timeout. If the
+       * network is down (or too slow) the entry is stored on this device with
+       * the real time and a provisional lane, and the farmer goes in NOW.
+       * It is written to the server later (Sync button / automatic).
+       */
+      const res = getState().online
+        ? await withTimeout(markGateEntry(match.tokenId, vehicles[0].plate, how, vehicles, presenter))
+        : { ok: false, offline: true };
+      if (res.ok) {
+        const done = res.result;
+        const laneLine = done?.laneAssigned ? `\n\n${tr('gs_sendToLane', { lane: done.laneAssigned })}` : '';
+        Alert.alert(tr('gs_admitted'), `${match.farmerName} • #${yardRef(match)} • ${tr('gs_nVehicles', { n: vehicles.length })}${laneLine}`, [
+          { text: tr('gs_nextScan'), onPress: reset },
+          { text: tr('back'), onPress: () => navigation.goBack() },
+        ]);
+      } else if (res.offline) {
+        const pending = await loadPending(centreId);
+        const lane = provisionalLane(rows, pending, lanes);
+        await queueEntry(centreId, { tokenId: match.tokenId, plates: vehicles.map((v) => normalizePlate(v.plate)), presentedBy: presenter, verifiedBy: how, lane, unverified: Boolean(match._unverified) });
+        Alert.alert(tr('og_admittedOffline'), `${match.farmerName} • #${yardRef(match)}\n\n${tr('gs_sendToLane', { lane })}\n${tr('og_admittedOfflineSub', { lane })}`, [
+          { text: tr('gs_nextScan'), onPress: reset },
+          { text: tr('back'), onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        throw res.error;
+      }
     } catch (error) {
       Alert.alert(tr('error'), trError(error, 'gs_entryFail'));
     } finally {

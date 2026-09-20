@@ -46,6 +46,8 @@ import {
 } from '../../services/bookings';
 
 import { getCurrentUserSession } from '../../services/auth';
+import { cacheRows, loadCachedRows, loadPending, syncPending, onOfflineState, getState, markOnline, dismissConflict } from '../../services/offlineGate';
+import { markGateEntry, reportGateConflict } from '../../services/bookings';
 
 import { useLang } from '../../i18n/LanguageContext';
 import { cropLabel, gradeLabel } from '../../services/centres';
@@ -71,6 +73,26 @@ export default function StageQueueScreen({ navigation, route }) {
   const [ask, setAsk] = useState(null);          // { kind:'shed'|'bags'|'round'|'utr', token }
   const [askText, setAskText] = useState('');
   const [showDone, setShowDone] = useState(false);
+  // install56: offline gate - cached list, pending entries, connectivity banner
+  const [net, setNet] = useState(getState());
+  const [pending, setPending] = useState([]);
+  const [cacheAt, setCacheAt] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const refreshPending = async (cid) => { if (cid) setPending(await loadPending(cid)); };
+  const doSync = async () => {
+    const cid = centreRef.current;
+    if (!cid) return;
+    setSyncing(true);
+    try {
+      const res = await syncPending(cid, (rec) => markGateEntry(rec.tokenId, rec.plates[0], rec.verifiedBy, rec.plates.map((p, i) => ({ serial: i + 1, plate: p })), rec.presentedBy, rec.at));
+      // install57: tell the admin (Reports -> Conflicts) about every rejected entry
+      for (const c of res.conflictRows || []) { try { await reportGateConflict(cid, c); } catch (e) { /* offline again - stays on device */ } }
+      await refreshPending(cid);
+      if (res.synced || res.conflicts) Alert.alert(tr('og_syncDone'), tr('og_syncBody', { s: res.synced, c: res.conflicts, l: res.left }));
+      else if (res.left) Alert.alert(tr('og_stillOffline'), tr('og_stillOfflineSub'));
+    } finally { setSyncing(false); }
+  };
 
   const runOptional = async (kind, token, value) => {
     setBusyId(token?.tokenId || kind);
@@ -145,9 +167,17 @@ export default function StageQueueScreen({ navigation, route }) {
         }
 
         centreRef.current = user.centreId;
+        // install56: show the cached list at once (works with no network), then live data replaces it
+        if (stage?.action === 'gate') {
+          const cached = await loadCachedRows(user.centreId, new Date().toISOString().slice(0, 10));
+          if (alive && cached.rows.length && !rows.length) { setRows(cached.rows); setCacheAt(cached.at); }
+          refreshPending(user.centreId);
+        }
         unsubCentre.current = subscribeToCentre(user.centreId, (c) => alive && setCentre(c));
         unsub.current = subscribeToTodaysQueue(user.centreId, null, (list) => {
           if (alive) setRows(list);
+          markOnline(true);
+          if (stage?.action === 'gate') { cacheRows(user.centreId, list[0]?.date || new Date().toISOString().slice(0, 10), list); setCacheAt(new Date().toISOString()); }
           // install49: refresh the "I'm late, re-book me" requests box
           if (stage?.action === 'gate') fetchRebookRequests(user.centreId).then((r) => alive && setLateReqs(r)).catch(() => {});
           // install42: passes whose hour ended without entry expire here
@@ -160,8 +190,10 @@ export default function StageQueueScreen({ navigation, route }) {
 
       start();
 
+      const offNet = onOfflineState((st) => { if (alive) { setNet(st); if (st.pending != null) refreshPending(centreRef.current); } });
       return () => {
         alive = false;
+        offNet();
         if (unsub.current) {
           unsub.current();
           unsub.current = null;
@@ -229,10 +261,35 @@ export default function StageQueueScreen({ navigation, route }) {
           subtitle={tr('sq_pendingLine', { n: list.length, sub: tr(stage.subtitleKey || stage.subtitle) })}
         />
 
+        {/* install56: offline banner + pending entries */}
+        {stage.action === 'gate' && (!net.online || pending.length > 0) ? (
+          <View style={[styles.offBox, net.online && styles.offBoxOk]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name={net.online ? 'cloud-upload-outline' : 'cloud-offline-outline'} size={20} color={net.online ? Colors.secondary : '#B45309'} />
+              <Text style={styles.offTitle}>{net.online ? tr('og_backOnline') : tr('og_offline')}</Text>
+            </View>
+            <Text style={styles.offSub}>
+              {net.online ? tr('og_pendingN', { n: pending.filter((p) => p.status === 'pending').length }) : tr('og_offlineSub', { t: cacheAt ? String(cacheAt).slice(11, 16) : '—' })}
+            </Text>
+            {pending.filter((p) => p.status === 'conflict').map((p) => (
+              <View key={p.id} style={styles.conflictRow}>
+                <Text style={styles.conflictText}>{tr('og_conflict', { t: p.tokenId.slice(-6), e: p.error })}</Text>
+                <TouchableOpacity onPress={async () => { await dismissConflict(centreRef.current, p.id); refreshPending(centreRef.current); }}>
+                  <Ionicons name="close-circle" size={20} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={[styles.syncBtn, syncing && styles.primaryDim]} disabled={syncing} onPress={doSync}>
+              <Ionicons name="sync-outline" size={16} color={Colors.white} />
+              <Text style={styles.primaryText}>{syncing ? '…' : tr('og_syncNow')}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {stage.action === 'gate' ? (
           <TouchableOpacity
             style={styles.scanBtn}
-            onPress={() => navigation.navigate('GateScan', { rows })}
+            onPress={() => navigation.navigate('GateScan', { rows, centreId: centreRef.current, lanes: centre?.parallelLanes || 2 })}
           >
             <Ionicons name="qr-code-outline" size={22} color={Colors.white} />
             <Text style={styles.scanBtnText}>
@@ -482,6 +539,13 @@ export default function StageQueueScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  offBox: { backgroundColor: '#FEF3C7', borderColor: '#D97706', borderWidth: 1.5, borderRadius: 12, padding: 12, marginBottom: 12 },
+  offBoxOk: { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' },
+  offTitle: { fontWeight: '900', color: Colors.navy, fontSize: 15 },
+  offSub: { color: Colors.text, fontSize: 13, marginTop: 4, lineHeight: 18 },
+  conflictRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, backgroundColor: '#FEE2E2', borderRadius: 8, padding: 8 },
+  conflictText: { flex: 1, color: '#991B1B', fontSize: 12, fontWeight: '700' },
+  syncBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.secondary, borderRadius: 8, paddingVertical: 9, marginTop: 10 },
   roundBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#E8F5E9', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#A5D6A7' },
   roundTitle: { fontWeight: '800', color: Colors.navy, fontSize: 14 },
   roundSub: { color: Colors.subText, fontSize: 13, marginTop: 2 },

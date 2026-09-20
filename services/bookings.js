@@ -45,6 +45,7 @@ import {
   CAPACITY_DEFAULTS, centreCapacity, windowList, windowLabelFor, planLoad, applyPlan, releasePlan, planDay, round1, formatHour, loadMinutesFor,
 } from '../engine/capacity';
 import { wrapInstrument } from './govRail';
+import { stageTelemetry, publicBoard as buildPublicBoard } from '../engine/telemetry';
 import { correctionRatio, trainCorrection } from '../engine/models/correction';
 import { showProbability, leadDaysBetween, trainNoShow } from '../engine/models/noshow';
 import { effectiveThroughput, learnThroughput } from '../engine/models/throughput';
@@ -1576,7 +1577,8 @@ export async function markGateEntry(
   vehicleNumber = '',
   verifiedBy = 'manual', // 'qr' | 'code' | 'manual'
   vehicles = null,       // install43: [{ serial: 1, plate: 'HR26AB1234' }, ...]
-  presentedBy = 'self'   // install55: 'self' | nominee name | 'arhtiya'
+  presentedBy = 'self',  // install55: 'self' | nominee name | 'arhtiya'
+  at = null              // install56: real entry time when an OFFLINE entry is synced later
 ) {
   const booking = await assertOfficerFor(tokenId, DUTY_FOR_STAGE.gate);
 
@@ -1585,10 +1587,12 @@ export async function markGateEntry(
   // (rebookAtGate) into the next hour with room. No queue-jumping.
   if (booking.status === STATUS.BOOKED && !TESTING_MODE) {
     // install53: a transfer pass is valid for its window, not for an hour
-    const ts = transferState(booking);
+    // install56: an offline entry is judged at the time it really happened
+    const when = at ? new Date(at) : new Date();
+    const ts = transferState(booking, when);
     if (ts === 'expired') throw tErr('err.transferExpired');
     if (ts !== 'valid') {
-      const st = slotState(booking);
+      const st = slotState(booking, when);
       if (st === 'before') throw tErr('err.slotNotOpen');
       if (st === 'passed') throw tErr('err.slotPassed');
     }
@@ -1620,10 +1624,12 @@ export async function markGateEntry(
   const clash = plates.find((p) => insidePlates.has(p));
   if (clash) throw tErr('err.plateInside', { plate: clash });
 
+  const entryAt = at ? new Date(at) : new Date();
   const patch = {
     status: STATUS.IN_GATE,
-    gateEntryAt: new Date().toISOString(),
-    actualAppearedTime: clockTime(),
+    gateEntryAt: entryAt.toISOString(),
+    actualAppearedTime: at ? `${String(entryAt.getHours()).padStart(2, '0')}:${String(entryAt.getMinutes()).padStart(2, '0')}` : clockTime(),
+    offlineEntry: Boolean(at),   // install56: admitted while the network was down, synced afterwards
     gatePassVerifiedBy: verifiedBy,
     vehicleNumber: plates[0],
     vehicles: list.map((v) => ({ ...v, grossWeightQuintals: null, tareWeightQuintals: null, netQuintals: null })),
@@ -2383,6 +2389,136 @@ export async function fetchOfficerSummary(centreId, dateStr = null) {
     console.error('Error fetching officer summary:', error);
     return empty;
   }
+}
+
+/* ===============================================================
+ * install56 ("58"): ARHTIYA BULK BOOKING
+ * ---------------------------------------------------------------
+ * The arhtiya picks a date + crop and a list of farmers with loads.
+ * Each farmer gets his OWN pass through the normal createBooking (so
+ * every rule applies: 2-token cap, 25 % arhtiya share, calendar, yard
+ * factor, ML expected load). The engine fills the day in order from
+ * the first hour with room; nothing is moved, nothing is promised.
+ * Partial success is normal: the result says who got what and why not.
+ * =============================================================== */
+export async function bulkBookForFarmers({ arhtiya, centreId, crop, cropName, date, farmers, fromSlotTime = null }) {
+  if (!arhtiya?.uid) throw tErr('loginAgain');
+  const centreRaw = await fetchCentreById(centreId);
+  if (!centreRaw) throw tErr('err.mandiNotFound');
+  const day = dayStatus(centreRaw, date);
+  if (!day.open) throw tErr('err.dayClosed');
+  const centre = centreForDay(centreRaw, date);
+  const slots = windowList(centre);
+  const results = [];
+  for (const f of farmers) {
+    const quintals = Math.max(1, Number(f.quintals) || 0);
+    let done = null, reason = null;
+    // fresh queue each time: the previous farmer's booking changed it
+    const qSnap = await getDoc(queueRef(centreId, date));
+    const queue = qSnap.exists() ? qSnap.data() : {};
+    const yp = await yardPlan(centre, crop, centreId);
+    const start = fromSlotTime ? Math.max(0, slots.indexOf(fromSlotTime)) : 0;
+    for (let i = start; i < slots.length && !done; i += 1) {
+      const cap = capacityWithYard(centre, crop, slots[i], yp, date);
+      const plan = planLoad(cap, slots, queue, i, quintals, { cropClass: cropClassOf(crop), leadDays: leadDaysBetween(todayString(), date) });
+      if (!plan.ok) { reason = reason || `ar_fail_${plan.reason}`; continue; }
+      try {
+        done = await createBooking({
+          farmerId: f.uid, farmerName: f.name, farmerPhone: f.phone, centreId, crop, cropName,
+          approxQuantityQuintals: quintals, date, slotTime: slots[i], slotWindow: windowLabelFor(slots[i], plan.needed),
+          bookedVia: 'arhtiya',
+          extra: { arhtiyaId: arhtiya.uid, arhtiyaName: arhtiya.businessName || arhtiya.name, arhtiyaShedId: arhtiya.shedId || null, farmerRegNo: f.farmerRegNo || null, regSource: f.regSource || null },
+        });
+        reason = null;
+      } catch (e) {
+        reason = e?.key || e?.message || 'error';
+        // hard per-farmer errors (2-token cap, arhtiya share) will not change with a later hour
+        if (/maxTokens|arhtiyaShare|dayClosed/.test(String(reason))) break;
+        reason = 'ar_fail_full';
+      }
+    }
+    results.push({ uid: f.uid, name: f.name, quintals, booking: done, reason: done ? null : reason || 'ar_fail_full' });
+  }
+  return { date, results, booked: results.filter((r) => r.booking).length, failed: results.filter((r) => !r.booking).length };
+}
+
+/**
+ * install57 (58b): for the farmers who did not fit, try the following
+ * open days one by one (up to 7 ahead). Each day is a normal bulk call;
+ * whoever fits on a day is booked there, the rest roll to the next day.
+ */
+export async function bulkBookNextOpenDay({ arhtiya, centreId, crop, cropName, fromDate, farmers }) {
+  const centre = await fetchCentreById(centreId);
+  if (!centre) throw tErr('err.mandiNotFound');
+  let left = farmers.slice();
+  const all = [];
+  const start = new Date(`${fromDate}T00:00:00`);
+  for (let off = 1; off <= 7 && left.length; off += 1) {
+    const d = new Date(start); d.setDate(d.getDate() + off);
+    const date = todayString(d);
+    if (!dayStatus(centre, date).open) continue;
+    const r = await bulkBookForFarmers({ arhtiya, centreId, crop, cropName, date, farmers: left });
+    r.results.forEach((x) => { x.date = date; });
+    all.push(...r.results.filter((x) => x.booking));
+    left = left.filter((f) => !r.results.find((x) => x.uid === f.uid && x.booking));
+  }
+  return { results: all, stillLeft: left, booked: all.length, failed: left.length };
+}
+
+/** Arhtiya day view: all his farmers' bookings for a date, grouped by hour. */
+export async function fetchArhtiyaDay(arhtiyaId, date) {
+  if (!arhtiyaId) return [];
+  const snap = await getDocs(query(collection(db, 'bookings'), where('arhtiyaId', '==', arhtiyaId), where('date', '==', date)));
+  return snap.docs.map((d) => d.data()).sort((a, b) => String(a.slotTime).localeCompare(String(b.slotTime)));
+}
+
+/* ===============================================================
+ * install57: OFFLINE-GATE CONFLICTS -> ADMIN
+ * ---------------------------------------------------------------
+ * When a queued offline entry is rejected on sync, the gate device
+ * reports it here so the admin sees it on Reports even from another
+ * device. The farmer is already inside; this is a review list only.
+ * Path: centres/{centreId}/gateConflicts/{entryId}
+ * =============================================================== */
+export async function reportGateConflict(centreId, rec) {
+  if (!centreId || !rec?.id) return;
+  await setDoc(doc(db, 'centres', centreId, 'gateConflicts', rec.id), {
+    id: rec.id, centreId, tokenId: rec.tokenId || null, farmerName: rec.farmerName || '', plates: rec.plates || [],
+    at: rec.at || null, lane: rec.lane || null, error: rec.error || 'error', reportedAt: serverTimestamp(), resolved: false,
+  }, { merge: true });
+}
+
+export async function fetchGateConflicts(centreId, { includeResolved = false } = {}) {
+  if (!centreId) return [];
+  const snap = await getDocs(collection(db, 'centres', centreId, 'gateConflicts'));
+  return snap.docs.map((d) => d.data()).filter((c) => includeResolved || !c.resolved).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
+
+export async function resolveGateConflict(centreId, id, note = '') {
+  await updateDoc(doc(db, 'centres', centreId, 'gateConflicts', id), { resolved: true, resolvedAt: serverTimestamp(), note });
+}
+
+/* ===============================================================
+ * install56: STAGE TELEMETRY + PUBLIC BOARD
+ * =============================================================== */
+
+/** Admin: where is the day stuck right now? (pure engine on today's rows) */
+export async function fetchStageTelemetry(centreId, dateStr = null) {
+  const rows = await fetchTodaysQueue(centreId, dateStr);
+  return { ...stageTelemetry(rows, Date.now()), rows: rows.length };
+}
+
+/**
+ * Public board: NO login, NO names, NO token numbers. Reads the centre doc
+ * and today's rows through the same queries; the screen re-reads every 60 s.
+ * A live yard would publish this to a TV at the gate.
+ */
+export async function fetchPublicBoard(centreId) {
+  const centre = await fetchCentreById(centreId);
+  if (!centre) throw tErr('err.mandiNotFound');
+  const today = todayString();
+  const rows = await fetchTodaysQueue(centreId, today);
+  return { centre, board: buildPublicBoard(centre, rows, Date.now(), dayStatus(centre, today)), at: new Date().toISOString() };
 }
 
 /* ===============================================================

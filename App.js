@@ -40,6 +40,7 @@ import UserStatusScreen from './screens/auth/UserStatusScreen';
 import LoginScreen from './screens/auth/LoginScreen';
 import RegisterScreen from './screens/auth/RegisterScreen';
 import OtpScreen from './screens/auth/OtpScreen';
+import PublicBoardScreen from './screens/common/PublicBoardScreen';   // install56: no-login mandi board
 
 // Farmer
 import FarmerDashboard from './screens/farmer/FarmerDashboard';
@@ -74,6 +75,7 @@ function AuthStack() {
       <AuthNav.Screen name="Login" component={LoginScreen} />
       <AuthNav.Screen name="Register" component={RegisterScreen} />
       <AuthNav.Screen name="Otp" component={OtpScreen} />
+      <AuthNav.Screen name="PublicBoard" component={PublicBoardScreen} />
     </AuthNav.Navigator>
   );
 }

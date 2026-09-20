@@ -227,3 +227,34 @@ No real API calls (adapter only), no assay-round-as-capacity, no walk-in demand 
 
 ### Test accounts
 Officers 9000000001–05, farmers 9100000001–09 (01–03 linked to arhtiya 9200000001), **arhtiyas 9200000001–03**, OTP 1234. `node demo.js --users` re-seeds them and gives Gurugram three sheds + Sunday off + 2 Oct holiday.
+
+## 10. install56 — Offline gate (57), stage telemetry + public board (56), arhtiya bulk booking (58)
+
+**Why together:** all three are "the day is already running" features; none changes the capacity model.
+
+### 10.1 Offline gate — `services/offlineGate.js`
+Root cause: the e-Kharid outage of 15 Apr 2026 (3–4 h queues, manual passes). Our gate must keep working with no internet.
+- Every time the gate list loads, the day's slim rows (token, code, name, hour, quantity, status) are cached in the phone (`AsyncStorage`, key per centre + date).
+- Admission write is wrapped in `withTimeout(8 s)`. If it fails or times out the entry is **queued locally** with the real clock time and a *provisional lane* (least-loaded lane in the cached list). The farmer walks in immediately.
+- Banner on the gate list: "No internet – gate running offline (list saved at HH:MM)", count of pending entries, **Send now** button.
+- `syncPending()` replays entries in order, passing the original time to `markGateEntry(..., at)`, so the hour check ("was he inside his booked hour?") is evaluated against the moment he *actually* arrived, not the moment the internet came back. Entries the server rejects (pass expired, already inside, duplicate plate) are listed as **conflicts** for information — the farmer is already inside, nothing is rolled back.
+- No names or lists leave the phone; the cache is the same data the officer already sees.
+
+### 10.2 Stage telemetry — `engine/telemetry.js` (pure), admin screen `Telemetry`
+Every officer action already writes a timestamp (`gateEntryAt, assayedAt, pricedAt, weighedAt, paidAt, liftedAt, creditedAt`). The engine turns these into, per stage: lots waiting now, oldest wait, median and p90 dwell today. Bottleneck = among assay / price / weigh / pay, the stage with the highest *load* = waiting × √(today's median ÷ normal median), capped at 4×. (Square-root so one slow lot does not flip the answer; tested in `/tmp/tt.mjs`.) The admin screen says it in one sentence plus a suggested action.
+
+### 10.3 Public board — `screens/common/PublicBoardScreen.js`, link on Welcome
+No login. Traffic light (green normal / amber slow: door-to-pay > 120 min or floor > 90 % / red closed or incident), four numbers (inside, gate→pay, paid today, floor), advice for farmers, stage list. **Never shows names, tokens or "now serving"** — consistent with the farmer-side rule. Refreshes every 60 s. `publicBoard()` in the engine is the single place that decides what is public.
+
+### 10.4 Arhtiya bulk — `bulkBookForFarmers()` + `screens/arhtiya/BulkBookScreen.js`
+The arhtiya ticks farmers, types quintals, picks a day. Each farmer is booked through the **normal `createBooking`** (transaction, 2-token cap, 25 % arhtiya share, calendar, yard factor, no-show model), filled from the first hour with room. Result list says who got which hour and why anyone did not. Below: his day plan grouped by hour so he can tell each farmer when to come. Nothing is moved and no future slot is promised — same rules as everywhere else.
+
+### 10.5 Test walk-through
+1. Officer 9000000001 (admin) → Tools → **Where is today stuck?**; run `demo.js` first so there are timestamps.
+2. Welcome screen → link at the bottom **Without login: see how the mandi is today**.
+3. Officer gate duty → open gate list once online → switch off Wi-Fi/phone data → scan/enter a code → "Admitted (offline)" → switch data on → banner → **Send now**.
+4. Arhtiya 9200000001 → tile **Book many farmers at once** → tick 3 farmers → Make passes.
+
+## 11. install57 — Gate-conflict tab for the admin (57a) + "next open day" for bulk leftovers (58b)
+- On sync, every rejected offline entry is written to `centres/{id}/gateConflicts/{entryId}` (`reportGateConflict`). Admin → Reports → **Gate conflicts** tab lists them with time, plates, lane, reason; **Reviewed** marks them resolved. The farmer is never removed — it is a review list.
+- Bulk screen: after a bulk result with leftovers, **Try the next open day for the N left** runs `bulkBookNextOpenDay` — walks the following open days (max 7), normal `bulkBookForFarmers` each day, whoever fits is booked there. Still no promise; anyone left after 7 days is shown as such.

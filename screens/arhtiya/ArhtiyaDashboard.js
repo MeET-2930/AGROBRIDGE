@@ -134,6 +134,7 @@ export default function ArhtiyaDashboard({ navigation }) {
         {/* Tile grid - same component as the farmer dashboard */}
         <View style={styles.grid}>
           <DashboardCard title={tr('ar_bookFor')} icon="calendar-outline" onPress={() => navigation.navigate('MyFarmers', { pick: true })} />
+          <DashboardCard title={tr('ar_bulkTitle')} icon="albums-outline" onPress={() => navigation.navigate('BulkBook')} />
           <DashboardCard title={tr('ar_myFarmers')} icon="people-outline" onPress={() => navigation.navigate('MyFarmers')} />
           <DashboardCard title={tr('ar_profile')} icon="business-outline" onPress={() => navigation.navigate('ArhtiyaProfile')} />
           <DashboardCard title={tr('help')} icon="help-circle-outline" onPress={() => navigation.navigate('Help', { role: 'farmer' })} />

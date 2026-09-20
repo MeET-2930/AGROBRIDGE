@@ -1,0 +1,596 @@
+import React, { useCallback, useRef, useState } from 'react';
+
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+} from 'react-native';
+
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+
+import AppHeader from '../../components/AppHeader';
+import Colors from '../../theme/colors';
+
+import {
+  subscribeToTodaysQueue,
+  getStagesForDuty,
+  STATUS,
+  CLOSED_STATUSES,
+  INSIDE_STATUSES,
+} from '../../services/bookings';
+
+import { getCurrentUserSession, logoutUserSession } from '../../services/auth';
+import { useLang } from '../../i18n/LanguageContext';
+import { centreLabel } from '../../services/centres';
+
+export default function OfficerDashboard({ navigation }) {
+  const { tr, lang } = useLang();
+  const dutyLabel = (d) => (d ? tr(`duty_${d}`) : '');
+
+  const [session, setSession] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [open, setOpen] = useState(false);
+
+  const unsub = useRef(null);
+
+  const duty = session?.officerDuty || 'gate';
+  const isAdmin = duty === 'admin';
+  const stages = getStagesForDuty(duty);
+
+  // Officers only ever see their own posted mandi.
+  const centreId = session?.centreId || '';
+  const hasCentre = !!centreId;
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+
+      const start = async () => {
+        const user = await getCurrentUserSession();
+        if (alive) setSession(user);
+
+        if (!user?.centreId) {
+          if (alive) setRows([]);
+          return;
+        }
+
+        unsub.current = subscribeToTodaysQueue(
+          user.centreId,
+          null,
+          (list) => {
+            if (alive) setRows(list);
+          }
+        );
+      };
+
+      start();
+
+      return () => {
+        alive = false;
+        if (unsub.current) {
+          unsub.current();
+          unsub.current = null;
+        }
+      };
+    }, [])
+  );
+
+  const countFor = (statuses) =>
+    rows.filter((r) => statuses.includes(r.status)).length;
+
+  const totals = {
+    total: rows.length,
+    waiting: rows.filter((r) => r.status === STATUS.BOOKED).length,
+    absent: rows.filter((r) => r.status === STATUS.NO_SHOW).length,
+    inside: rows.filter((r) => INSIDE_STATUSES.includes(r.status)).length,
+    paid: rows.filter((r) => r.status === STATUS.PAID).length,
+    done: rows.filter((r) => CLOSED_STATUSES.includes(r.status)).length,
+  };
+
+  const myWork = stages.reduce(
+    (sum, stage) => sum + countFor(stage.statuses),
+    0
+  );
+
+  const logout = async () => {
+    setOpen(false);
+    if (unsub.current) unsub.current();
+    await logoutUserSession();
+    navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader
+        navigation={navigation}
+        showBack={false}
+        tag={tr('od_portal')}
+        audioKey="audio_officer_queue"
+      />
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.headRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greet}>{tr('namaste')}</Text>
+            <Text style={styles.name}>{session?.name || tr('od_officer')}</Text>
+            <View style={styles.dutyPill}>
+              <Text style={styles.dutyPillText}>
+                {dutyLabel(duty)}
+              </Text>
+            </View>
+
+            <Text style={styles.centreLine} numberOfLines={1}>
+              {session?.centreName ? centreLabel(session.centreName, lang) : tr('od_noCentre')}
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={() => setOpen(true)}>
+            <Ionicons
+              name="person-circle-outline"
+              size={40}
+              color={Colors.navy}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {!hasCentre ? (
+          <TouchableOpacity
+            style={styles.setupCard}
+            onPress={() =>
+              navigation.navigate('OfficerProfile', { mustPickCentre: true })
+            }
+          >
+            <Ionicons name="business-outline" size={28} color="#E65100" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.setupTitle}>{tr('od_setupTitle')}</Text>
+              <Text style={styles.setupSub}>
+                {tr('od_setupSub')}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#E65100" />
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Pending work banner */}
+        <View
+          style={[
+            styles.banner,
+            myWork === 0 ? styles.bannerClear : styles.bannerBusy,
+          ]}
+        >
+          <Ionicons
+            name={myWork === 0 ? 'checkmark-circle' : 'alert-circle'}
+            size={26}
+            color={myWork === 0 ? '#2E7D32' : '#E65100'}
+          />
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.bannerTitle,
+                { color: myWork === 0 ? '#1B5E20' : '#E65100' },
+              ]}
+            >
+              {myWork === 0
+                ? tr('od_noWork')
+                : tr('od_pending', { n: myWork })}
+            </Text>
+            <Text style={styles.bannerSub}>
+              {tr('od_todayLine', { total: totals.total, inside: totals.inside })}
+            </Text>
+          </View>
+        </View>
+
+        {/* Work cards, one per stage this officer owns */}
+        <Text style={styles.sectionTitle}>{tr('od_yourWork')}</Text>
+
+        {stages.map((stage) => {
+          const count = countFor(stage.statuses);
+
+          return (
+            <TouchableOpacity
+              key={stage.id}
+              style={[styles.workCard, count > 0 && styles.workCardActive]}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation.navigate('StageQueue', { stageId: stage.id })
+              }
+            >
+              <View
+                style={[
+                  styles.workIcon,
+                  count > 0 && { backgroundColor: Colors.primary },
+                ]}
+              >
+                <Ionicons
+                  name={stage.icon}
+                  size={24}
+                  color={count > 0 ? Colors.white : Colors.secondary}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.workTitle}>{tr(stage.titleKey || stage.title)}</Text>
+                <Text style={styles.workSub}>{tr(stage.subtitleKey || stage.subtitle)}</Text>
+              </View>
+
+              <View
+                style={[
+                  styles.countPill,
+                  count > 0 ? styles.countPillOn : styles.countPillOff,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.countText,
+                    { color: count > 0 ? Colors.white : Colors.subText },
+                  ]}
+                >
+                  {count}
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={Colors.subText}
+              />
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Day summary */}
+        <Text style={styles.sectionTitle}>{tr('od_summary')}</Text>
+
+        <View style={styles.stats}>
+          <View style={styles.stat}>
+            <Text style={styles.num}>{totals.total}</Text>
+            <Text style={styles.lbl}>{tr('od_totalTokens')}</Text>
+          </View>
+
+          <View style={styles.stat}>
+            <Text style={[styles.num, { color: '#FFD54F' }]}>
+              {totals.waiting}
+            </Text>
+            <Text style={styles.lbl}>{tr('od_waiting')}</Text>
+          </View>
+
+          <View style={styles.stat}>
+            <Text style={[styles.num, { color: '#90CAF9' }]}>
+              {totals.inside}
+            </Text>
+            <Text style={styles.lbl}>{tr('od_inside')}</Text>
+          </View>
+
+          <View style={styles.stat}>
+            <Text style={[styles.num, { color: '#A5D6A7' }]}>
+              {totals.paid}
+            </Text>
+            <Text style={styles.lbl}>{tr('od_paid')}</Text>
+          </View>
+
+          <View style={styles.stat}>
+            <Text style={[styles.num, { color: '#EF9A9A' }]}>
+              {totals.absent}
+            </Text>
+            <Text style={styles.lbl}>{tr('od_absent')}</Text>
+          </View>
+        </View>
+
+        {/* Extra tools */}
+        <Text style={styles.sectionTitle}>{tr('od_other')}</Text>
+
+        <TouchableOpacity
+          style={styles.toolRow}
+          onPress={() => navigation.navigate('TodaysQueue')}
+        >
+          <Ionicons name="list-outline" size={20} color={Colors.secondary} />
+          <Text style={styles.toolText}>{tr('od_fullQueue')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.toolRow}
+          onPress={() => navigation.navigate('Reports')}
+        >
+          <Ionicons
+            name="bar-chart-outline"
+            size={20}
+            color={Colors.secondary}
+          />
+          <Text style={styles.toolText}>{tr('od_dailyReport')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+        </TouchableOpacity>
+
+        {isAdmin ? (
+          <TouchableOpacity
+            style={styles.toolRow}
+            onPress={() => navigation.navigate('Engine')}
+          >
+            <Ionicons name="speedometer-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('en_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
+          <TouchableOpacity
+            style={styles.toolRow}
+            onPress={() => navigation.navigate('HourBoard')}
+          >
+            <Ionicons name="time-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('en_boardTitle')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {/* install55: calendar, sheds, yield table + the SMS outbox */}
+        {isAdmin ? (
+          <TouchableOpacity style={styles.toolRow} onPress={() => navigation.navigate('YardSetup')}>
+            <Ionicons name="business-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('ys_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
+          <TouchableOpacity style={styles.toolRow} onPress={() => navigation.navigate('SmsOutbox')}>
+            <Ionicons name="chatbox-ellipses-outline" size={20} color={Colors.secondary} />
+            <Text style={styles.toolText}>{tr('so_title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+          </TouchableOpacity>
+        ) : null}
+
+        {isAdmin ? (
+          <TouchableOpacity
+            style={styles.toolRow}
+            onPress={() => navigation.navigate('DelayReport')}
+          >
+            <Ionicons
+              name="alert-circle-outline"
+              size={20}
+              color={Colors.error}
+            />
+            <Text style={styles.toolText}>{tr('od_delayReport')}</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={Colors.subText}
+            />
+          </TouchableOpacity>
+        ) : null}
+
+        <TouchableOpacity
+          style={styles.toolRow}
+          onPress={() => navigation.navigate('Help', { role: 'officer' })}
+        >
+          <Ionicons name="help-circle-outline" size={20} color={Colors.secondary} />
+          <Text style={styles.toolText}>{tr('hc_title')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.subText} />
+        </TouchableOpacity>
+      </ScrollView>
+
+      <Modal visible={open} transparent animationType="fade">
+        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
+          <View style={styles.modal}>
+            <Text style={styles.modalName}>{session?.name || tr('od_officer')}</Text>
+            <Text style={styles.modalSub}>
+              {dutyLabel(duty)} • {session?.employeeId || ''}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => {
+                setOpen(false);
+                navigation.navigate('OfficerProfile');
+              }}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={18}
+                color={Colors.secondary}
+              />
+              <Text style={styles.profileLinkText}>
+                {tr('od_changePosting')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileLink}
+              onPress={() => { setOpen(false); navigation.navigate('Notifications'); }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={Colors.secondary} />
+              <Text style={styles.profileLinkText}>{tr('nt_title')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.logout} onPress={logout}>
+              <Ionicons
+                name="log-out-outline"
+                size={20}
+                color={Colors.white}
+              />
+              <Text style={styles.logoutText}>
+                {tr('logout')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: 16, paddingBottom: 30 },
+
+  headRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  greet: { color: Colors.secondary, fontWeight: '800', fontSize: 20 },
+  name: { fontSize: 19, fontWeight: '800', color: Colors.navy },
+  dutyPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 5,
+  },
+  dutyPillText: { color: Colors.secondary, fontWeight: '800', fontSize: 12 },
+
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1.5,
+  },
+  bannerBusy: { backgroundColor: '#FFF8E1', borderColor: '#FFB300' },
+  bannerClear: { backgroundColor: '#E8F5E9', borderColor: '#66BB6A' },
+  bannerTitle: { fontSize: 15, fontWeight: '900' },
+  bannerSub: { fontSize: 12, color: Colors.subText, marginTop: 2 },
+
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.subText,
+    marginBottom: 10,
+    marginTop: 6,
+  },
+
+  workCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  workCardActive: { borderColor: Colors.primary },
+  workIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workTitle: { fontSize: 15, fontWeight: '800', color: Colors.navy },
+  workSub: { fontSize: 12, color: Colors.subText, marginTop: 2 },
+  countPill: {
+    minWidth: 32,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  countPillOn: { backgroundColor: Colors.primary },
+  countPillOff: { backgroundColor: Colors.background },
+  countText: { fontWeight: '900', fontSize: 14 },
+
+  stats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    backgroundColor: Colors.navy,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  stat: {
+    width: '47%',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 10,
+    padding: 10,
+  },
+  num: { color: Colors.white, fontSize: 22, fontWeight: '900' },
+  lbl: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
+
+  toolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  toolText: { flex: 1, fontWeight: '700', color: Colors.navy, fontSize: 14 },
+
+  setupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFF8E1',
+    borderColor: '#FFB300',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  setupTitle: { fontSize: 15, fontWeight: '900', color: '#E65100' },
+  setupSub: { fontSize: 12, color: '#8D6E63', marginTop: 3, lineHeight: 15 },
+
+  centreLine: {
+    fontSize: 12,
+    color: Colors.subText,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+
+  profileLink: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: 12,
+  },
+  profileLinkText: { color: Colors.secondary, fontWeight: '800', fontSize: 14 },
+
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modal: {
+    width: '80%',
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalName: {
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.navy,
+  },
+  modalSub: {
+    textAlign: 'center',
+    color: Colors.subText,
+    marginTop: 4,
+    marginBottom: 20,
+    fontSize: 13,
+  },
+  logout: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.error, borderRadius: 12, paddingVertical: 12, marginTop: 6,
+  },
+  logoutText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
+});
