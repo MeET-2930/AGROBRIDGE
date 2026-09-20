@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -10,17 +10,70 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import AppHeader from '../../components/AppHeader';
 import Colors from '../../theme/colors';
 import { useLang } from '../../i18n/LanguageContext';
 import { getCurrentUserSession } from '../../services/auth';
-import { sendChatMessage } from '../../services/chatbot';
+import { sendChatMessage, translateTexts, missingTranslations } from '../../services/chatbot';
 
 let counter = 0;
 const nextId = () => `m${Date.now()}-${(counter += 1)}`;
+
+const HISTORY_LIMIT = 60;
+const CACHE_LIMIT = 200;
+
+const historyKey = (id) => `chatHistory_${id || 'guest'}`;
+const translationsKey = (id) => `chatTranslations_${id || 'guest'}`;
+
+function sanitizeMessages(arr) {
+  return (Array.isArray(arr) ? arr : [])
+    .filter((m) => m && (m.role === 'user' || m.role === 'bot') && typeof m.text === 'string')
+    .map((m) => ({
+      id: String(m.id || nextId()),
+      role: m.role,
+      text: m.text.slice(0, 2000),
+      ...(m.isGreeting ? { isGreeting: true } : {}),
+    }))
+    .slice(-HISTORY_LIMIT);
+}
+
+function sanitizeCache(obj) {
+  const out = {};
+  for (const code of ['en', 'hi', 'pa', 'mr']) {
+    if (!Array.isArray(obj[code])) continue;
+    out[code] = obj[code]
+      .filter((e) => e && typeof e.id === 'string' && typeof e.text === 'string')
+      .map((e) => ({ id: e.id, text: e.text.slice(0, 2000) }))
+      .slice(-CACHE_LIMIT);
+  }
+  return out;
+}
+
+function mergeCache(prev, code, out) {
+  const cur = Array.isArray(prev?.[code]) ? prev[code].slice() : [];
+  const known = new Set(cur.map((e) => e.id));
+  for (const t of out) {
+    if (t && typeof t.id === 'string' && typeof t.text === 'string' && !known.has(t.id)) {
+      cur.push({ id: t.id, text: t.text.slice(0, 2000) });
+      known.add(t.id);
+    }
+  }
+  return { ...(prev || {}), [code]: cur.slice(-CACHE_LIMIT) };
+}
+
+function trimCache(cache) {
+  const out = {};
+  for (const code of ['en', 'hi', 'pa', 'mr']) {
+    if (Array.isArray(cache?.[code])) out[code] = cache[code].slice(-CACHE_LIMIT);
+  }
+  return out;
+}
 
 function renderRichText(body, baseStyle, boldStyle) {
   const parts = String(body || '').split(/(\*\*[^*]+\*\*)/g);
@@ -100,6 +153,59 @@ You can ask in English, Hindi, or Hinglish.`,
 तुम्ही इंग्रजी, हिंदी किंवा हिंग्लिशमध्ये विचारू शकता.`,
 };
 
+function TypingDots() {
+  const d1 = useRef(new Animated.Value(0)).current;
+  const d2 = useRef(new Animated.Value(0)).current;
+  const d3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const bounce = (v, delay) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(v, {
+            toValue: 1,
+            duration: 300,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(v, {
+            toValue: 0,
+            duration: 300,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    const a1 = bounce(d1, 0);
+    const a2 = bounce(d2, 180);
+    const a3 = bounce(d3, 360);
+    a1.start();
+    a2.start();
+    a3.start();
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [d1, d2, d3]);
+
+  const dots = [d1, d2, d3].map((v, i) => (
+    <Animated.View
+      key={i}
+      style={[
+        styles.typingDot,
+        {
+          opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+          transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }],
+        },
+      ]}
+    />
+  ));
+
+  return <View style={styles.typingRow}>{dots}</View>;
+}
+
 export default function ChatbotScreen({ navigation }) {
   const { tr, lang } = useLang();
 
@@ -110,6 +216,113 @@ export default function ChatbotScreen({ navigation }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const listRef = useRef(null);
+  const [uid, setUid] = useState(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [transCache, setTransCache] = useState({});
+  const translatingRef = useRef(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const transCacheRef = useRef(transCache);
+  transCacheRef.current = transCache;
+  const langSettledRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let id = 'guest';
+      try {
+        const session = await getCurrentUserSession();
+        if (session?.uid) id = String(session.uid);
+      } catch (e) {
+        id = 'guest';
+      }
+      let storedMessages = null;
+      let storedCache = null;
+      try {
+        const raw = await AsyncStorage.getItem(historyKey(id));
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) storedMessages = sanitizeMessages(arr);
+        }
+      } catch (e) {
+        storedMessages = null;
+      }
+      try {
+        const rawCache = await AsyncStorage.getItem(translationsKey(id));
+        if (rawCache) {
+          const obj = JSON.parse(rawCache);
+          if (obj && typeof obj === 'object') storedCache = sanitizeCache(obj);
+        }
+      } catch (e) {
+        storedCache = null;
+      }
+      if (!alive) return;
+      setUid(id);
+      if (storedMessages && storedMessages.length) setMessages(storedMessages);
+      if (storedCache) setTransCache(storedCache);
+      setHistoryLoaded(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!historyLoaded || !uid) return;
+    AsyncStorage.setItem(historyKey(uid), JSON.stringify(messages.slice(-HISTORY_LIMIT))).catch(() => {});
+  }, [messages, uid, historyLoaded]);
+
+  useEffect(() => {
+    if (!historyLoaded || !uid) return;
+    AsyncStorage.setItem(translationsKey(uid), JSON.stringify(trimCache(transCache))).catch(() => {});
+  }, [transCache, uid, historyLoaded]);
+
+  const displayMessages = useMemo(() => {
+    const entries = Array.isArray(transCache?.[lang]) ? transCache[lang] : null;
+    if (!entries || !entries.length) return messages;
+    const byId = new Map(entries.map((e) => [e.id, e.text]));
+    let changed = false;
+    const out = messages.map((m) => {
+      if (m.isGreeting || m.typing) return m;
+      const t = byId.get(m.id);
+      if (typeof t === 'string' && t !== m.text) {
+        changed = true;
+        return { ...m, text: t };
+      }
+      return m;
+    });
+    return changed ? out : messages;
+  }, [messages, transCache, lang]);
+
+  useEffect(() => {
+    if (!historyLoaded || !uid) return;
+    const key = `${uid}|${lang}`;
+    if (langSettledRef.current === key) return;
+    const first = langSettledRef.current === null;
+    langSettledRef.current = key;
+    if (first) return;
+    const cache = transCacheRef.current;
+    const missing = missingTranslations(
+      messagesRef.current,
+      cache?.[lang]
+    );
+    if (!missing.length) return;
+    if (translatingRef.current === key) return;
+    translatingRef.current = key;
+    (async () => {
+      try {
+        const out = await translateTexts(
+          missing.map((m) => ({ id: m.id, text: m.text })),
+          lang
+        );
+        if (Array.isArray(out) && out.length) {
+          setTransCache((prev) => mergeCache(prev, lang, out));
+        }
+      } catch (e) {
+        // Keep showing the original text; switching language again retries.
+      } finally {
+        if (translatingRef.current === key) translatingRef.current = null;
+      }
+    })();
+  }, [lang, uid, historyLoaded]);
 
   const faqQuestions = [
     tr('chat_faq1'),
@@ -144,9 +357,12 @@ export default function ChatbotScreen({ navigation }) {
       phone = null;
     }
 
+    const replyLang = lang;
     try {
-      const reply = await sendChatMessage(text, messages, phone, lang);
-      setMessages((prev) => [...prev, { id: nextId(), role: 'bot', text: reply }]);
+      const reply = await sendChatMessage(text, messages, phone, replyLang);
+      const replyId = nextId();
+      setMessages((prev) => [...prev, { id: replyId, role: 'bot', text: reply }]);
+      setTransCache((prev) => mergeCache(prev, replyLang, [{ id: replyId, text: reply }]));
     } catch (e) {
       setError(e);
     } finally {
@@ -167,15 +383,15 @@ export default function ChatbotScreen({ navigation }) {
   }, [deliver]);
 
   const data = sending
-    ? [...messages, { id: 'typing', role: 'bot', typing: true }]
-    : messages;
+    ? [...displayMessages, { id: 'typing', role: 'bot', typing: true }]
+    : displayMessages;
 
   const renderItem = ({ item }) => {
     if (item.typing) {
       return (
         <View style={[styles.row, styles.rowBot]}>
           <View style={[styles.bubble, styles.bubbleBot]}>
-            <Text style={styles.typing}>…</Text>
+            <TypingDots />
           </View>
         </View>
       );
@@ -298,7 +514,8 @@ const styles = StyleSheet.create({
   textUser: { color: Colors.white, fontSize: 15, lineHeight: 21 },
   textBot: { color: Colors.text, fontSize: 15, lineHeight: 21 },
   bold: { fontWeight: '700' },
-  typing: { color: Colors.subText, fontSize: 18, fontWeight: '700', paddingHorizontal: 4 },
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4, paddingVertical: 6 },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.subText },
 
   faqCard: {
     backgroundColor: Colors.white,

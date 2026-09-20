@@ -260,10 +260,14 @@ function makeStore(db) {
     }
     return slots.filter((s) => !s.isFull);
   }
-  async function activeBookingFor(phone) {
+  async function activeBookingsFor(phone) {
     const snap = await db.collection("bookings").where("farmerId", "==", phone).get();
     const rows = snap.docs.map((d) => d.data()).filter((b) => ACTIVE_STATUSES.includes(b.status));
     rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return rows;
+  }
+  async function activeBookingFor(phone) {
+    const rows = await activeBookingsFor(phone);
     return rows[0] || null;
   }
   async function queueFor(centreId, date) {
@@ -349,7 +353,7 @@ function makeStore(db) {
     });
   }
 
-  return {fetchCentres, fetchCentreById, fetchAvailableSlots, activeBookingFor, queueFor, nextWaitingBooking, createBookingFromIvr};
+  return {fetchCentres, fetchCentreById, fetchAvailableSlots, activeBookingFor, activeBookingsFor, queueFor, nextWaitingBooking, createBookingFromIvr};
 }
 
 // ---------------------------------------------------------------

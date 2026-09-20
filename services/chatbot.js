@@ -22,6 +22,7 @@
 import { CHATBOT_BASE_URL } from './config';
 
 const CHATBOT_URL = `${CHATBOT_BASE_URL}/chat`;
+const TRANSLATE_URL = `${CHATBOT_BASE_URL}/translate`;
 const MAX_HISTORY = 10;
 
 export class ChatError extends Error {
@@ -116,4 +117,57 @@ export async function sendChatMessage(message, history = [], phone = null, langu
   if (!reply) throw new ChatError('EMPTY_REPLY', 'Empty reply from the Assistant');
 
   return reply;
+}
+
+/**
+ * IDs of stored messages still missing a display translation.
+ * Pure helper so the screen translates only on language switch with
+ * uncached history - never on plain re-renders or new messages.
+ */
+export function missingTranslations(messages, entries) {
+  const have = new Set((Array.isArray(entries) ? entries : []).map((e) => e && e.id));
+  return (Array.isArray(messages) ? messages : []).filter(
+    (m) => m && !m.isGreeting && !m.typing && typeof m.text === 'string' && m.text.trim() && !have.has(m.id)
+  );
+}
+
+/**
+ * Translate already-stored chat messages for the translated-history
+ * display cache. One batched backend call per invocation - callers
+ * must cache results per language and never call this on every render.
+ * @param {Array<{id:string, text:string}>} texts  messages to translate
+ * @param {string} language                        en | hi | pa | mr
+ * @returns {Promise<Array<{id:string, text:string}>>}
+ */
+export async function translateTexts(texts, language) {
+  const cleanLang = String(language || '').toLowerCase();
+  if (!['en', 'hi', 'pa', 'mr'].includes(cleanLang)) {
+    throw new ChatError('BAD_LANGUAGE', 'Valid target language is required');
+  }
+  const items = (Array.isArray(texts) ? texts : [])
+    .filter((t) => t && typeof t.id === 'string' && typeof t.text === 'string' && t.text.trim())
+    .map((t) => ({ id: t.id, text: t.text.trim() }));
+  if (!items.length) return [];
+
+  let res;
+  try {
+    res = await fetch(TRANSLATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texts: items, language: cleanLang }),
+    });
+  } catch (e) {
+    throw new ChatError('NETWORK', 'Cannot reach the Assistant server');
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new ChatError('SERVER', String(data.error || `HTTP ${res.status}`));
+  }
+
+  const out = Array.isArray(data.translations) ? data.translations : [];
+  return out
+    .filter((t) => t && typeof t.id === 'string' && typeof t.text === 'string')
+    .map((t) => ({ id: t.id, text: t.text }));
 }

@@ -26,6 +26,7 @@ You can answer common AgroBridge FAQs and use the supplied farmer/mandi data whe
 The farmer context below has LIVE sections (BOOKING, QUEUE, PAYMENT, CENTRE) read from Firestore for THIS farmer only, plus your general AgroBridge knowledge.
 - Use the LIVE sections for personal questions ("my token", "meri turn", "my payment", "mandi timings").
 - Answer general process questions from general knowledge.
+- BOOKINGS lists EVERY active booking for this farmer (the top-level BOOKING, QUEUE, PAYMENT, CENTRE describe only the most recent one). If BOOKINGS has more than one entry, answer about the booking the farmer means: use the entry matching any slot, date, token, or centre they mention; otherwise list the available bookings (token, centre, date, slot, status) or ask which one they mean. Do NOT silently answer only about the newest booking.
 
 Rules:
 - Never invent booking, queue, payment, slot, centre, or crop information.
@@ -42,21 +43,8 @@ Rules:
 
   // READ-ONLY context for one farmer. Only whitelisted fields are
   // exposed to Gemini. gatePassCode / gatePassQr are NEVER included.
-  async function getContext(phone) {
-    const farmerId = normalizePhone(phone);
-    if (!farmerId) return {};
-
-    let booking = null;
-
-    try {
-      booking = await store.activeBookingFor(farmerId);
-    } catch (e) {
-      console.error("chatbot booking lookup failed:", e.message);
-    }
-
-    if (!booking) return { booking: null };
-
-    const bookingView = {
+  function bookingViewOf(booking) {
+    return {
       tokenNumber: booking.tokenNumber || null,
       positionAssigned: booking.positionAssigned ?? null,
       centreName: booking.centreName || null,
@@ -70,8 +58,10 @@ Rules:
       status: booking.status || null,
       estimatedTurnTime: booking.estimatedTurnTime || booking.arriveAt || null,
     };
+  }
 
-    const payment = {
+  function paymentViewOf(booking) {
+    return {
       status: booking.status || null,
       ratePerQuintal: booking.ratePerQuintal ?? null,
       actualQuantity: booking.actualQuantity ?? null,
@@ -85,55 +75,110 @@ Rules:
       paymentReference: booking.paymentReference || null,
       paymentBasis: booking.paymentBasis || null,
     };
+  }
 
-    let queueView = null;
+  function queueViewOf(booking, queue) {
+    if (!queue) return null;
+    const position = Number(booking.positionAssigned) || 0;
+    const inside = new Set(queue.insidePositions || []);
+    const ahead = (queue.openPositions || []).filter(
+      (p) => p < position && !inside.has(p)
+    ).length;
+    return {
+      nowServingPosition: queue.nowServingPosition ?? null,
+      nowServingToken: queue.nowServingToken || null,
+      nowServingStatus: queue.nowServingStatus || null,
+      totalBooked: queue.totalBooked ?? null,
+      completedCount: queue.completedCount ?? null,
+      openPositions: queue.openPositions || [],
+      insidePositions: queue.insidePositions || [],
+      myPosition: position || null,
+      tokensAhead: ahead,
+      isInside: inside.has(position),
+    };
+  }
 
-    if (booking.centreId && booking.date) {
-      try {
-        const queue = await store.queueFor(booking.centreId, booking.date);
-        if (queue) {
-          const position = Number(booking.positionAssigned) || 0;
-          const inside = new Set(queue.insidePositions || []);
-          const ahead = (queue.openPositions || []).filter(
-            (p) => p < position && !inside.has(p)
-          ).length;
-          queueView = {
-            nowServingPosition: queue.nowServingPosition ?? null,
-            nowServingToken: queue.nowServingToken || null,
-            nowServingStatus: queue.nowServingStatus || null,
-            totalBooked: queue.totalBooked ?? null,
-            completedCount: queue.completedCount ?? null,
-            openPositions: queue.openPositions || [],
-            insidePositions: queue.insidePositions || [],
-            myPosition: position || null,
-            tokensAhead: ahead,
-            isInside: inside.has(position),
-          };
-        }
-      } catch (e) {
-        console.error("chatbot queue lookup failed:", e.message);
-      }
+  function centreViewOf(c) {
+    if (!c) return null;
+    return {
+      name: c.name || null,
+      name_en: c.name_en || null,
+      address: c.address || null,
+      acceptedCrops: c.acceptedCrops || [],
+      operatingStartTime: c.operatingStartTime || null,
+      operatingEndTime: c.operatingEndTime || null,
+      parallelLanes: c.parallelLanes ?? null,
+      avgMinutesPerEntry: c.avgMinutesPerEntry ?? null,
+    };
+  }
+
+  async function queueViewFor(booking) {
+    if (!booking.centreId || !booking.date) return null;
+    try {
+      const queue = await store.queueFor(booking.centreId, booking.date);
+      return queueViewOf(booking, queue);
+    } catch (e) {
+      console.error("chatbot queue lookup failed:", e.message);
+      return null;
+    }
+  }
+
+  async function centreViewFor(centreId) {
+    if (!centreId) return null;
+    try {
+      const c = await store.fetchCentreById(centreId);
+      return centreViewOf(c);
+    } catch (e) {
+      console.error("chatbot centre lookup failed:", e.message);
+      return null;
+    }
+  }
+
+  async function getContext(phone) {
+    const farmerId = normalizePhone(phone);
+    if (!farmerId) return {};
+
+    let all = [];
+
+    try {
+      all = await store.activeBookingsFor(farmerId);
+    } catch (e) {
+      console.error("chatbot booking lookup failed:", e.message);
     }
 
-    let centre = null;
+    if (!all.length) return { booking: null };
 
-    if (booking.centreId) {
-      try {
-        const c = await store.fetchCentreById(booking.centreId);
-        if (c) {
-          centre = {
-            name: c.name || null,
-            name_en: c.name_en || null,
-            address: c.address || null,
-            acceptedCrops: c.acceptedCrops || [],
-            operatingStartTime: c.operatingStartTime || null,
-            operatingEndTime: c.operatingEndTime || null,
-            parallelLanes: c.parallelLanes ?? null,
-            avgMinutesPerEntry: c.avgMinutesPerEntry ?? null,
-          };
-        }
-      } catch (e) {
-        console.error("chatbot centre lookup failed:", e.message);
+    const booking = all[0];
+    const bookingView = bookingViewOf(booking);
+    const payment = paymentViewOf(booking);
+    const queueView = await queueViewFor(booking);
+    const centre = await centreViewFor(booking.centreId);
+
+    if (all.length === 1) {
+      return {
+        booking: bookingView,
+        queue: queueView,
+        payment,
+        centre,
+      };
+    }
+
+    const bookings = [];
+    for (const b of all) {
+      bookings.push({
+        booking: bookingViewOf(b),
+        payment: paymentViewOf(b),
+        queue: await queueViewFor(b),
+      });
+    }
+
+    const centres = {};
+    const seen = new Set();
+    for (const b of all) {
+      if (b.centreId && !seen.has(b.centreId)) {
+        seen.add(b.centreId);
+        const c = await centreViewFor(b.centreId);
+        if (c) centres[b.centreId] = c;
       }
     }
 
@@ -142,6 +187,8 @@ Rules:
       queue: queueView,
       payment,
       centre,
+      bookings,
+      centres,
     };
   }
 
@@ -165,11 +212,9 @@ Rules:
     }[langCode] || null;
     const languageLine = langName
       ? `RESPONSE LANGUAGE: ${langName} (${langCode}).
-The farmer's selected app language is ${langName}. ALWAYS answer in ${langName} by default.
-- English app -> English. Hindi app -> Hindi. Punjabi app -> Punjabi. Marathi app -> Marathi.
-- Do not randomly switch languages. Do not mix languages unless ${langName} itself naturally requires it.
+The farmer's selected app language is ${langName}. Answer in ${langName} by default, writing naturally and conversationally like a helpful local assistant: fluent sentences, correct farming and procurement terms, no awkward word-for-word translation, no random mixing of other languages.
 - If the farmer explicitly asks for a different response language, that explicit request may override this default.
-- Otherwise ALWAYS answer in ${langName}. The question's language alone must NOT change your response language.`
+- Otherwise always answer in ${langName}. The question's language alone must NOT change your response language.`
       : `No app language was supplied. Match the farmer's message language (English, Hindi, or Hinglish).`;
 
     const context = await getContext(phone);
@@ -214,7 +259,35 @@ ${cleanMessage}`
     };
   }
 
-  return { chat };
+  // Batched translation for the app's translated-history display cache.
+  // READ-ONLY: one Gemini request per call, never one per message.
+  async function translateTexts({ texts, language }) {
+    const code = String(language || "").toLowerCase();
+    const target = {
+      en: "English",
+      hi: "Hindi",
+      pa: "Punjabi",
+      mr: "Marathi",
+    }[code] || null;
+    if (!target) throw new Error("Valid target language is required");
+    const items = (Array.isArray(texts) ? texts : [])
+      .filter((t) => t && typeof t.id === "string" && typeof t.text === "string" && t.text.trim())
+      .map((t) => ({ id: t.id, text: t.text.trim() }))
+      .slice(0, 50);
+    if (!items.length) return { translations: [] };
+    const prompt = `Translate each chat message below into natural, fluent ${target} (conversational, farmer-friendly; keep names, numbers, dates and token codes unchanged). Return ONLY a JSON array like [{"id": "...", "text": "..."}] with the same ids in the same order, no other text:\n${JSON.stringify(items)}`;
+    const result = await model.generateContent(prompt);
+    const match = /\[[\s\S]*\]/.exec(String(result.response.text() || ""));
+    if (!match) throw new Error("Translate failed");
+    const parsed = JSON.parse(match[0]);
+    const translations = (Array.isArray(parsed) ? parsed : [])
+      .filter((t) => t && typeof t.id === "string" && typeof t.text === "string")
+      .map((t) => ({ id: t.id, text: t.text }))
+      .slice(0, items.length);
+    return { translations };
+  }
+
+  return { chat, translateTexts, getContext };
 }
 
 module.exports = { createChatbot };
