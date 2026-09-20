@@ -54,6 +54,7 @@ import HistoryScreen from './screens/farmer/HistoryScreen';
 import PaymentsScreen from './screens/farmer/PaymentsScreen';
 import FarmerProfileScreen from './screens/farmer/FarmerProfileScreen';
 import HelpScreen from './screens/common/HelpScreen';
+import ChatbotScreen from './screens/common/ChatbotScreen';
 import NotificationsScreen from './screens/common/NotificationsScreen';
 import { NotificationProvider } from './notifications/NotificationContext';
 
@@ -94,6 +95,7 @@ function FarmerStack() {
       <FarmerNav.Screen name="Payments" component={PaymentsScreen} />
       <FarmerNav.Screen name="FarmerProfile" component={FarmerProfileScreen} />
       <FarmerNav.Screen name="Help" component={HelpScreen} />
+      <FarmerNav.Screen name="Chatbot" component={ChatbotScreen} />
       <FarmerNav.Screen name="Notifications" component={NotificationsScreen} />
     </FarmerNav.Navigator>
   );

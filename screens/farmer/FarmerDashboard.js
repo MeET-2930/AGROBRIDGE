@@ -319,6 +319,12 @@ export default function FarmerDashboard({ navigation }) {
             onPress={() => navigation.navigate('Help', { role: 'farmer' })}
           />
 
+          <DashboardCard
+            title={tr('chat_withAssistant')}
+            icon="chatbubbles-outline"
+            onPress={() => navigation.navigate('Chatbot')}
+          />
+
           {IVR_BASE_URL ? (
             <DashboardCard
               title={tr('ivr_callMe')}
