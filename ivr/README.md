@@ -32,7 +32,10 @@ Firebase console → ⚙️ Project settings → **Service accounts** →
 base64 -w0 ~/Downloads/agrobridge-sih26-*.json > /tmp/sa.b64
 cat /tmp/sa.b64        # copy this whole long string
 ```
-Never commit the JSON. `ivr/.gitignore` already blocks it.
+Never commit the JSON. Heads-up: `ivr/.gitignore` only matches
+`serviceAccount*.json`, so the Firebase download name
+`agrobridge-sih26-*.json` is **not** covered — keep the key in
+`~/Downloads`, outside this repo.
 
 ## 2. Push the code
 ```bash
