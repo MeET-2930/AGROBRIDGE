@@ -23,10 +23,9 @@ services:
       # Optional model override (default: gemini-3.1-flash-lite).
       - key: GEMINI_MODEL
         sync: false
-      # Enforce the x-agb-key guard on /chat + /translate.
-      # "false" for now: the deployed web app + installed APKs do not
-      # send the header yet, so enforcing would break live chat.
-      # FLIP TO "true" once the app build that sends x-agb-key is live
-      # (web rebuilt + deployed, testers updated via EAS).
+      # Opt-in guard on /chat + /translate (the code default is OFF, so
+      # unset = off). Set to "true" once the app build that sends
+      # x-agb-key is live (web rebuilt + deployed, testers updated via
+      # EAS); until then "false" keeps current clients working.
       - key: CHATBOT_REQUIRE_KEY
         value: "false"

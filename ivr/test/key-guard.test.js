@@ -87,10 +87,10 @@ test("fails closed (503) when no key is configured", () => {
   assert.equal(nexted, false);
 });
 
-test("requiredByEnv: enforced unless explicitly false", () => {
-  assert.equal(requiredByEnv({}), true);
+test("requiredByEnv: opt-in (on only when explicitly true)", () => {
+  assert.equal(requiredByEnv({}), false);
   assert.equal(requiredByEnv({ CHATBOT_REQUIRE_KEY: "true" }), true);
+  assert.equal(requiredByEnv({ CHATBOT_REQUIRE_KEY: " TRUE " }), true);
   assert.equal(requiredByEnv({ CHATBOT_REQUIRE_KEY: "false" }), false);
-  assert.equal(requiredByEnv({ CHATBOT_REQUIRE_KEY: "FALSE" }), false);
-  assert.equal(requiredByEnv({ CHATBOT_REQUIRE_KEY: " no " }), true);
+  assert.equal(requiredByEnv({ CHATBOT_REQUIRE_KEY: "no" }), false);
 });

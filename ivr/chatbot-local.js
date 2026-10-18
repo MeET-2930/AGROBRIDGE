@@ -43,9 +43,10 @@ app.use(
 
 const PORT = 3001;
 
-// Mirror production: /chat and /translate require the app's shared key
-// (services/config.js IVR_APP_KEY === APP_SHARED_KEY here). Not strong
-// auth - see README "Security limitations".
+// Mirror production: /chat and /translate can require the app's shared
+// key (services/config.js IVR_APP_KEY === APP_SHARED_KEY here) when
+// CHATBOT_REQUIRE_KEY=true. Opt-in, so it never breaks a local app that
+// hasn't been rebuilt. Not strong auth - see README "Security limitations".
 const guard = makeKeyGuard({
   key: process.env.APP_SHARED_KEY || "agb-dev-key",
   enabled: requiredByEnv(),

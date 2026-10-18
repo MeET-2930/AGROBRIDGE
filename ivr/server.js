@@ -355,8 +355,9 @@ function auth(req, res, next) {
 
 // Same shared-secret check as `auth`, but without the telephony
 // requirement - used by the read-only chatbot endpoints. NOT strong
-// auth (the key ships in the client bundle); set CHATBOT_REQUIRE_KEY=false
-// to disable during client rollout. See README "Security limitations".
+// auth (the key ships in the client bundle). Opt-in: set
+// CHATBOT_REQUIRE_KEY=true once the app sends the header.
+// See README "Security limitations".
 const chatGuard = makeKeyGuard({
   key: APP_SHARED_KEY,
   enabled: requiredByEnv(),

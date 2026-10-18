@@ -12,17 +12,18 @@
  * The caller-supplied `phone` stays untrusted for personal data.
  * See ivr/README.md -> "Security limitations".
  *
- * Enforcement is ON by default and can be turned off with
- * `CHATBOT_REQUIRE_KEY=false` (a rollout kill-switch for clients
- * that do not send the header yet). No secret value is ever logged.
+ * Enforcement is OFF unless `CHATBOT_REQUIRE_KEY=true` (opt-in), so
+ * the guard can never break clients that do not send the header yet.
+ * Set `CHATBOT_REQUIRE_KEY=true` on the server once the app build that
+ * sends x-agb-key is live. No secret value is ever logged.
  * ---------------------------------------------------------------
  */
 
 const KEY_HEADER = "x-agb-key";
 
-/** True unless CHATBOT_REQUIRE_KEY is explicitly "false". */
+/** True only when CHATBOT_REQUIRE_KEY is explicitly "true". */
 function requiredByEnv(env = process.env) {
-  return String(env.CHATBOT_REQUIRE_KEY || "").trim().toLowerCase() !== "false";
+  return String(env.CHATBOT_REQUIRE_KEY || "").trim().toLowerCase() === "true";
 }
 
 /**

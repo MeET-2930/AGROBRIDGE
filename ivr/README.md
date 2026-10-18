@@ -58,8 +58,18 @@ client-side, send the ID token, and verify it server-side
 (`admin.auth().verifyIdToken()`), deriving the farmer from the token's
 verified `phone_number` -> `users/{10 digits}`. That needs the Blaze plan -
 see `BLAZE_LATER.md`. Until then, keep the shared key and treat this as a
-**stopgap**, not a secure identity check. `CHATBOT_REQUIRE_KEY=false` disables
-the guard temporarily (rollout kill-switch).
+**stopgap**, not a secure identity check.
+
+The `x-agb-key` guard is **opt-in** (`CHATBOT_REQUIRE_KEY=true`) so it never
+breaks a client that does not send the header yet. Roll it out in this order:
+
+1. Ship the app build that sends `x-agb-key` (web rebuild + `firebase deploy
+   --only hosting`; mobile testers update via `eas update`).
+2. Set `CHATBOT_REQUIRE_KEY=true` in the Render dashboard (the service is
+   created manually, so `render.yaml` is documentation - it does not apply
+   env vars by itself).
+
+A one-line value flip back to `false` (then a redeploy) is the kill-switch.
 
 ## Which "phone line" does it use?  (`PROVIDER` env var)
 
