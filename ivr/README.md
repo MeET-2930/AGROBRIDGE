@@ -7,6 +7,60 @@ next farmer** automatically when the gate officer admits a vehicle.
 Runs on **Render.com free tier**. Same code runs as a Firebase Cloud
 Function once you have Blaze (see "Moving to Blaze" at the bottom).
 
+ ---------------------------------------------------------------------------
+## AI chatbot (agentic assistant)
+
+The same service hosts the app's **AgroBridge Assistant** (`POST /chat`,
+`POST /translate`) - now an agentic Gemini loop (`ivr/agent.js`):
+
+- Gemini picks from **read-only tools** backed by real Firestore data via
+  `ivr-core makeStore`: `getFarmerBookings`, `getQueueStatus`,
+  `getAvailableSlots`, `getCentreInfo`, `getPaymentStatus`.
+- The trusted backend executes each tool, returns whitelisted results to
+  Gemini, and loops (max 5 tool rounds; a tools-free forced answer ends a
+  request that hits the limit). There are **no write tools** - booking,
+  cancel and payment changes are refused by design.
+- Identity: the request's `phone` (the app session uid) must be a
+  registered `users/{phone}` document or personal tools return
+  `NOT_LOGGED_IN`. Tools can never accept a farmer id from the model.
+  Gate pass codes / QR / admin codes are never exposed to the model.
+- The app client (`services/chatbot.js` + `screens/common/ChatbotScreen.js`)
+  sends the `x-agb-key` header (same `IVR_APP_KEY` as the IVR calls) and
+  consumes the same `/chat` contract `{reply}` (+ a `toolsUsed` extra it
+  ignores).
+
+**Run locally:** `npm run chatbot` (port 3001, `ivr/.env` with at least
+`GEMINI_API_KEY`; Firebase credentials optional - without them it runs in
+FAQ-only mode with live tools disabled). Point
+`services/config.js CHATBOT_BASE_URL` at `http://localhost:3001` for local
+app work (do not commit).
+
+**Tests:** `npm test` (mocked Gemini + mocked Firestore, no network) and
+`npm run test:live` (real Gemini API, still-mocked Firestore; needs
+`GEMINI_API_KEY`).
+
+### Security limitations (read before a public deploy)
+`/chat` and `/translate` require the app's shared key (`x-agb-key`, the same
+`APP_SHARED_KEY` the IVR endpoints use). This is **not authentication** - the
+key ships inside the client bundle, so it only proves "the caller has the
+app", never *who the farmer is*. The app still has **no Firebase Auth**
+(sign-in is a client-side phone + Firestore `users/{phone}` lookup), so
+`/chat` still trusts the caller-supplied `phone`:
+
+- Anyone who has the key **and** knows (or guesses) a registered 10-digit
+  number can read that farmer's bookings, queue and payment status.
+- Read-only only: there are no booking/cancel/pay tools, the verified session
+  phone is the only farmer id the tools can use, and gate-pass / QR / admin
+  codes are never sent to the model.
+
+The real fix is Firebase Auth: enable the Phone provider, sign in
+client-side, send the ID token, and verify it server-side
+(`admin.auth().verifyIdToken()`), deriving the farmer from the token's
+verified `phone_number` -> `users/{10 digits}`. That needs the Blaze plan -
+see `BLAZE_LATER.md`. Until then, keep the shared key and treat this as a
+**stopgap**, not a secure identity check. `CHATBOT_REQUIRE_KEY=false` disables
+the guard temporarily (rollout kill-switch).
+
 ## Which "phone line" does it use?  (`PROVIDER` env var)
 
 | PROVIDER | What it is | Cost | Needs |
@@ -56,6 +110,9 @@ git add -A && git commit -m "install19: phone service" && git push
    | `FIREBASE_SERVICE_ACCOUNT_B64` | the long string from step 1 |
    | `PROVIDER` | `sim` |
    | `APP_SHARED_KEY` | `agb-demo-2026` (= `IVR_APP_KEY` in `services/config.js`) |
+   | `GEMINI_API_KEY` | Google AI Studio key (**required** - server won't boot without it) |
+   | `GEMINI_MODEL` | optional, default `gemini-3.1-flash-lite` |
+   | `CHATBOT_REQUIRE_KEY` | `true` (enforce `x-agb-key` on `/chat` + `/translate`; set `false` only as a rollout kill-switch) |
 
 4. **Deploy web service** → ~2 min → log shows
    `telephony provider: sim (outbound enabled)` and `IVR listening`.

@@ -4,258 +4,125 @@ const {
   makeStore,
   normalizePhone,
 } = require("./ivr-core");
+const { createAgent } = require("./agent");
 
-function createChatbot({ db }) {
-  const store = makeStore(db);
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+const MODEL_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 30000;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY in environment");
-  }
+/**
+ * createChatbot({ db, model?, store?, maxSteps? })
+ *
+ * Agentic AgroBridge Assistant. Gemini picks read-only tools
+ * (see ivr/agent.js); the trusted backend executes them against
+ * Firestore and feeds real results back until a final answer.
+ *
+ * `db` is the firebase-admin Firestore instance from server.js.
+ * All dependencies are injectable for tests (model / store).
+ */
+function createChatbot({ db, model = null, store = null, maxSteps = undefined } = {}) {
+  if (!store && db) store = makeStore(db);
 
-  const genAI = new GoogleGenerativeAI(apiKey);
+  if (!model) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Missing GEMINI_API_KEY in environment");
+    }
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const liveToolsBrief = store
+      ? `You have LIVE READ-ONLY TOOLS backed by the real AgroBridge database:
+- getFarmerBookings: the logged-in farmer's own active bookings.
+- getQueueStatus: live queue for a centre + date.
+- getAvailableSlots: remaining bookable slots for a centre + date.
+- getCentreInfo: centre address, hours, accepted crops.
+- getPaymentStatus: payment details of the farmer's own booking.
 
-  const model = genAI.getGenerativeModel({
-    model: "gemini-3.1-flash-lite",
-    systemInstruction: `
-You are AgroBridge Assistant, a helpful assistant for farmers using AgroBridge.
+How to work:
+1. Understand the farmer's goal (their whole request, not just one keyword).
+2. When the answer needs live data, call the right tool. Chain tools when
+   needed (e.g. getFarmerBookings first to learn centreId/date, then
+   getQueueStatus for the live queue).
+3. Base the final answer ONLY on verified tool results. Never invent
+   booking, queue, payment, slot, centre, crop or token data.
+4. If a tool returns ok:false / found:false / NOT_LOGGED_IN / TOOL_FAILED,
+   explain the limitation honestly (and suggest logging in or retrying)
+   instead of guessing.`
+      : `Live account data is NOT connected on this server. Do not claim to know
+anyone's booking, queue, payment or slot details. If asked for personal live
+data, say it cannot be checked right now and suggest the app's dashboard.`;
 
-Answer questions clearly and simply.
-You can answer common AgroBridge FAQs and use the supplied farmer/mandi data when available.
+    model = genAI.getGenerativeModel({
+      model: DEFAULT_MODEL,
+      systemInstruction: `
+You are AgroBridge Assistant, a helpful agentic assistant for farmers using AgroBridge.
 
-The farmer context below has LIVE sections (BOOKING, QUEUE, PAYMENT, CENTRE) read from Firestore for THIS farmer only, plus your general AgroBridge knowledge.
-- Use the LIVE sections for personal questions ("my token", "meri turn", "my payment", "mandi timings").
-- Answer general process questions from general knowledge.
-- BOOKINGS lists EVERY active booking for this farmer (the top-level BOOKING, QUEUE, PAYMENT, CENTRE describe only the most recent one). If BOOKINGS has more than one entry, answer about the booking the farmer means: use the entry matching any slot, date, token, or centre they mention; otherwise list the available bookings (token, centre, date, slot, status) or ask which one they mean. Do NOT silently answer only about the newest booking.
+AgroBridge helps farmers manage mandi/procurement-yard visits: slots, queues,
+tokens, gate entry, quality check (assay), weighing and payments.
+
+${liveToolsBrief}
 
 Rules:
-- Never invent booking, queue, payment, slot, centre, or crop information.
-- Only mention a token, queue position, payment amount, slot, timing, or booking if it appears in the LIVE context below. If the LIVE context is missing or null, say the information is not available instead of guessing.
-- Clearly distinguish live personal information from general process information.
-- If the booking status shows the farmer is already inside the yard (in-gate, assay, price-fixed, weighing, payment-processing) or paid, explain that stage; do not describe them as waiting in the queue.
-- paid means payment is completed; payment-processing means it is being processed; weighing or earlier stages mean payment has not been reached yet.
-- Do not make bookings, cancellations, payments, or other changes.
-- You are currently a READ-ONLY assistant.
-- Keep answers concise and practical.
-- Response language: if the farmer context specifies a RESPONSE LANGUAGE, it is the farmer's selected app language and the DEFAULT response language - follow it. Otherwise match the farmer's message language (English, Hindi, or Hinglish).
+- You are strictly READ-ONLY. There are no booking/cancel/pay tools.
+  If asked to book, cancel, reschedule or pay, say you cannot do that in
+  chat and point to the app's booking flow or the helpdesk.
+- Never reveal or ask for gate pass codes, QR payloads, admin codes or
+  other farmers' data.
+- Answer general process FAQs (how booking works, assay, weighing,
+  payment flow, documents, MSP vs auction) from knowledge without tools.
+- Keep answers concise, practical and farmer-friendly.
+- Stay on AgroBridge/mandi/farming topics; politely redirect otherwise.
 `,
+    });
+  }
+
+  const agent = createAgent({
+    model,
+    store,
+    maxSteps,
   });
 
-  // READ-ONLY context for one farmer. Only whitelisted fields are
-  // exposed to Gemini. gatePassCode / gatePassQr are NEVER included.
-  function bookingViewOf(booking) {
-    return {
-      tokenNumber: booking.tokenNumber || null,
-      positionAssigned: booking.positionAssigned ?? null,
-      centreName: booking.centreName || null,
-      centreAddress: booking.centreAddress || null,
-      date: booking.date || null,
-      slotTime: booking.slotTime || null,
-      slotWindow: booking.slotWindow || null,
-      crop: booking.crop || null,
-      cropName: booking.cropName || null,
-      quantityQuintals: booking.approxQuantityQuintals ?? null,
-      status: booking.status || null,
-      estimatedTurnTime: booking.estimatedTurnTime || booking.arriveAt || null,
-    };
-  }
-
-  function paymentViewOf(booking) {
-    return {
-      status: booking.status || null,
-      ratePerQuintal: booking.ratePerQuintal ?? null,
-      actualQuantity: booking.actualQuantity ?? null,
-      grossAmount: booking.grossAmount ?? null,
-      mandiFee: booking.mandiFee ?? null,
-      commission: booking.commission ?? null,
-      hamali: booking.hamali ?? null,
-      netPayable: booking.netPayable ?? null,
-      receiptId: booking.receiptId || null,
-      paidAt: booking.paidAt || null,
-      paymentReference: booking.paymentReference || null,
-      paymentBasis: booking.paymentBasis || null,
-    };
-  }
-
-  function queueViewOf(booking, queue) {
-    if (!queue) return null;
-    const position = Number(booking.positionAssigned) || 0;
-    const inside = new Set(queue.insidePositions || []);
-    const ahead = (queue.openPositions || []).filter(
-      (p) => p < position && !inside.has(p)
-    ).length;
-    return {
-      nowServingPosition: queue.nowServingPosition ?? null,
-      nowServingToken: queue.nowServingToken || null,
-      nowServingStatus: queue.nowServingStatus || null,
-      totalBooked: queue.totalBooked ?? null,
-      completedCount: queue.completedCount ?? null,
-      openPositions: queue.openPositions || [],
-      insidePositions: queue.insidePositions || [],
-      myPosition: position || null,
-      tokensAhead: ahead,
-      isInside: inside.has(position),
-    };
-  }
-
-  function centreViewOf(c) {
-    if (!c) return null;
-    return {
-      name: c.name || null,
-      name_en: c.name_en || null,
-      address: c.address || null,
-      acceptedCrops: c.acceptedCrops || [],
-      operatingStartTime: c.operatingStartTime || null,
-      operatingEndTime: c.operatingEndTime || null,
-      parallelLanes: c.parallelLanes ?? null,
-      avgMinutesPerEntry: c.avgMinutesPerEntry ?? null,
-    };
-  }
-
-  async function queueViewFor(booking) {
-    if (!booking.centreId || !booking.date) return null;
+  /**
+   * Validate the requester's claimed phone against Firestore:
+   * exactly 10 digits AND a registered users/{phone} document must
+   * exist. Returns the verified farmer id, or null which disables
+   * every personal tool for this request.
+   *
+   * LIMITATION (existing app auth): the app signs farmers in with a
+   * phone number + Firestore users doc - there is no Firebase Auth
+   * ID token to verify yet (see firestore.rules MODE B). Until that
+   * is wired, this check is the strongest identity verification the
+   * platform supports. The model can never supply this id itself.
+   */
+  async function verifyFarmer(claimedPhone) {
+    const farmerId = normalizePhone(claimedPhone);
+    if (!farmerId || farmerId.length !== 10) return null;
+    if (!db) return null;
     try {
-      const queue = await store.queueFor(booking.centreId, booking.date);
-      return queueViewOf(booking, queue);
+      const snap = await db.collection("users").doc(farmerId).get();
+      return snap.exists ? farmerId : null;
     } catch (e) {
-      console.error("chatbot queue lookup failed:", e.message);
+      console.error("chatbot identity check failed:", e.message);
       return null;
     }
   }
 
-  async function centreViewFor(centreId) {
-    if (!centreId) return null;
-    try {
-      const c = await store.fetchCentreById(centreId);
-      return centreViewOf(c);
-    } catch (e) {
-      console.error("chatbot centre lookup failed:", e.message);
-      return null;
-    }
-  }
-
-  async function getContext(phone) {
-    const farmerId = normalizePhone(phone);
-    if (!farmerId) return {};
-
-    let all = [];
-
-    try {
-      all = await store.activeBookingsFor(farmerId);
-    } catch (e) {
-      console.error("chatbot booking lookup failed:", e.message);
-    }
-
-    if (!all.length) return { booking: null };
-
-    const booking = all[0];
-    const bookingView = bookingViewOf(booking);
-    const payment = paymentViewOf(booking);
-    const queueView = await queueViewFor(booking);
-    const centre = await centreViewFor(booking.centreId);
-
-    if (all.length === 1) {
-      return {
-        booking: bookingView,
-        queue: queueView,
-        payment,
-        centre,
-      };
-    }
-
-    const bookings = [];
-    for (const b of all) {
-      bookings.push({
-        booking: bookingViewOf(b),
-        payment: paymentViewOf(b),
-        queue: await queueViewFor(b),
-      });
-    }
-
-    const centres = {};
-    const seen = new Set();
-    for (const b of all) {
-      if (b.centreId && !seen.has(b.centreId)) {
-        seen.add(b.centreId);
-        const c = await centreViewFor(b.centreId);
-        if (c) centres[b.centreId] = c;
-      }
-    }
-
-    return {
-      booking: bookingView,
-      queue: queueView,
-      payment,
-      centre,
-      bookings,
-      centres,
-    };
-  }
-
+  /**
+   * One farmer message -> agentic reply.
+   * `phone` is the requester's claimed identity from the app session;
+   * it is verified above and the verified result is the ONLY farmer id
+   * the tools can use.
+   */
   async function chat({ message, phone, history = [], language = null }) {
-    const cleanMessage = String(message || "").trim();
-
-    if (!cleanMessage) {
-      throw new Error("Message is required");
-    }
-
-    if (cleanMessage.length > 2000) {
-      throw new Error("Message is too long");
-    }
-
-    const langCode = String(language || "").toLowerCase();
-    const langName = {
-      en: "English",
-      hi: "Hindi",
-      pa: "Punjabi",
-      mr: "Marathi",
-    }[langCode] || null;
-    const languageLine = langName
-      ? `RESPONSE LANGUAGE: ${langName} (${langCode}).
-The farmer's selected app language is ${langName}. Answer in ${langName} by default, writing naturally and conversationally like a helpful local assistant: fluent sentences, correct farming and procurement terms, no awkward word-for-word translation, no random mixing of other languages.
-- If the farmer explicitly asks for a different response language, that explicit request may override this default.
-- Otherwise always answer in ${langName}. The question's language alone must NOT change your response language.`
-      : `No app language was supplied. Match the farmer's message language (English, Hindi, or Hinglish).`;
-
-    const context = await getContext(phone);
-
-    const contextText = `
-Farmer context (LIVE data from Firestore for this farmer; null means unavailable):
-
-LANGUAGE:
-${languageLine}
-
-BOOKING:
-${JSON.stringify(context.booking ?? null, null, 2)}
-
-QUEUE:
-${JSON.stringify(context.queue ?? null, null, 2)}
-
-PAYMENT:
-${JSON.stringify(context.payment ?? null, null, 2)}
-
-CENTRE:
-${JSON.stringify(context.centre ?? null, null, 2)}
-
-Use the LIVE data above only when relevant to the farmer's question.
-Answer general AgroBridge questions from general knowledge.
-`;
-
-    const chatSession = model.startChat({
-      history: Array.isArray(history)
-        ? history.slice(-10)
-        : [],
+    const farmerId = await verifyFarmer(phone);
+    const result = await agent.chat({
+      message,
+      history,
+      farmerId,
+      language,
     });
-
-    const result = await chatSession.sendMessage(
-      `${contextText}
-
-Farmer's question:
-${cleanMessage}`
-    );
-
     return {
-      reply: result.response.text(),
+      reply: result.reply,
+      toolsUsed: result.toolsUsed,
+      toolRounds: result.toolRounds,
     };
   }
 
@@ -276,7 +143,7 @@ ${cleanMessage}`
       .slice(0, 50);
     if (!items.length) return { translations: [] };
     const prompt = `Translate each chat message below into natural, fluent ${target} (conversational, farmer-friendly; keep names, numbers, dates and token codes unchanged). Return ONLY a JSON array like [{"id": "...", "text": "..."}] with the same ids in the same order, no other text:\n${JSON.stringify(items)}`;
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(prompt, { timeout: MODEL_TIMEOUT_MS });
     const match = /\[[\s\S]*\]/.exec(String(result.response.text() || ""));
     if (!match) throw new Error("Translate failed");
     const parsed = JSON.parse(match[0]);
@@ -287,7 +154,7 @@ ${cleanMessage}`
     return { translations };
   }
 
-  return { chat, translateTexts, getContext };
+  return { chat, translateTexts };
 }
 
 module.exports = { createChatbot };

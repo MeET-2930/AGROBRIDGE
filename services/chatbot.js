@@ -1,29 +1,36 @@
 /*
  * services/chatbot.js
  * ---------------------------------------------------------------
- * Client for the AgroBridge Assistant (read-only Gemini chatbot).
+ * Client for the AgroBridge Assistant (agentic Gemini chatbot with
+ * live read-only Firestore tools on the backend).
  * Talks to the Render backend  ->  POST ${CHATBOT_BASE_URL}/chat
  * (services/config.js; production: https://agrobridge-ivr.onrender.com/chat)
  *
- *   in:  { message, history, phone }   out:  { reply }
+ *   in:  { message, history, phone, language }   out:  { reply, toolsUsed? }
  *
  * `phone` is the logged-in farmer's 10-digit phone (session uid).
  * It is optional: without it the assistant answers general FAQs.
+ * The backend verifies it against Firestore and uses it as the ONLY
+ * farmer identity for live tool calls (bookings, queue, payment).
  *
  * `history` is the list of prior chat messages in Gemini turn
  * format ({ role: 'user' | 'model', parts: [{ text }] }), built
  * from the same message objects the screen keeps.
  *
  * Best-effort: network/app errors throw a ChatError with a `.code`
- * the screen can show. No live Firebase data is read yet.
+ * the screen can show.
  * ---------------------------------------------------------------
  */
 
-import { CHATBOT_BASE_URL } from './config';
+import { CHATBOT_BASE_URL, IVR_APP_KEY } from './config';
 
 const CHATBOT_URL = `${CHATBOT_BASE_URL}/chat`;
 const TRANSLATE_URL = `${CHATBOT_BASE_URL}/translate`;
 const MAX_HISTORY = 10;
+
+// Server-side shared-secret guard (same key as the IVR endpoints).
+// Not strong auth - it only proves the caller has the app.
+const AUTH_HEADERS = { 'Content-Type': 'application/json', 'x-agb-key': IVR_APP_KEY };
 
 export class ChatError extends Error {
   constructor(code, message) {
@@ -95,7 +102,7 @@ export async function sendChatMessage(message, history = [], phone = null, langu
   try {
     res = await fetch(CHATBOT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: AUTH_HEADERS,
       body: JSON.stringify(body),
     });
   } catch (e) {
@@ -153,7 +160,7 @@ export async function translateTexts(texts, language) {
   try {
     res = await fetch(TRANSLATE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: AUTH_HEADERS,
       body: JSON.stringify({ texts: items, language: cleanLang }),
     });
   } catch (e) {

@@ -1,8 +1,30 @@
 require("dotenv").config();
 
+/**
+ * ivr/chatbot-local.js
+ * ---------------------------------------------------------------
+ * Local AgroBridge Assistant server (port 3001) for app development.
+ * Runs the SAME agentic chatbot as production (ivr/agent.js via
+ * ivr/chatbot.js):
+ *
+ * - With FIREBASE_SERVICE_ACCOUNT_B64 (or _JSON / application default
+ *   credentials) it connects to Firestore and all live read-only tools
+ *   work (bookings, queue, slots, centre, payment).
+ * - Without Firebase credentials it still runs, in FAQ-only mode:
+ *   Gemini answers general AgroBridge questions, personal live data
+ *   is reported as unavailable (tools are not offered to the model).
+ *
+ * Endpoints: GET /health, POST /chat, POST /translate
+ * Point services/config.js CHATBOT_BASE_URL at
+ * 'http://localhost:3001' for local work (do not commit).
+ * ---------------------------------------------------------------
+ */
+
 const express = require("express");
 const cors = require("cors");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { createChatbot } = require("./chatbot");
+const { parseServiceAccount } = require("./firebase-credential");
+const { makeKeyGuard, requiredByEnv } = require("./key-guard");
 
 const app = express();
 app.use(express.json());
@@ -15,103 +37,137 @@ app.use(
       /^http:\/\/127\.0\.0\.1:\d+$/,
     ],
     methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-agb-key"],
   })
 );
 
 const PORT = 3001;
 
-const apiKey = process.env.GEMINI_API_KEY;
+// Mirror production: /chat and /translate require the app's shared key
+// (services/config.js IVR_APP_KEY === APP_SHARED_KEY here). Not strong
+// auth - see README "Security limitations".
+const guard = makeKeyGuard({
+  key: process.env.APP_SHARED_KEY || "agb-dev-key",
+  enabled: requiredByEnv(),
+});
 
-if (!apiKey) {
+if (!process.env.GEMINI_API_KEY) {
   console.error("Missing GEMINI_API_KEY in .env");
   process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+// ---------------------------------------------------------------
+// Optional Firebase (live tools). Safe to run without it.
+// ---------------------------------------------------------------
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-3.6-flash",
-  systemInstruction: `
-You are the AgroBridge Assistant.
+// Accepts base64 or raw JSON; throws on anything else (see the module).
+function readServiceAccount(raw) {
+  return parseServiceAccount(raw);
+}
 
-AgroBridge is a smart procurement platform that helps farmers manage
-mandi/procurement-yard visits, slots, queues, tokens, payments and
-procurement information.
+async function initFirebase() {
+  const raw =
+    process.env.FIREBASE_SERVICE_ACCOUNT_B64 ||
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-Answer farmers clearly and simply.
-
-You can answer common FAQs such as:
-
-1. How do I book a slot?
-2. How does the procurement yard work?
-3. What is a token?
-4. How does the queue work?
-5. What happens after gate entry?
-6. What is quality/assay checking?
-7. What happens during weighing?
-8. How does payment work?
-9. How can I use phone-call booking?
-10. What can I do if I have a problem?
-11. What crops can be accepted?
-12. How can I check my booking?
-13. How can I check my payment status?
-
-Rules:
-- Do not invent live booking, queue, payment, slot, mandi or farmer data.
-- You are currently a read-only assistant.
-- Do not claim that an action was completed.
-- Do not book, cancel, reschedule or modify anything.
-- If the farmer asks for live personal information, explain that
-  live account data is not connected yet.
-- Keep answers concise and practical.
-- Respond in Hindi when the farmer writes in Hindi/Hinglish.
-- Respond in English when the farmer writes in English.
-- If the question is unrelated to AgroBridge, politely redirect
-  the farmer to AgroBridge-related help.
-`,
-});
-
-app.get("/health", (req, res) => {
-  res.json({ ok: true, service: "agrobridge-chatbot" });
-});
-
-app.post("/chat", async (req, res) => {
   try {
-    const message = String(req.body.message || "").trim();
-    const history = Array.isArray(req.body.history)
-      ? req.body.history
-      : [];
+    const { initializeApp, cert, applicationDefault, getApps } = require("firebase-admin/app");
+    const { getFirestore } = require("firebase-admin/firestore");
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Message is required",
-      });
+    if (getApps().length) return await probeFirestore(getFirestore());
+
+    if (raw && String(raw).trim().startsWith("#")) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT_B64 is a placeholder, not credentials");
     }
 
-    if (message.length > 2000) {
-      return res.status(400).json({
-        error: "Message is too long",
-      });
+    if (raw) {
+      initializeApp({ credential: cert(readServiceAccount(raw)) });
+    } else {
+      initializeApp({ credential: applicationDefault() });
     }
-
-    const chat = model.startChat({
-      history: history.slice(-10),
-    });
-
-    const result = await chat.sendMessage(message);
-
-    res.json({
-      reply: result.response.text(),
-    });
-  } catch (error) {
-    console.error("Chatbot error:", error);
-
-    res.status(500).json({
-      error: "Unable to get a response from AgroBridge Assistant",
-    });
+    return await probeFirestore(getFirestore());
+  } catch (e) {
+    console.warn(`chatbot-local: Firestore unavailable (${e.message}); running in FAQ-only mode (no live tools).`);
+    return null;
   }
-});
+}
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`AgroBridge chatbot running on http://localhost:${PORT}`);
-});
+/** Confirm credentials really work (lazy ADC would otherwise fail later). */
+async function probeFirestore(db) {
+  const probe = db.collection("centres").limit(1).get();
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Firestore probe timed out")), 8000)
+  );
+  await Promise.race([probe, timeout]);
+  return db;
+}
+
+(async () => {
+  const db = await initFirebase();
+  const chatbot = createChatbot({ db });
+
+  console.log(
+    db
+      ? "chatbot-local: live Firestore tools ENABLED"
+      : "chatbot-local: FAQ-only mode (no Firebase credentials)"
+  );
+
+  app.get("/health", (req, res) => {
+    res.json({ ok: true, service: "agrobridge-chatbot", liveData: !!db });
+  });
+
+  app.post("/chat", guard, async (req, res) => {
+    try {
+      const message = String(req.body.message || "").trim();
+      const history = Array.isArray(req.body.history) ? req.body.history : [];
+
+      if (!message) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      if (message.length > 2000) {
+        return res.status(400).json({ error: "Message is too long" });
+      }
+
+      const result = await chatbot.chat({
+        message,
+        history,
+        phone: req.body.phone,
+        language: req.body.language,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Chatbot error:", error);
+      res.status(500).json({
+        error: "Unable to get a response from AgroBridge Assistant",
+      });
+    }
+  });
+
+  app.post("/translate", guard, async (req, res) => {
+    try {
+      const result = await chatbot.translateTexts({
+        texts: req.body.texts,
+        language: req.body.language,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Translate error:", error);
+      res.status(500).json({
+        error: "Unable to translate right now",
+      });
+    }
+  });
+
+  // A malformed JSON body must not surface an Express stack trace.
+  app.use((err, req, res, next) => {
+    if (err && err.type === "entity.parse.failed") {
+      return res.status(400).json({ error: "Invalid JSON body" });
+    }
+    next(err);
+  });
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`AgroBridge chatbot running on http://localhost:${PORT}`);
+  });
+})();

@@ -8,6 +8,7 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
+      # Values in the Render dashboard (sync: false = never stored in git).
       - key: BASE_URL
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_B64
@@ -16,3 +17,16 @@ services:
         value: sim
       - key: APP_SHARED_KEY
         sync: false
+      # Required: the server crashes on boot without the Gemini key.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional model override (default: gemini-3.1-flash-lite).
+      - key: GEMINI_MODEL
+        sync: false
+      # Enforce the x-agb-key guard on /chat + /translate.
+      # "false" for now: the deployed web app + installed APKs do not
+      # send the header yet, so enforcing would break live chat.
+      # FLIP TO "true" once the app build that sends x-agb-key is live
+      # (web rebuilt + deployed, testers updated via EAS).
+      - key: CHATBOT_REQUIRE_KEY
+        value: "false"

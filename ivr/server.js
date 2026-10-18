@@ -24,6 +24,8 @@ const path = require("path");
 
 const { makeIvr, makeCaller } = require("./ivr-core");
 const { createChatbot } = require("./chatbot");
+const { parseServiceAccount } = require("./firebase-credential");
+const { makeKeyGuard, requiredByEnv } = require("./key-guard");
 
 const {
   PORT = 3000,
@@ -78,22 +80,12 @@ if (!FIREBASE_SERVICE_ACCOUNT_B64) {
 
 /**
  * Accepts the base64 string OR the raw service-account JSON.
+ * Fails closed with a clear message; the value is never printed.
  */
 function readServiceAccount(raw) {
-  const v = String(raw)
-    .trim()
-    .replace(/\s+/g, (m) => (m.includes("\n") ? "" : m));
-
-  if (v.startsWith("{")) {
-    return JSON.parse(v);
-  }
-
-  const decoded = Buffer.from(
-    v.replace(/\s/g, ""),
-    "base64"
-  ).toString("utf8");
-
-  if (!decoded.trim().startsWith("{")) {
+  try {
+    return parseServiceAccount(raw);
+  } catch (e) {
     console.error(
       "FIREBASE_SERVICE_ACCOUNT_B64 is not valid."
     );
@@ -102,8 +94,6 @@ function readServiceAccount(raw) {
     );
     process.exit(1);
   }
-
-  return JSON.parse(decoded);
 }
 
 initializeApp({
@@ -363,6 +353,15 @@ function auth(req, res, next) {
   next();
 }
 
+// Same shared-secret check as `auth`, but without the telephony
+// requirement - used by the read-only chatbot endpoints. NOT strong
+// auth (the key ships in the client bundle); set CHATBOT_REQUIRE_KEY=false
+// to disable during client rollout. See README "Security limitations".
+const chatGuard = makeKeyGuard({
+  key: APP_SHARED_KEY,
+  enabled: requiredByEnv(),
+});
+
 // ---------------------------------------------------------------
 // Call farmer
 // ---------------------------------------------------------------
@@ -462,7 +461,7 @@ app.post(
 // AI CHATBOT
 // ---------------------------------------------------------------
 
-app.post("/chat", async (req, res) => {
+app.post("/chat", chatGuard, async (req, res) => {
   try {
     const {
       message,
@@ -486,10 +485,10 @@ app.post("/chat", async (req, res) => {
       e
     );
 
+    // Never echo internal error details (Gemini/SDK messages) to the client.
     res.status(500).json({
       error:
-        e.message ||
-        "Chatbot failed",
+        "Unable to get a response from AgroBridge Assistant",
     });
   }
 });
@@ -498,7 +497,7 @@ app.post("/chat", async (req, res) => {
 // TRANSLATE (display cache for the app's translated chat history)
 // ---------------------------------------------------------------
 
-app.post("/translate", async (req, res) => {
+app.post("/translate", chatGuard, async (req, res) => {
   try {
     const {
       texts,
@@ -518,12 +517,20 @@ app.post("/translate", async (req, res) => {
       e
     );
 
+    // Never echo internal error details (Gemini/SDK messages) to the client.
     res.status(500).json({
       error:
-        e.message ||
-        "Translate failed",
+        "Unable to translate right now",
     });
   }
+});
+
+// A malformed JSON body must not surface an Express stack trace.
+app.use((err, req, res, next) => {
+  if (err && err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+  next(err);
 });
 
 // ---------------------------------------------------------------
