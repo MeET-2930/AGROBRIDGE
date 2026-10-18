@@ -39,8 +39,32 @@ function sanitizeMessages(arr) {
       role: m.role,
       text: m.text.slice(0, 2000),
       ...(m.isGreeting ? { isGreeting: true } : {}),
+      ...(m.action === 'start-booking' ? { action: 'start-booking' } : {}),
     }))
     .slice(-HISTORY_LIMIT);
+}
+
+// Booking is deliberately handled by the app's booking screens, not by the
+// language model. Those screens query live Firestore availability and use the
+// transactional createBooking() path, so chat can never invent a free slot or
+// a booking ID.
+function isBookingRequest(text) {
+  const value = String(text || '').toLowerCase();
+  return /\b(book|booking|slot|appointment)\b|बुक|स्लॉट|बुकिंग|ਮੁਲਾਕਾਤ|ਸਲਾਟ|बुक करा|स्लॉट बुक/.test(value);
+}
+
+function bookingPrompt(lang) {
+  const prompts = {
+    hi: 'मैं आपके लिए वास्तविक स्लॉट बुकिंग शुरू कर सकता हूँ। पहले फसल, मंडी और मात्रा चुनें; फिर मैं लाइव उपलब्ध स्लॉट दिखाऊँगा। स्लॉट चुनने और पुष्टि करने के बाद ही बुकिंग बनेगी।',
+    pa: 'ਮੈਂ ਤੁਹਾਡੇ ਲਈ ਅਸਲੀ ਸਲਾਟ ਬੁਕਿੰਗ ਸ਼ੁਰੂ ਕਰ ਸਕਦਾ ਹਾਂ। ਪਹਿਲਾਂ ਫ਼ਸਲ, ਮੰਡੀ ਅਤੇ ਮਾਤਰਾ ਚੁਣੋ; ਫਿਰ ਲਾਈਵ ਉਪਲਬਧ ਸਲਾਟ ਦਿਖਾਏ ਜਾਣਗੇ। ਸਲਾਟ ਚੁਣਨ ਅਤੇ ਪੁਸ਼ਟੀ ਤੋਂ ਬਾਅਦ ਹੀ ਬੁਕਿੰਗ ਬਣੇਗੀ।',
+    mr: 'मी तुमच्यासाठी प्रत्यक्ष स्लॉट बुकिंग सुरू करू शकतो. आधी पीक, मंडी आणि प्रमाण निवडा; मग लाइव्ह उपलब्ध स्लॉट दिसतील. स्लॉट निवडून पुष्टी केल्यानंतरच बुकिंग होईल.',
+    en: 'I can start a real slot booking for you. Choose the crop, mandi and quantity first; then you will see live available slots. A booking is created only after you select a slot and confirm it.',
+  };
+  return prompts[lang] || prompts.en;
+}
+
+function bookingButtonLabel(lang) {
+  return ({ hi: 'स्लॉट बुकिंग शुरू करें', pa: 'ਸਲਾਟ ਬੁਕਿੰਗ ਸ਼ੁਰੂ ਕਰੋ', mr: 'स्लॉट बुकिंग सुरू करा', en: 'Start slot booking' })[lang] || 'Start slot booking';
 }
 
 function sanitizeCache(obj) {
@@ -346,8 +370,20 @@ export default function ChatbotScreen({ navigation }) {
     if (!text || sending) return;
 
     setError(null);
-    setSending(true);
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text }]);
+
+    // Do not ask the read-only AI service to book. Hand the farmer to the
+    // existing, authenticated flow which reads live capacity and creates the
+    // booking in a Firestore transaction after explicit confirmation.
+    if (isBookingRequest(text)) {
+      const replyId = nextId();
+      const reply = bookingPrompt(lang);
+      setMessages((prev) => [...prev, { id: replyId, role: 'bot', text: reply, action: 'start-booking' }]);
+      setTransCache((prev) => mergeCache(prev, lang, [{ id: replyId, text: reply }]));
+      return;
+    }
+
+    setSending(true);
 
     let phone = null;
     try {
@@ -382,6 +418,10 @@ export default function ChatbotScreen({ navigation }) {
     deliver(q);
   }, [deliver]);
 
+  const startBooking = useCallback(() => {
+    navigation.navigate('CropSelection');
+  }, [navigation]);
+
   const data = sending
     ? [...displayMessages, { id: 'typing', role: 'bot', typing: true }]
     : displayMessages;
@@ -406,6 +446,12 @@ export default function ChatbotScreen({ navigation }) {
           <Text style={isUser ? styles.textUser : styles.textBot}>
             {isUser ? body : renderRichText(body, styles.textBot, styles.bold)}
           </Text>
+          {item.action === 'start-booking' ? (
+            <TouchableOpacity style={styles.bookingAction} onPress={startBooking} activeOpacity={0.8}>
+              <Ionicons name="calendar-outline" size={16} color={Colors.white} />
+              <Text style={styles.bookingActionText}>{bookingButtonLabel(lang)}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     );
@@ -514,6 +560,8 @@ const styles = StyleSheet.create({
   textUser: { color: Colors.white, fontSize: 15, lineHeight: 21 },
   textBot: { color: Colors.text, fontSize: 15, lineHeight: 21 },
   bold: { fontWeight: '700' },
+  bookingAction: { marginTop: 10, backgroundColor: Colors.primary, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start' },
+  bookingActionText: { color: Colors.white, fontSize: 13, fontWeight: '800' },
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4, paddingVertical: 6 },
   typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.subText },
 
