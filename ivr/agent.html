@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroBridge — AI Booking Agent</title>
+<style>
+ :root{--saffron:#FF9933;--green:#138808;--ink:#111827;--muted:#6b7280;--bg:#f9fafb}
+ *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100vh}
+ .strip{height:5px;width:100%} .top{background:var(--saffron)} .bottom{background:var(--green);margin-top:auto}
+ header{padding:14px 16px;text-align:center}
+ header h1{margin:0;font-size:20px;font-weight:800} header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+ .wrap{max-width:560px;width:100%;margin:0 auto;padding:0 14px 18px;flex:1;display:flex;flex-direction:column}
+ .card{background:#fff;border-radius:18px;padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.08);margin:10px 0}
+ .row{display:flex;gap:8px;align-items:center}
+ input{flex:1;height:42px;border:1px solid #d1d5db;border-radius:10px;padding:0 12px;font-size:15px}
+ select{height:42px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;font-size:14px}
+ .chat{flex:1;min-height:340px;max-height:52vh;overflow:auto;padding:12px;background:#f3f4f6;border-radius:14px}
+ .msg{max-width:86%;padding:10px 12px;border-radius:14px;margin:8px 0;font-size:15px;line-height:1.45}
+ .bot{background:#e8f5e9;border-left:3px solid var(--green)} .me{background:#fff3e0;border-right:3px solid var(--saffron);margin-left:auto;text-align:right}
+ .sys{font-size:12px;color:var(--muted);text-align:center;margin:6px 0}
+ .mic{width:68px;height:68px;border-radius:50%;border:0;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.2)}
+ .idle{background:var(--green)} .listen{background:#dc2626;animation:pulse 1.2s infinite}
+ @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+ .btn{height:42px;border:0;border-radius:12px;padding:0 16px;font-weight:700;cursor:pointer}
+ .send{background:var(--ink);color:#fff} .grey{background:#e5e7eb}
+ .hint{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="strip top"></div>
+<header>
+  <h1>AgroBridge AI Agent <span style="font-weight:400">— talks like a person</span></h1>
+  <p>IVR is still there. This AI agent is extra — speak naturally, it books the slot.</p>
+</header>
+<div class="wrap">
+  <div class="card row">
+    <select id="lang"><option value="hi">हिन्दी</option><option value="en">English</option></select>
+    <input id="phone" placeholder="10-digit mobile (farmer)" maxlength="10" value="9100000001">
+    <button class="btn grey" id="clear">Clear</button>
+  </div>
+  <div class="chat" id="chat"></div>
+  <div class="card">
+    <div class="row" style="justify-content:center;gap:16px">
+      <button id="mic" class="mic idle">🎤</button>
+      <div style="flex:1">
+        <div class="row">
+          <input id="text" placeholder="Type or speak — e.g. 'Gurugram me gehu 20 quintal kal subah'">
+          <button id="send" class="btn send">Send</button>
+        </div>
+        <div class="hint">Tap mic and speak naturally. Example: <em>"Mujhe Karnal me sarson 15 quintal parson 10 baje chahiye"</em></div>
+      </div>
+    </div>
+    <p class="hint">Voice uses browser mic + <code>/tts</code> female Hindi (Swara) — same as IVR. No API key needed for demo. Add <code>OPENAI_API_KEY</code> on Render for smarter chat.</p>
+  </div>
+</div>
+<div class="strip bottom"></div>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ const chat=$('chat'), mic=$('mic'), text=$('text'), phoneEl=$('phone'), langEl=$('lang');
+ let messages=[]; let speaking=false; let player=null;
+ const log=(cls,t)=>{ const d=document.createElement('div'); d.className='msg '+cls; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ function speak(txt){
+   const lang=langEl.value==='hi'?'hi':'en';
+   if(txt.length>600) txt=txt.slice(0,600);
+   const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(txt));
+   player=a; speaking=true;
+   a.onended=()=>speaking=false; a.onerror=()=>{ speaking=false; fallbackSpeak(txt,lang); };
+   a.play().catch(()=>fallbackSpeak(txt,lang));
+ }
+ function fallbackSpeak(t,lang){
+   try{ const u=new SpeechSynthesisUtterance(t); u.lang=lang==='hi'?'hi-IN':'en-IN'; speechSynthesis.speak(u);}catch(e){}
+ }
+ function stopSpeak(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} speaking=false; }
+ async function send(content){
+   if(!content.trim()) return;
+   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10) return alert('Enter 10-digit phone');
+   log('me',content); text.value='';
+   messages.push({role:'user', content});
+   sys('…'); 
+   try{
+     const r=await fetch('/agent/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages, phone:p, lang:langEl.value})});
+     const j=await r.json();
+     chat.lastChild.remove();
+     const reply=j.reply||'Sorry ji, phir boliye.';
+     messages.push({role:'assistant', content:reply});
+     log('bot',reply); speak(reply);
+     if(j.done) sys('✓ Booking done — check Farmer Dashboard with this phone.');
+   }catch(e){ chat.lastChild.remove(); log('bot','Network error — try again.'); }
+ }
+ $('send').onclick=()=>send(text.value);
+ text.onkeydown=e=>{ if(e.key==='Enter') send(text.value); };
+ $('clear').onclick=()=>{ messages=[]; chat.innerHTML=''; stopSpeak(); greet(); };
+ function greet(){
+   const g=langEl.value==='hi' ? 'Namaste ji! Main AgroBridge AI hun — normal insaan ki tarah baat karti hun. Kaunsi mandi aur kaunsi fasal leke aana hai?' : 'Hello! I am AgroBridge AI — I talk like a person. Which mandi and which crop do you want to book?';
+   messages=[{role:'assistant', content:g}]; log('bot',g); // don't auto-speak greet to avoid noise
+ }
+ // mic
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null;
+ function startMic(){
+   if(!SR) return alert('Mic not supported in this browser — type instead.');
+   if(rec) try{rec.abort()}catch(e){}
+   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=false; rec.continuous=false;
+   rec.onstart=()=>{ mic.className='mic listen'; mic.textContent='●'; };
+   rec.onend=()=>{ mic.className='mic idle'; mic.textContent='🎤'; };
+   rec.onerror=e=>{ mic.className='mic idle'; mic.textContent='🎤'; if(e.error==='not-allowed') alert('Allow mic in address bar lock icon.'); };
+   rec.onresult=e=>{ const t=e.results[0][0].transcript||''; if(t) send(t); };
+   try{rec.start();}catch(e){}
+ }
+ mic.onclick=()=>{ stopSpeak(); if(mic.classList.contains('listen')){ try{rec.abort()}catch(e){} mic.className='mic idle'; mic.textContent='🎤'; } else startMic(); };
+ langEl.onchange=()=>{ messages=[]; chat.innerHTML=''; greet(); };
+ greet();
+})();
+</script>
+</body>
+</html>
