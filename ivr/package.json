@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "chatbot": "node chatbot-local.js",
-    "test": "node --test test/agent.test.js test/agent.scenarios.test.js test/firebase-credential.test.js test/firebase.readonly.test.js test/key-guard.test.js",
+    "test": "node --test test/agent.test.js test/agent.scenarios.test.js test/agent.booking.test.js test/booking-service.test.js test/firebase-credential.test.js test/firebase.readonly.test.js test/key-guard.test.js",
     "test:live": "node --test test/agent.live.test.js",
     "verify:firebase": "node verify-firebase-readonly.js"
   },

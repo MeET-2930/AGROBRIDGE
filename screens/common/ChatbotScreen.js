@@ -30,6 +30,7 @@ const CACHE_LIMIT = 200;
 
 const historyKey = (id) => `chatHistory_${id || 'guest'}`;
 const translationsKey = (id) => `chatTranslations_${id || 'guest'}`;
+const sessionKey = (id) => `chatSession_${id || 'guest'}`;
 
 function sanitizeMessages(arr) {
   return (Array.isArray(arr) ? arr : [])
@@ -44,10 +45,9 @@ function sanitizeMessages(arr) {
     .slice(-HISTORY_LIMIT);
 }
 
-// Booking is deliberately handled by the app's booking screens, not by the
-// language model. Those screens query live Firestore availability and use the
-// transactional createBooking() path, so chat can never invent a free slot or
-// a booking ID.
+// Used only as a fallback: if the assistant server is unreachable during a
+// booking request, offer the screen-based flow instead of leaving the farmer
+// stuck. Normal booking chats go through the backend's confirmed flow.
 function isBookingRequest(text) {
   const value = String(text || '').toLowerCase();
   return /\b(book|booking|slot|appointment)\b|बुक|स्लॉट|बुकिंग|ਮੁਲਾਕਾਤ|ਸਲਾਟ|बुक करा|स्लॉट बुक/.test(value);
@@ -249,6 +249,7 @@ export default function ChatbotScreen({ navigation }) {
   const transCacheRef = useRef(transCache);
   transCacheRef.current = transCache;
   const langSettledRef = useRef(null);
+  const sessionIdRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -280,7 +281,18 @@ export default function ChatbotScreen({ navigation }) {
       } catch (e) {
         storedCache = null;
       }
+      let sid = null;
+      try {
+        sid = await AsyncStorage.getItem(sessionKey(id));
+      } catch (e) {
+        sid = null;
+      }
+      if (!sid) {
+        sid = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        AsyncStorage.setItem(sessionKey(id), sid).catch(() => {});
+      }
       if (!alive) return;
+      sessionIdRef.current = sid;
       setUid(id);
       if (storedMessages && storedMessages.length) setMessages(storedMessages);
       if (storedCache) setTransCache(storedCache);
@@ -372,17 +384,6 @@ export default function ChatbotScreen({ navigation }) {
     setError(null);
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text }]);
 
-    // Do not ask the read-only AI service to book. Hand the farmer to the
-    // existing, authenticated flow which reads live capacity and creates the
-    // booking in a Firestore transaction after explicit confirmation.
-    if (isBookingRequest(text)) {
-      const replyId = nextId();
-      const reply = bookingPrompt(lang);
-      setMessages((prev) => [...prev, { id: replyId, role: 'bot', text: reply, action: 'start-booking' }]);
-      setTransCache((prev) => mergeCache(prev, lang, [{ id: replyId, text: reply }]));
-      return;
-    }
-
     setSending(true);
 
     let phone = null;
@@ -395,12 +396,18 @@ export default function ChatbotScreen({ navigation }) {
 
     const replyLang = lang;
     try {
-      const reply = await sendChatMessage(text, messages, phone, replyLang);
+      const reply = await sendChatMessage(text, messages, phone, replyLang, sessionIdRef.current);
       const replyId = nextId();
       setMessages((prev) => [...prev, { id: replyId, role: 'bot', text: reply }]);
       setTransCache((prev) => mergeCache(prev, replyLang, [{ id: replyId, text: reply }]));
     } catch (e) {
       setError(e);
+      if (isBookingRequest(text)) {
+        const replyId = nextId();
+        const reply = bookingPrompt(replyLang);
+        setMessages((prev) => [...prev, { id: replyId, role: 'bot', text: reply, action: 'start-booking' }]);
+        setTransCache((prev) => mergeCache(prev, replyLang, [{ id: replyId, text: reply }]));
+      }
     } finally {
       setSending(false);
     }

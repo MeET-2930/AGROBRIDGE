@@ -13,21 +13,33 @@ Function once you have Blaze (see "Moving to Blaze" at the bottom).
 The same service hosts the app's **AgroBridge Assistant** (`POST /chat`,
 `POST /translate`) - now an agentic Gemini loop (`ivr/agent.js`):
 
-- Gemini picks from **read-only tools** backed by real Firestore data via
+- Gemini picks from live tools backed by real Firestore data via
   `ivr-core makeStore`: `getFarmerBookings`, `getQueueStatus`,
   `getAvailableSlots`, `getCentreInfo`, `getPaymentStatus`.
+- Booking tools use the same capacity engine as the app:
+  `getCentresForCrop`, `getBookingSlots`, `proposeBooking`, `confirmBooking`
+  (`ivr/booking-service.js`). `proposeBooking` only creates a pending
+  summary; `confirmBooking` commits in one transaction and only when the
+  farmer's **current** message explicitly confirms. The pending intent is
+  bound to the verified farmer + app `sessionId`, expires after 15 minutes,
+  and is re-checked against live capacity. Cancel / reschedule / payment
+  still have no tools.
 - The trusted backend executes each tool, returns whitelisted results to
   Gemini, and loops (max 5 tool rounds; a tools-free forced answer ends a
-  request that hits the limit). There are **no write tools** - booking,
-  cancel and payment changes are refused by design.
+  request that hits the limit).
 - Identity: the request's `phone` (the app session uid) must be a
   registered `users/{phone}` document or personal tools return
   `NOT_LOGGED_IN`. Tools can never accept a farmer id from the model.
   Gate pass codes / QR / admin codes are never exposed to the model.
 - The app client (`services/chatbot.js` + `screens/common/ChatbotScreen.js`)
-  sends the `x-agb-key` header (same `IVR_APP_KEY` as the IVR calls) and
-  consumes the same `/chat` contract `{reply}` (+ a `toolsUsed` extra it
-  ignores).
+  sends the `x-agb-key` header (same `IVR_APP_KEY` as the IVR calls), a
+  persisted `sessionId`, and consumes the `/chat` contract `{reply}` (+ a
+  `toolsUsed` extra it ignores).
+- Booking writes use the Admin SDK collections
+  `chatBookingIntents`, `chatBookingSessions`, `chatBookingLocks`. The
+  chatbot creates the real `bookings` and `centreQueues` documents with the
+  same fields as `services/bookings.js`. `CHATBOT_ALLOW_BOOKING=false` is a
+  server-side kill switch (tools disappear; chat stays read-only).
 
 **Run locally:** `npm run chatbot` (port 3001, `ivr/.env` with at least
 `GEMINI_API_KEY`; Firebase credentials optional - without them it runs in
@@ -48,10 +60,17 @@ app", never *who the farmer is*. The app still has **no Firebase Auth**
 `/chat` still trusts the caller-supplied `phone`:
 
 - Anyone who has the key **and** knows (or guesses) a registered 10-digit
-  number can read that farmer's bookings, queue and payment status.
-- Read-only only: there are no booking/cancel/pay tools, the verified session
-  phone is the only farmer id the tools can use, and gate-pass / QR / admin
-  codes are never sent to the model.
+  number can read that farmer's bookings, queue and payment status, and can
+  create tokens for that farmer until **explicit confirmation** (the server
+  refuses unconfirmed or same-turn commits, but a malicious caller can still
+  say "yes").
+- The chatbot can write real bookings. Keep `CHATBOT_ALLOW_BOOKING=false`
+  for any public/production deployment until Firebase Auth ID-token
+  verification is in place. The verified session phone is the only farmer id
+  the tools can use; gate-pass / QR / admin codes are never sent to the model.
+- `firestore.rules` MODE A is fully open for the demo. The chatbot's Admin
+  SDK bypasses those rules, so do not treat MODE A as safe just because the
+  write path is server-side.
 
 The real fix is Firebase Auth: enable the Phone provider, sign in
 client-side, send the ID token, and verify it server-side
@@ -123,6 +142,7 @@ git add -A && git commit -m "install19: phone service" && git push
    | `GEMINI_API_KEY` | Google AI Studio key (**required** - server won't boot without it) |
    | `GEMINI_MODEL` | optional, default `gemini-3.1-flash-lite` |
    | `CHATBOT_REQUIRE_KEY` | `true` (enforce `x-agb-key` on `/chat` + `/translate`; set `false` only as a rollout kill-switch) |
+   | `CHATBOT_ALLOW_BOOKING` | `false` until Firebase Auth is wired; omit/`true` only for the controlled demo |
 
 4. **Deploy web service** → ~2 min → log shows
    `telephony provider: sim (outbound enabled)` and `IVR listening`.

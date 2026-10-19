@@ -5,22 +5,40 @@ const {
   normalizePhone,
 } = require("./ivr-core");
 const { createAgent } = require("./agent");
+const { makeBookingService } = require("./booking-service");
 
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 const MODEL_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 30000;
 
 /**
- * createChatbot({ db, model?, store?, maxSteps? })
+ * createChatbot({ db, model?, store?, bookingService?, maxSteps? })
  *
- * Agentic AgroBridge Assistant. Gemini picks read-only tools
- * (see ivr/agent.js); the trusted backend executes them against
- * Firestore and feeds real results back until a final answer.
+ * Agentic AgroBridge Assistant. Gemini picks tools (see ivr/agent.js);
+ * the trusted backend executes them against Firestore and feeds real
+ * results back until a final answer. Booking tools are enabled only
+ * when a booking service can be built (or is injected) and
+ * CHATBOT_ALLOW_BOOKING is not "false".
  *
  * `db` is the firebase-admin Firestore instance from server.js.
- * All dependencies are injectable for tests (model / store).
+ * All dependencies are injectable for tests (model / store / booking).
  */
-function createChatbot({ db, model = null, store = null, maxSteps = undefined } = {}) {
+function createChatbot({ db, model = null, store = null, bookingService = null, maxSteps = undefined } = {}) {
   if (!store && db) store = makeStore(db);
+  const bookingAllowed = String(process.env.CHATBOT_ALLOW_BOOKING || "true").toLowerCase() !== "false";
+  if (
+    bookingAllowed &&
+    !bookingService &&
+    db &&
+    typeof db.runTransaction === "function" &&
+    typeof db.collection === "function"
+  ) {
+    try {
+      bookingService = makeBookingService({ db });
+    } catch (e) {
+      console.error("chatbot booking service init failed:", e.message);
+    }
+  }
+  const bookingEnabled = Boolean(bookingService && bookingService.enabled !== false);
 
   if (!model) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -28,27 +46,26 @@ function createChatbot({ db, model = null, store = null, maxSteps = undefined } 
       throw new Error("Missing GEMINI_API_KEY in environment");
     }
     const genAI = new GoogleGenerativeAI(apiKey);
-    const liveToolsBrief = store
+    const readToolsBrief = store
       ? `You have LIVE READ-ONLY TOOLS backed by the real AgroBridge database:
 - getFarmerBookings: the logged-in farmer's own active bookings.
 - getQueueStatus: live queue for a centre + date.
 - getAvailableSlots: remaining bookable slots for a centre + date.
 - getCentreInfo: centre address, hours, accepted crops.
-- getPaymentStatus: payment details of the farmer's own booking.
-
-How to work:
-1. Understand the farmer's goal (their whole request, not just one keyword).
-2. When the answer needs live data, call the right tool. Chain tools when
-   needed (e.g. getFarmerBookings first to learn centreId/date, then
-   getQueueStatus for the live queue).
-3. Base the final answer ONLY on verified tool results. Never invent
-   booking, queue, payment, slot, centre, crop or token data.
-4. If a tool returns ok:false / found:false / NOT_LOGGED_IN / TOOL_FAILED,
-   explain the limitation honestly (and suggest logging in or retrying)
-   instead of guessing.`
+- getPaymentStatus: payment details of the farmer's own booking.`
       : `Live account data is NOT connected on this server. Do not claim to know
 anyone's booking, queue, payment or slot details. If asked for personal live
 data, say it cannot be checked right now and suggest the app's dashboard.`;
+
+    const bookingBrief = bookingEnabled
+      ? `You also have LIVE BOOKING TOOLS; bookings are real and committed server-side:
+- getCentresForCrop: eligible active mandis for a crop.
+- getBookingSlots: actual open slots using the app's capacity engine and the farmer's quantity.
+- proposeBooking: validates details and creates a pending summary. It does NOT book.
+- confirmBooking: commits the pending booking ONLY when the farmer's current message explicitly confirms it.
+
+Never skip proposeBooking, never call confirmBooking without explicit confirmation, and never say "booked" unless confirmBooking returns ok:true. If details change, propose again. If capacity is full or a limit is hit, explain the real reason and offer returned alternatives.`
+      : `Live booking is NOT connected on this server. If asked to book, point to the app's booking flow; do not pretend to book.`;
 
     model = genAI.getGenerativeModel({
       model: DEFAULT_MODEL,
@@ -58,16 +75,30 @@ You are AgroBridge Assistant, a helpful agentic assistant for farmers using Agro
 AgroBridge helps farmers manage mandi/procurement-yard visits: slots, queues,
 tokens, gate entry, quality check (assay), weighing and payments.
 
-${liveToolsBrief}
+${readToolsBrief}
+
+${bookingBrief}
+
+How to work:
+1. Understand the farmer's whole goal, not just one keyword.
+2. When the answer needs live data, call the right tool. Chain tools when
+   needed (e.g. getFarmerBookings first to learn centreId/date, then
+   getQueueStatus for the live queue).
+3. Base the final answer ONLY on verified tool results. Never invent
+   booking, queue, payment, slot, centre, crop or token data.
+4. If a tool returns ok:false / found:false / NOT_LOGGED_IN / TOOL_FAILED,
+   explain the limitation honestly (and suggest logging in or retrying)
+   instead of guessing.
 
 Rules:
-- You are strictly READ-ONLY. There are no booking/cancel/pay tools.
-  If asked to book, cancel, reschedule or pay, say you cannot do that in
-  chat and point to the app's booking flow or the helpdesk.
-- Never reveal or ask for gate pass codes, QR payloads, admin codes or
-  other farmers' data.
-- Answer general process FAQs (how booking works, assay, weighing,
-  payment flow, documents, MSP vs auction) from knowledge without tools.
+- You can book slots through the booking tools above, but cannot cancel,
+  reschedule or take payments in chat. Point those to the app/helpdesk.
+- Never reveal or ask for gate pass codes, QR payloads, admin codes,
+  booking ids or other farmers' data. The backend returns the real token.
+- Farmer identity is verified server-side. Never ask for or pass a farmer
+  id/phone to a tool.
+- Answer general process FAQs (booking, assay, weighing, payment flow,
+  documents, MSP vs auction) from knowledge without tools.
 - Keep answers concise, practical and farmer-friendly.
 - Stay on AgroBridge/mandi/farming topics; politely redirect otherwise.
 `,
@@ -77,6 +108,7 @@ Rules:
   const agent = createAgent({
     model,
     store,
+    bookingService: bookingEnabled ? bookingService : null,
     maxSteps,
   });
 
@@ -111,12 +143,22 @@ Rules:
    * it is verified above and the verified result is the ONLY farmer id
    * the tools can use.
    */
-  async function chat({ message, phone, history = [], language = null }) {
+  async function chat({ message, phone, history = [], language = null, sessionId = null }) {
     const farmerId = await verifyFarmer(phone);
+    let pendingBooking = null;
+    if (bookingEnabled && farmerId && sessionId) {
+      try {
+        pendingBooking = await bookingService.getPending({ farmerId, sessionId });
+      } catch (e) {
+        console.error("chatbot pending booking lookup failed:", e.message);
+      }
+    }
     const result = await agent.chat({
       message,
       history,
       farmerId,
+      sessionId,
+      pendingBooking,
       language,
     });
     return {

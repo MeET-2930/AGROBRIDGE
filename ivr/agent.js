@@ -3,10 +3,10 @@
  * ---------------------------------------------------------------
  * Agentic AgroBridge Assistant core.
  *
- * Gemini (function calling) decides which READ-ONLY tools to run;
- * this module executes them against the injected Firestore store
- * (ivr-core makeStore), feeds the real results back to Gemini, and
- * loops until the model returns a final answer or `maxSteps`
+ * Gemini (function calling) decides which tools to run; this module
+ * executes them against the injected Firestore store (ivr-core
+ * makeStore) and booking service, feeds the real results back to Gemini,
+ * and loops until the model returns a final answer or `maxSteps`
  * tool rounds are used up.
  *
  * SECURITY MODEL
@@ -19,8 +19,9 @@
  * - Every tool validates its arguments and returns ok:false JSON
  *   (never throws into the loop); Firestore/Gemini failures are
  *   reported gracefully instead of invented around.
- * - No write tools exist: booking / cancel / payment actions are
- *   refused by the system instructions and simply have no tool.
+ * - Booking writes go through booking-service.js: a server-side pending
+ *   intent, explicit current-message confirmation and one Firestore
+ *   transaction. Cancel / reschedule / payment still have no tools.
  * ---------------------------------------------------------------
  */
 
@@ -37,6 +38,10 @@ const TOOL_NAMES = {
   GET_AVAILABLE_SLOTS: "getAvailableSlots",
   GET_CENTRE_INFO: "getCentreInfo",
   GET_PAYMENT_STATUS: "getPaymentStatus",
+  GET_CENTRES_FOR_CROP: "getCentresForCrop",
+  GET_BOOKING_SLOTS: "getBookingSlots",
+  PROPOSE_BOOKING: "proposeBooking",
+  CONFIRM_BOOKING: "confirmBooking",
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -236,6 +241,61 @@ const FUNCTION_DECLARATIONS = [
   },
 ];
 
+const BOOKING_FUNCTION_DECLARATIONS = [
+  {
+    name: TOOL_NAMES.GET_CENTRES_FOR_CROP,
+    description:
+      "List active mandis, optionally filtered to those that accept a crop. Use this to discover eligible mandis before offering choices. Takes crop (id like wheat/paddy/mustard) optionally.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        crop: {
+          type: SchemaType.STRING,
+          description: "Crop id, e.g. wheat, paddy, mustard, cotton, maize, gram, tomato, onion",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: TOOL_NAMES.GET_BOOKING_SLOTS,
+    description:
+      "Live, quantity-aware slot availability for a booking. Uses the same capacity engine as the app (planLoad + yard scaling + quantity rules), not the simplified IVR count. Pass the farmer's actual quantity in quintals. Returns only slots that fit, plus closed-day/too-big information.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        centreId: { type: SchemaType.STRING, description: "Centre document id" },
+        crop: { type: SchemaType.STRING, description: "Crop id, e.g. wheat" },
+        quantityQuintals: { type: SchemaType.NUMBER, description: "Load size in quintals, 1-999" },
+        date: { type: SchemaType.STRING, description: "Booking date YYYY-MM-DD" },
+      },
+      required: ["centreId", "crop", "quantityQuintals", "date"],
+    },
+  },
+  {
+    name: TOOL_NAMES.PROPOSE_BOOKING,
+    description:
+      "Validate exact booking details and create a server-side PENDING confirmation. This does NOT book anything yet. After calling it, show the returned summary to the farmer and ask 'Should I confirm this booking?'. If any detail changes, call this again.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        centreId: { type: SchemaType.STRING, description: "Centre document id" },
+        crop: { type: SchemaType.STRING, description: "Crop id, e.g. wheat" },
+        quantityQuintals: { type: SchemaType.NUMBER, description: "Load size in quintals, 1-999" },
+        date: { type: SchemaType.STRING, description: "Booking date YYYY-MM-DD" },
+        slotTime: { type: SchemaType.STRING, description: "Slot start time, e.g. '10:00'" },
+      },
+      required: ["centreId", "crop", "quantityQuintals", "date", "slotTime"],
+    },
+  },
+  {
+    name: TOOL_NAMES.CONFIRM_BOOKING,
+    description:
+      "Commit the pending booking for this conversation. Call ONLY after the farmer explicitly confirms the exact summary. The backend checks the current farmer message, session and pending details; it rejects premature or ambiguous confirmations. Returns the real committed booking id/token or a failure with fresh alternatives.",
+    parameters: { type: SchemaType.OBJECT, properties: {}, required: [] },
+  },
+];
+
 // ---------------------------------------------------------------
 // Agent
 // ---------------------------------------------------------------
@@ -244,15 +304,17 @@ const FUNCTION_DECLARATIONS = [
  * @param {object} opts
  * @param {object} opts.model     Gemini model from GoogleGenerativeAI (with systemInstruction)
  * @param {object|null} opts.store  makeStore(db) result; null = no Firestore (FAQ-only mode)
+ * @param {object|null} opts.bookingService  server-side booking service (enables booking tools)
  * @param {number} [opts.maxSteps]  max tool-call rounds per request
  * @param {object} [opts.logger]
  * @param {number} [opts.modelTimeoutMs]  per Gemini call timeout (default 30s; 0 disables)
  */
-function createAgent({ model, store, maxSteps = DEFAULT_MAX_STEPS, logger = console, modelTimeoutMs } = {}) {
+function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_MAX_STEPS, logger = console, modelTimeoutMs } = {}) {
   if (!model) throw new Error("createAgent: model is required");
 
   const steps = Math.max(1, Math.min(Number(maxSteps) || DEFAULT_MAX_STEPS, 10));
-  const toolsAvailable = !!store;
+  const bookingAvailable = Boolean(bookingService && bookingService.enabled !== false);
+  const toolsAvailable = Boolean(store) || bookingAvailable;
   const timeoutMs = Math.max(
     0,
     Number(modelTimeoutMs) || Number(process.env.GEMINI_TIMEOUT_MS) || DEFAULT_MODEL_TIMEOUT_MS
@@ -405,6 +467,92 @@ function createAgent({ model, store, maxSteps = DEFAULT_MAX_STEPS, logger = cons
       }
       return { ok: true, found: true, centre: centreViewOf(c) };
     },
+
+    async [TOOL_NAMES.GET_CENTRES_FOR_CROP](args, ctx) {
+      if (!bookingAvailable) {
+        return { ok: false, error: "BOOKING_UNAVAILABLE", message: "Live booking is not connected on this server." };
+      }
+      const crop = isPlainObject(args) && args.crop ? String(args.crop).trim().toLowerCase() : "";
+      const centres = await bookingService.listCentresForCrop(crop || null);
+      return {
+        ok: true,
+        crop: crop || null,
+        count: centres.length,
+        centres,
+        note: centres.length
+          ? "Choose a mandi from this verified list; do not invent one."
+          : "No active mandi accepts that crop.",
+      };
+    },
+
+    async [TOOL_NAMES.GET_BOOKING_SLOTS](args, ctx) {
+      if (!bookingAvailable) {
+        return { ok: false, error: "BOOKING_UNAVAILABLE", message: "Live booking is not connected on this server." };
+      }
+      if (!isPlainObject(args)) {
+        return { ok: false, error: "INVALID_ARGUMENTS", message: "Arguments must include centreId, crop, quantityQuintals and date." };
+      }
+      const centre = validateCentreId(args.centreId);
+      if (!centre.ok) return centre;
+      const date = validateDate(args.date);
+      if (!date.ok) return date;
+      const qty = Number(args.quantityQuintals);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return { ok: false, error: "INVALID_QUANTITY", message: "quantityQuintals must be a positive number." };
+      }
+      return bookingService.getSlots({
+        centreId: centre.value,
+        crop: args.crop,
+        quantityQuintals: qty,
+        date: date.value,
+        farmerId: ctx.farmerId,
+        language: ctx.language,
+      });
+    },
+
+    async [TOOL_NAMES.PROPOSE_BOOKING](args, ctx) {
+      if (!bookingAvailable) {
+        return { ok: false, error: "BOOKING_UNAVAILABLE", message: "Live booking is not connected on this server." };
+      }
+      if (!isPlainObject(args)) {
+        return { ok: false, error: "INVALID_ARGUMENTS", message: "Arguments must be an object with the exact booking details." };
+      }
+      const centre = validateCentreId(args.centreId);
+      if (!centre.ok) return centre;
+      const date = validateDate(args.date);
+      if (!date.ok) return date;
+      const qty = Number(args.quantityQuintals);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return { ok: false, error: "INVALID_QUANTITY", message: "quantityQuintals must be a positive number." };
+      }
+      const slotTime = typeof args.slotTime === "string" ? args.slotTime.trim() : "";
+      if (!/^\d{2}:\d{2}$/.test(slotTime)) {
+        return { ok: false, error: "INVALID_SLOT", message: "slotTime must look like '10:00'." };
+      }
+      return bookingService.proposeBooking({
+        farmerId: ctx.farmerId,
+        sessionId: ctx.sessionId,
+        centreId: centre.value,
+        crop: args.crop,
+        quantityQuintals: qty,
+        date: date.value,
+        slotTime,
+        language: ctx.language,
+        turnId: ctx.turnId,
+      });
+    },
+
+    async [TOOL_NAMES.CONFIRM_BOOKING](args, ctx) {
+      if (!bookingAvailable) {
+        return { ok: false, error: "BOOKING_UNAVAILABLE", message: "Live booking is not connected on this server." };
+      }
+      return bookingService.confirmBooking({
+        farmerId: ctx.farmerId,
+        sessionId: ctx.sessionId,
+        message: ctx.message,
+        turnId: ctx.turnId,
+      });
+    },
   };
 
   async function runTool(call, ctx) {
@@ -491,10 +639,12 @@ function createAgent({ model, store, maxSteps = DEFAULT_MAX_STEPS, logger = cons
    * @param {string} req.message
    * @param {Array}  [req.history]  Gemini-format turns ({role, parts})
    * @param {string|null} [req.farmerId]  verified 10-digit farmer phone (server-side only)
+   * @param {string|null} [req.sessionId]  opaque chat session id for booking state
+   * @param {object|null} [req.pendingBooking]  current unconfirmed booking summary
    * @param {string|null} [req.language]  en | hi | pa | mr
    * @returns {Promise<{reply: string, toolRounds: number, toolsUsed: string[]}>}
    */
-  async function chat({ message, history, farmerId = null, language = null }) {
+  async function chat({ message, history, farmerId = null, sessionId = null, pendingBooking = null, language = null }) {
     const cleanMessage = String(message || "").trim();
     if (!cleanMessage) throw new Error("Message is required");
     if (cleanMessage.length > 2000) throw new Error("Message is too long");
@@ -511,8 +661,24 @@ The farmer's selected app language is ${langName}. Answer in ${langName} by defa
     const identityLine = farmerId
       ? `FARMER IDENTITY: verified server-side. Tools automatically read THIS farmer's data. Never ask the farmer for their farmer ID/phone for tool calls, and never try to pass one - tools ignore such arguments.`
       : toolsAvailable
-        ? `FARMER IDENTITY: not logged in. Personal tools (bookings, payment) will return NOT_LOGGED_IN - tell the farmer to log in to the app for personal data. Queue/slot/centre tools still work.`
+        ? `FARMER IDENTITY: not logged in. Personal tools (bookings, payment, live booking) will return NOT_LOGGED_IN - tell the farmer to log in to the app for personal data. Queue/centre lookup may still work.`
         : `LIVE DATA: not connected on this server. Tools are unavailable; answer general AgroBridge FAQs only and say live account data cannot be checked right now.`;
+
+    const bookingLine = bookingAvailable
+      ? `BOOKING: You CAN create a real booking, but only through the mandatory flow. Never claim a booking exists until confirmBooking returns ok:true with a booking id/token.
+1. Discover eligible mandis with getCentresForCrop when needed. Never invent a centre.
+2. Ask for the crop quantity in quintals, the date, and collect the farmer's preferred slot. Call getBookingSlots with the real quantity; offer ONLY returned open slots. Mention closed days and quantity-too-big reasons honestly.
+3. When the farmer chooses a slot and all details are known, call proposeBooking. This only creates an unconfirmed pending summary - it does NOT book.
+4. Show the exact summary back (crop, quantity, mandi, date, slot) and ask a clear yes/no confirmation question.
+5. Call confirmBooking ONLY when the farmer's CURRENT message explicitly confirms that summary (yes/haan/confirm/kar do). If they change any detail, call proposeBooking again and ask again. Never treat a question, silence or ambiguous reply as confirmation.
+6. If confirmBooking fails (slot full, daily limit, active-token limit, closed day, duplicate), explain the specific reason and offer fresh slots; do not pretend it succeeded.
+7. After confirmBooking returns ok:true, tell the farmer the real token number, booking id, date, slot and centre taken from that tool result.
+8. The backend decides identity, capacity and the actual token. Never ask for or invent booking ids, token numbers, gate codes or payment details.`
+      : `BOOKING: Live booking is not connected here. Do not claim to book; point to the app's booking flow.`;
+
+    const pendingLine = pendingBooking && pendingBooking.summary
+      ? `PENDING UNCONFIRMED BOOKING for this chat (not booked yet): ${JSON.stringify(pendingBooking.summary)}. It is valid until ${pendingBooking.expiresAt || "soon"}.`
+      : `PENDING UNCONFIRMED BOOKING: none.`;
 
     const prompt = `${languageLine}
 
@@ -520,10 +686,20 @@ Today's date (India): ${todayIst()}
 
 ${identityLine}
 
+${bookingLine}
+
+${pendingLine}
+
 Farmer's question:
 ${cleanMessage}`;
 
-    const ctx = { farmerId: farmerId || null };
+    const ctx = {
+      farmerId: farmerId || null,
+      sessionId: sessionId || null,
+      message: cleanMessage,
+      language: langCode || null,
+      turnId: `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    };
 
     // Conversation is managed manually with generateContent({contents}).
     // The SDK's chatSession.sendMessage() wraps function responses in
@@ -534,8 +710,11 @@ ${cleanMessage}`;
     for (const turn of cleanHistory(history)) contents.push(turn);
     contents.push({ role: "user", parts: [{ text: prompt }] });
 
-    const baseRequest = toolsAvailable
-      ? { tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }] }
+    const declarations = [];
+    if (store) declarations.push(...FUNCTION_DECLARATIONS);
+    if (bookingAvailable) declarations.push(...BOOKING_FUNCTION_DECLARATIONS);
+    const baseRequest = declarations.length
+      ? { tools: [{ functionDeclarations: declarations }] }
       : {};
 
     let finalText = "";
@@ -594,13 +773,14 @@ ${cleanMessage}`;
     return { reply, toolRounds: Math.min(round, steps), toolsUsed };
   }
 
-  return { chat, maxSteps: steps, toolsAvailable };
+  return { chat, maxSteps: steps, toolsAvailable, bookingAvailable };
 }
 
 module.exports = {
   createAgent,
   TOOL_NAMES,
   FUNCTION_DECLARATIONS,
+  BOOKING_FUNCTION_DECLARATIONS,
   bookingViewOf,
   paymentViewOf,
   queueViewOf,
@@ -609,3 +789,4 @@ module.exports = {
   validateDate,
   validateToken,
 };
+

@@ -8,8 +8,8 @@ require("dotenv").config();
  * ivr/chatbot.js):
  *
  * - With FIREBASE_SERVICE_ACCOUNT_B64 (or _JSON / application default
- *   credentials) it connects to Firestore and all live read-only tools
- *   work (bookings, queue, slots, centre, payment).
+ *   credentials) it connects to Firestore and all live tools work
+ *   (read-only queries plus the confirmed booking flow).
  * - Without Firebase credentials it still runs, in FAQ-only mode:
  *   Gemini answers general AgroBridge questions, personal live data
  *   is reported as unavailable (tools are not offered to the model).
@@ -134,6 +134,7 @@ async function probeFirestore(db) {
         history,
         phone: req.body.phone,
         language: req.body.language,
+        sessionId: req.body.sessionId,
       });
 
       res.json(result);

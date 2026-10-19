@@ -2,16 +2,20 @@
  * services/chatbot.js
  * ---------------------------------------------------------------
  * Client for the AgroBridge Assistant (agentic Gemini chatbot with
- * live read-only Firestore tools on the backend).
+ * live Firestore tools and a confirmed booking flow on the backend).
  * Talks to the Render backend  ->  POST ${CHATBOT_BASE_URL}/chat
  * (services/config.js; production: https://agrobridge-ivr.onrender.com/chat)
  *
- *   in:  { message, history, phone, language }   out:  { reply, toolsUsed? }
+ *   in:  { message, history, phone, language, sessionId }   out:  { reply, toolsUsed? }
  *
  * `phone` is the logged-in farmer's 10-digit phone (session uid).
- * It is optional: without it the assistant answers general FAQs.
- * The backend verifies it against Firestore and uses it as the ONLY
- * farmer identity for live tool calls (bookings, queue, payment).
+ * It is optional: without it the assistant answers general FAQs and
+ * cannot book. The backend verifies it against Firestore and uses it
+ * as the ONLY farmer identity for live tool calls.
+ *
+ * `sessionId` is a stable, per-user chat id persisted by the screen.
+ * The backend binds a pending booking to it so an explicit "yes" can
+ * only confirm the summary shown in this conversation.
  *
  * `history` is the list of prior chat messages in Gemini turn
  * format ({ role: 'user' | 'model', parts: [{ text }] }), built
@@ -82,9 +86,10 @@ export function buildHistory(messages = []) {
  * @param {Array}  history        prior messages (screen format)
  * @param {string} [phone]        logged-in farmer's phone/uid (optional)
  * @param {string} [language]     selected app language: en | hi | pa | mr
+ * @param {string} [sessionId]    stable chat session id for pending bookings
  * @returns {Promise<string>}     the assistant's reply text
  */
-export async function sendChatMessage(message, history = [], phone = null, language = null) {
+export async function sendChatMessage(message, history = [], phone = null, language = null, sessionId = null) {
   const text = String(message || '').trim();
   if (!text) throw new ChatError('EMPTY_MESSAGE', 'Empty message');
   if (text.length > 2000) throw new ChatError('TOO_LONG', 'Message is too long');
@@ -97,6 +102,8 @@ export async function sendChatMessage(message, history = [], phone = null, langu
   if (cleanPhone) body.phone = cleanPhone;
   const cleanLang = String(language || '').toLowerCase();
   if (['en', 'hi', 'pa', 'mr'].includes(cleanLang)) body.language = cleanLang;
+  const cleanSession = String(sessionId || '').trim().slice(0, 100);
+  if (cleanSession) body.sessionId = cleanSession;
 
   let res;
   try {

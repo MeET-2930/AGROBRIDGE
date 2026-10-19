@@ -354,7 +354,7 @@ function auth(req, res, next) {
 }
 
 // Same shared-secret check as `auth`, but without the telephony
-// requirement - used by the read-only chatbot endpoints. NOT strong
+// requirement - used by the chatbot endpoints. NOT strong
 // auth (the key ships in the client bundle). Opt-in: set
 // CHATBOT_REQUIRE_KEY=true once the app sends the header.
 // See README "Security limitations".
@@ -469,6 +469,7 @@ app.post("/chat", chatGuard, async (req, res) => {
       phone,
       history,
       language,
+      sessionId,
     } = req.body;
 
     const result =
@@ -477,6 +478,7 @@ app.post("/chat", chatGuard, async (req, res) => {
         phone,
         history,
         language,
+        sessionId,
       });
 
     res.json(result);

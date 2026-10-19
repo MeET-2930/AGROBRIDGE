@@ -29,3 +29,7 @@ services:
       # EAS); until then "false" keeps current clients working.
       - key: CHATBOT_REQUIRE_KEY
         value: "false"
+      # Server-side kill switch for real chat bookings. Set "false" for
+      # public deployments until Firebase Auth token verification lands.
+      - key: CHATBOT_ALLOW_BOOKING
+        sync: false
