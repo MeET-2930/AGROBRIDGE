@@ -93,7 +93,7 @@ function makeStore(db){
   return {fetchCentres, fetchCentreById, fetchAvailableSlots, getDateOptions, createBooking, capacityPerWindow};
 }
 
-const SYSTEM_PROMPT = `You are AgroBridge AI Booking Assistant — a warm, human, Indian farmer helper. Speak naturally like a person, not a robot. Mix Hindi and English naturally if farmer uses Hindi. Use 'ji' respectfully.
+const SYSTEM_PROMPT = `You are AgroBridge AI Booking Assistant — a warm, human, Indian farmer helper. Speak ONLY in clear Hindi (Devanagari script) when lang is 'hi', pure Hindi with 'जी' respectfully. Never use Roman Hindi. Be natural like a person, not a robot.
 
 Goal: book a mandi slot. Collect step by step by asking like a human: 
 1) farmer name (if not known), 2) mandi, 3) crop (wheat/paddy/mustard/cotton/maize/gram), 4) quantity 1-999 quintals, 5) date (next 4 days), 6) time slot.
@@ -101,11 +101,11 @@ Goal: book a mandi slot. Collect step by step by asking like a human:
 Rules:
 - Ask ONE question at a time, like a real conversation. Interrogate gently.
 - If user says mandi/crop/quantity together, extract all.
-- Confirm before booking: "Toh {mandi}, {crop}, {quantity} quintal, {date} {slot} — confirm karu ji?"
+- Confirm before booking in Hindi Devanagari: "तो {mandi}, {crop}, {quantity} क्विंटल, {date} {slot} — कन्फर्म करूँ जी?"
 - On booking success, spell token like "A - 0 5" and give gate code.
 - If slot full, suggest another slot nearby.
 - Keep reply under 40 words, friendly, short.
-- Always reply in the language farmer last used (hi = Hindi, en = English).`;
+- Always reply in Devanagari Hindi if lang is 'hi', else English. Never mix Roman Hindi.`;
 
 function buildTools(){ return [
   { type:"function", function:{ name:"list_mandis", description:"List active mandis with id and name", parameters:{type:"object", properties:{}, required:[]} }},
@@ -143,36 +143,36 @@ async function ruleBasedReply({messages, phone, store, lang}){
   if(!extracted.centreId){
     const list=centres.slice(0,3).map(c=>c.name||c.id).join(", ");
     return lang==="hi"
-      ? `Bilkul ji! Kaunsi mandi me laana hai? ${list} — naam bata dijiye.`
+      ? `बिल्कुल जी! कौन सी मंडी में लाना है? ${list} — नाम बता दीजिए।`
       : `Sure! Which mandi do you want? Try ${list} — just tell me the name.`;
   }
   if(!extracted.crop){
     return lang==="hi"
-      ? `Samajh gaya ji, ${extracted.centreId} me. Kaunsi fasal hai — gehu, dhaan, sarson?`
+      ? `समझ गया जी, ${extracted.centreId} में। कौन सी फसल है — गेहूं, धान, सरसों?`
       : `Got it — ${extracted.centreId}. Which crop — wheat, paddy or mustard?`;
   }
   if(!extracted.quantity || extracted.quantity<1 || extracted.quantity>999){
     return lang==="hi"
-      ? `Theek hai, ${extracted.crop} ji. Kitna maal hai — kitne quintal?`
+      ? `ठीक है, ${extracted.crop} जी। कितना माल है — कितने क्विंटल?`
       : `Great, ${extracted.crop}. How much quantity — how many quintals?`;
   }
   if(!extracted.date){
     const dates=store.getDateOptions(lang);
     const opts=dates.slice(0,3).map(d=>`${d.value} (${d.label})`).join(" | ");
     return lang==="hi"
-      ? `Shukriya ji, ${extracted.quantity} quintal. Kis din aayenge? ${opts} — bata dijiye.`
+      ? `शुक्रिया जी, ${extracted.quantity} क्विंटल। किस दिन आएंगे? ${opts} — बता दीजिए।`
       : `Thanks, ${extracted.quantity} quintals. Which date? ${opts}`;
   }
   // need slot
   const centre=await store.fetchCentreById(extracted.centreId);
   const slots=await store.fetchAvailableSlots(centre, extracted.date);
   if(!slots.length){
-    return lang==="hi" ? `Us din koi slot khali nahi hai ji, dusra din boliye.` : `No slots free that day, please pick another date.`;
+    return lang==="hi" ? `उस दिन कोई स्लॉट खाली नहीं है जी, दूसरा दिन बताइए।` : `No slots free that day, please pick another date.`;
   }
   if(!extracted.slot || !slots.find(s=>s.slotTime===extracted.slot)){
     const slotList=slots.slice(0,4).map(s=>s.windowLabel).join(", ");
     return lang==="hi"
-      ? `Wah ji, ${extracted.date} ko ye slot khali hain: ${slotList}. Kaunsa samay chahiye?`
+      ? `वाह जी, ${extracted.date} को ये स्लॉट खाली हैं: ${slotList}। कौन सा समय चाहिए?`
       : `${extracted.date} has these free: ${slotList}. Which time slot?`;
   }
   // all collected -> ask confirm if last message not confirming
@@ -180,18 +180,18 @@ async function ruleBasedReply({messages, phone, store, lang}){
   const isConfirm = /(ha|yes|confirm|kar do|book|theek|ok)/.test(last);
   if(!isConfirm){
     return lang==="hi"
-      ? `Toh confirm karu ji — ${centre.name||centre.id}, ${extracted.crop}, ${extracted.quantity} quintal, ${extracted.date} ${extracted.slot} wali slot? Haan boliye toh book kar deta hun.`
+      ? `तो कन्फर्म करूं जी — ${centre.name||centre.id}, ${extracted.crop}, ${extracted.quantity} क्विंटल, ${extracted.date} ${extracted.slot} वाली स्लॉट? हाँ बोलिए तो बुक कर देता हूँ।`
       : `Confirm — ${centre.name||centre.id}, ${extracted.crop}, ${extracted.quantity} quintals, ${extracted.date} ${extracted.slot}? Say yes to book.`;
   }
   // book
   try{
     const booking=await store.createBooking({farmerId:phone, farmerName, centre, crop:extracted.crop, quantity:extracted.quantity, date:extracted.date, slot:extracted.slot});
     return lang==="hi"
-      ? `Ho gaya ji! Token ${spell(booking.tokenNumber)} — gate code ${spell(booking.gatePassCode)}. ${extracted.date} ${extracted.slot} par aaiye. Dhanyawaad!`
-      : `Done! Token ${spell(booking.tokenNumber)} — gate code ${spell(booking.gatePassCode)}. Come on ${extracted.date} at ${extracted.slot}. Thank you!`
+      ? `हो गया जी! टोकन ${spell(booking.tokenNumber)} — गेट कोड ${spell(booking.gatePassCode)}. ${extracted.date} ${extracted.slot} पर आइए। धन्यवाद!`
+      : `Done! Token ${spell(booking.tokenNumber)} — गेट कोड ${spell(booking.gatePassCode)}. Come on ${extracted.date} at ${extracted.slot}. Thank you!`
   }catch(e){
-    if(String(e.message).includes("SLOT_FULL")) return lang==="hi"?`Are wah, ye slot abhi bhar gaya. Dusra samay bataiye.`:`That slot just got full, pick another time.`;
-    return lang==="hi"?`Kuch gadbad ho gayi ji, phir se koshish karte hain.`:`Something went wrong, let's try again.`;
+    if(String(e.message).includes("SLOT_FULL")) return lang==="hi"?`अरे वाह, ये स्लॉट अभी भर गया। दूसरा समय बताइए।`:`That slot just got full, pick another time.`;
+    return lang==="hi"?`कुछ गड़बड़ हो गई जी, फिर से कोशिश करते हैं।`:`Something went wrong, let's try again.`;
   }
 }
 
@@ -257,7 +257,7 @@ function makeAiAgent({db}){
   async function handleChat(req,res){
     try{
       const {messages=[], phone="9100000001", lang="hi"} = req.body||{};
-      if(!Array.isArray(messages) || !messages.length) return res.json({reply: lang==="hi"?"Namaste ji! Main AgroBridge AI hun. Kaise madad karun? Mandi ka naam bataiye.":"Hello! I'm AgroBridge AI. Which mandi do you want to book?"});
+      if(!Array.isArray(messages) || !messages.length) return res.json({reply: lang==="hi"?"नमस्ते जी! मैं एग्रोब्रिज एआई हूँ। कैसे मदद करूँ? मंडी का नाम बताइए।":"Hello! I'm AgroBridge AI. Which mandi do you want to book?"});
       let reply="";
       if(OPENAI_KEY) reply=await callOpenAI(messages, phone, lang);
       else if(GEMINI_KEY) reply=await callGemini(messages, phone, lang);
@@ -267,7 +267,7 @@ function makeAiAgent({db}){
       return res.json({reply, done:isDone});
     }catch(e){
       console.error("ai-agent error",e);
-      res.status(500).json({reply:"Sorry ji, thodi dikkat aa gayi. Phir boliye.", error:e.message});
+      res.status(500).json({reply:"क्षमा कीजिए जी, थोड़ी तकनीकी दिक्कत आ गई। कृपया फिर से बताइए।", error:e.message});
     }
   }
 
