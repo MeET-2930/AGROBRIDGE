@@ -259,11 +259,18 @@ function makeAiAgent({db}){
       const {messages=[], phone="9100000001", lang="hi"} = req.body||{};
       if(!Array.isArray(messages) || !messages.length) return res.json({reply: lang==="hi"?"नमस्ते जी! मैं एग्रोब्रिज एआई हूँ। कैसे मदद करूँ? मंडी का नाम बताइए।":"Hello! I'm AgroBridge AI. Which mandi do you want to book?"});
       let reply="";
-      if(OPENAI_KEY) reply=await callOpenAI(messages, phone, lang);
-      else if(GEMINI_KEY) reply=await callGemini(messages, phone, lang);
-      else reply=await ruleBasedReply({messages, phone, store, lang});
-      // detect booking success
-      const isDone=/(token|gate code|ho gaya|done)/i.test(reply);
+      try{
+        if(OPENAI_KEY) reply=await callOpenAI(messages, phone, lang);
+        else if(GEMINI_KEY) reply=await callGemini(messages, phone, lang);
+        else reply=await ruleBasedReply({messages, phone, store, lang});
+      }catch(inner){
+        console.error("ai-agent llm failed, falling back to rule-based:", inner.message);
+        reply=await ruleBasedReply({messages, phone, store, lang});
+      }
+      if(!reply || !String(reply).trim()){
+        reply=await ruleBasedReply({messages, phone, store, lang});
+      }
+      const isDone=/(टोकन|गेट कोड|हो गया|done|token)/i.test(reply);
       return res.json({reply, done:isDone});
     }catch(e){
       console.error("ai-agent error",e);
