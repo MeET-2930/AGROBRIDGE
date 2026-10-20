@@ -24,7 +24,9 @@ const MODEL_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 30000;
  */
 function createChatbot({ db, model = null, store = null, bookingService = null, maxSteps = undefined } = {}) {
   if (!store && db) store = makeStore(db);
-  const bookingAllowed = String(process.env.CHATBOT_ALLOW_BOOKING || "true").toLowerCase() !== "false";
+  // Booking writes are disabled by default; must be explicitly enabled
+  // (CHATBOT_ALLOW_BOOKING=true) in the demo / trusted environment.
+  const bookingAllowed = String(process.env.CHATBOT_ALLOW_BOOKING || "false").toLowerCase() === "true";
   if (
     bookingAllowed &&
     !bookingService &&

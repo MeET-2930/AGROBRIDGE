@@ -450,7 +450,7 @@ function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_M
         date: date.value,
         slots,
         note: slots.length
-          ? "These are remaining slots only - the assistant cannot book them."
+          ? "These are remaining slots with free capacity - use getBookingSlots with the farmer's exact quantity for a booking."
           : "No open slots remain for that date.",
       };
     },
