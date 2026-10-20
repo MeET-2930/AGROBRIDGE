@@ -23,6 +23,22 @@ services:
       # Optional model override (default: gemini-3.1-flash-lite).
       - key: GEMINI_MODEL
         sync: false
+      # Optional agent provider. Keep "gemini" unless Antigravity is
+      # intentionally enabled; see ivr/README.md for its env vars.
+      - key: CHATBOT_PROVIDER
+        value: gemini
+      - key: CHATBOT_ANTIGRAVITY_FALLBACK
+        sync: false
+      - key: ANTIGRAVITY_AGENT
+        sync: false
+      - key: ANTIGRAVITY_MAX_TOTAL_TOKENS
+        sync: false
+      - key: ANTIGRAVITY_TIMEOUT_MS
+        sync: false
+      - key: ANTIGRAVITY_MAX_STEPS
+        sync: false
+      - key: ANTIGRAVITY_MODEL
+        sync: false
       # Opt-in guard on /chat + /translate (the code default is OFF, so
       # unset = off). Set to "true" once the app build that sends
       # x-agb-key is live (web rebuilt + deployed, testers updated via

@@ -47,9 +47,42 @@ FAQ-only mode with live tools disabled). Point
 `services/config.js CHATBOT_BASE_URL` at `http://localhost:3001` for local
 app work (do not commit).
 
-**Tests:** `npm test` (mocked Gemini + mocked Firestore, no network) and
-`npm run test:live` (real Gemini API, still-mocked Firestore; needs
-`GEMINI_API_KEY`).
+**Tests:** `npm test` (mocked Gemini/Antigravity + mocked Firestore, no
+network), `npm run test:live` (real Gemini API, still-mocked Firestore;
+needs `GEMINI_API_KEY`) and `ANTIGRAVITY_LIVE=1 npm run
+test:live:antigravity` (real Antigravity call, mocked read store, opt-in
+because it costs tokens).
+
+### Optional Antigravity provider (opt-in)
+
+`CHATBOT_PROVIDER=antigravity` routes `/chat` through Google Antigravity
+(`@google/genai` Interactions API, `ivr/antigravity.js`) instead of the
+Gemini loop. The default stays `gemini`; nothing changes unless you opt in.
+
+- Both providers use the **same** trusted toolkit and prompts
+  (`ivr/agent.js createToolkit` / `buildChatInstructions`), so identity,
+  session binding, explicit confirmation and idempotency are unchanged.
+- Only custom function tools are exposed. Code execution, Google Search,
+  URL context, browser and MCP tools are never enabled. The required
+  remote environment has no mounted sources.
+- Interaction ids are persisted per farmer + session in the small
+  `chatInteractionSessions` collection (`interactionId`, `updatedAt` only).
+  Without Firestore the cache is in-memory.
+- A conservative token budget, per-call timeout, max tool-round cap and a
+  30-second circuit breaker limit latency/cost after a failure.
+- Fallback is **off** by default. `CHATBOT_ANTIGRAVITY_FALLBACK=gemini`
+  retries with Gemini only when Antigravity failed **before any tool ran**,
+  never after a read/booking tool has executed.
+
+| Env var | Default | Notes |
+| --- | --- | --- |
+| `CHATBOT_PROVIDER` | `gemini` | Set to `antigravity` to opt in |
+| `CHATBOT_ANTIGRAVITY_FALLBACK` | empty | `gemini` enables pre-tool fallback |
+| `ANTIGRAVITY_AGENT` | `antigravity-preview-09-2026` | Agent id |
+| `ANTIGRAVITY_MAX_TOTAL_TOKENS` | `50000` | Clamped to 1,000-200,000 |
+| `ANTIGRAVITY_TIMEOUT_MS` | `60000` | Per interaction call |
+| `ANTIGRAVITY_MAX_STEPS` | `5` | Tool rounds, clamped to 1-8 |
+| `ANTIGRAVITY_MODEL` | empty | Optional reasoning-model override |
 
 ### Security limitations (read before a public deploy)
 `/chat` and `/translate` require the app's shared key (`x-agb-key`, the same

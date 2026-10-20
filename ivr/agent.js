@@ -297,34 +297,72 @@ const BOOKING_FUNCTION_DECLARATIONS = [
 ];
 
 // ---------------------------------------------------------------
-// Agent
+// Shared turn instructions (Gemini content prompt + Antigravity
+// system_instruction, so both providers see the same rules)
 // ---------------------------------------------------------------
 
-/**
- * @param {object} opts
- * @param {object} opts.model     Gemini model from GoogleGenerativeAI (with systemInstruction)
- * @param {object|null} opts.store  makeStore(db) result; null = no Firestore (FAQ-only mode)
- * @param {object|null} opts.bookingService  server-side booking service (enables booking tools)
- * @param {number} [opts.maxSteps]  max tool-call rounds per request
- * @param {object} [opts.logger]
- * @param {number} [opts.modelTimeoutMs]  per Gemini call timeout (default 30s; 0 disables)
- */
-function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_MAX_STEPS, logger = console, modelTimeoutMs } = {}) {
-  if (!model) throw new Error("createAgent: model is required");
+function todayIst() {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
 
-  const steps = Math.max(1, Math.min(Number(maxSteps) || DEFAULT_MAX_STEPS, 10));
+function buildChatInstructions({
+  farmerId = null,
+  language = null,
+  pendingBooking = null,
+  toolsAvailable = false,
+  bookingAvailable = false,
+} = {}) {
+  const langCode = String(language || "").toLowerCase();
+  const langName = { en: "English", hi: "Hindi", pa: "Punjabi", mr: "Marathi" }[langCode] || null;
+  const languageLine = langName
+    ? `RESPONSE LANGUAGE: ${langName} (${langCode}).
+The farmer's selected app language is ${langName}. Answer in ${langName} by default, writing naturally and conversationally like a helpful local assistant: fluent sentences, correct farming and procurement terms, no awkward word-for-word translation, no random mixing of other languages.
+- If the farmer explicitly asks for a different response language, that explicit request may override this default.
+- Otherwise always answer in ${langName}. The question's language alone must NOT change your response language.`
+    : `No app language was supplied. Match the farmer's message language (English, Hindi, or Hinglish).`;
+
+  const identityLine = farmerId
+    ? `FARMER IDENTITY: verified server-side. Tools automatically read THIS farmer's data. Never ask the farmer for their farmer ID/phone for tool calls, and never try to pass one - tools ignore such arguments.`
+    : toolsAvailable
+      ? `FARMER IDENTITY: not logged in. Personal tools (bookings, payment, live booking) will return NOT_LOGGED_IN - tell the farmer to log in to the app for personal data. Queue/centre lookup may still work.`
+      : `LIVE DATA: not connected on this server. Tools are unavailable; answer general AgroBridge FAQs only and say live account data cannot be checked right now.`;
+
+  const bookingLine = bookingAvailable
+    ? `BOOKING: You CAN create a real booking, but only through the mandatory flow. Never claim a booking exists until confirmBooking returns ok:true with a booking id/token.
+1. Discover eligible mandis with getCentresForCrop when needed. Never invent a centre.
+2. Ask for the crop quantity in quintals, the date, and collect the farmer's preferred slot. Call getBookingSlots with the real quantity; offer ONLY returned open slots. Mention closed days and quantity-too-big reasons honestly.
+3. When the farmer chooses a slot and all details are known, call proposeBooking. This only creates an unconfirmed pending summary - it does NOT book.
+4. Show the exact summary back (crop, quantity, mandi, date, slot) and ask a clear yes/no confirmation question.
+5. Call confirmBooking ONLY when the farmer's CURRENT message explicitly confirms that summary (yes/haan/confirm/kar do). If they change any detail, call proposeBooking again and ask again. Never treat a question, silence or ambiguous reply as confirmation.
+6. If confirmBooking fails (slot full, daily limit, active-token limit, closed day, duplicate), explain the specific reason and offer fresh slots; do not pretend it succeeded.
+7. After confirmBooking returns ok:true, tell the farmer the real token number, booking id, date, slot and centre taken from that tool result.
+8. The backend decides identity, capacity and the actual token. Never ask for or invent booking ids, token numbers, gate codes or payment details.`
+    : `BOOKING: Live booking is not connected here. Do not claim to book; point to the app's booking flow.`;
+
+  const pendingLine = pendingBooking && pendingBooking.summary
+    ? `PENDING UNCONFIRMED BOOKING for this chat (not booked yet): ${JSON.stringify(pendingBooking.summary)}. It is valid until ${pendingBooking.expiresAt || "soon"}.`
+    : `PENDING UNCONFIRMED BOOKING: none.`;
+
+  return `${languageLine}
+
+Today's date (India): ${todayIst()}
+
+${identityLine}
+
+${bookingLine}
+
+${pendingLine}`;
+}
+
+// ---------------------------------------------------------------
+// Shared tool toolkit (used by the Gemini loop and the optional
+// Antigravity provider, so both execute the exact same trusted code)
+// ---------------------------------------------------------------
+
+function createToolkit({ store, bookingService = null, logger = console } = {}) {
   const bookingAvailable = Boolean(bookingService && bookingService.enabled !== false);
   const toolsAvailable = Boolean(store) || bookingAvailable;
-  const timeoutMs = Math.max(
-    0,
-    Number(modelTimeoutMs) || Number(process.env.GEMINI_TIMEOUT_MS) || DEFAULT_MODEL_TIMEOUT_MS
-  );
-  // Native SDK request timeout so a stalled call fails fast instead of hanging.
-  const requestOptions = timeoutMs > 0 ? { timeout: timeoutMs } : undefined;
-
-  function callModel(request) {
-    return model.generateContent(request, requestOptions);
-  }
 
   // -------------------------------------------------------------
   // Tool executors. All return plain JSON; none throw.
@@ -555,7 +593,7 @@ function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_M
     },
   };
 
-  async function runTool(call, ctx) {
+  async function run(call, ctx) {
     const name = String((call && call.name) || "");
     const handler = handlers[name];
     if (!handler) {
@@ -572,6 +610,43 @@ function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_M
         message: "The live data service is unavailable right now. Say you could not fetch the data - do not invent it.",
       };
     }
+  }
+
+  const declarations = [];
+  if (store) declarations.push(...FUNCTION_DECLARATIONS);
+  if (bookingAvailable) declarations.push(...BOOKING_FUNCTION_DECLARATIONS);
+
+  return { run, declarations, toolsAvailable, bookingAvailable };
+}
+
+// ---------------------------------------------------------------
+// Agent
+// ---------------------------------------------------------------
+
+/**
+ * @param {object} opts
+ * @param {object} opts.model     Gemini model from GoogleGenerativeAI (with systemInstruction)
+ * @param {object|null} opts.store  makeStore(db) result; null = no Firestore (FAQ-only mode)
+ * @param {object|null} opts.bookingService  server-side booking service (enables booking tools)
+ * @param {number} [opts.maxSteps]  max tool-call rounds per request
+ * @param {object} [opts.logger]
+ * @param {number} [opts.modelTimeoutMs]  per Gemini call timeout (default 30s; 0 disables)
+ */
+function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_MAX_STEPS, logger = console, modelTimeoutMs } = {}) {
+  if (!model) throw new Error("createAgent: model is required");
+
+  const toolkit = createToolkit({ store, bookingService, logger });
+  const { bookingAvailable, toolsAvailable, declarations } = toolkit;
+  const steps = Math.max(1, Math.min(Number(maxSteps) || DEFAULT_MAX_STEPS, 10));
+  const timeoutMs = Math.max(
+    0,
+    Number(modelTimeoutMs) || Number(process.env.GEMINI_TIMEOUT_MS) || DEFAULT_MODEL_TIMEOUT_MS
+  );
+  // Native SDK request timeout so a stalled call fails fast instead of hanging.
+  const requestOptions = timeoutMs > 0 ? { timeout: timeoutMs } : undefined;
+
+  function callModel(request) {
+    return model.generateContent(request, requestOptions);
   }
 
   function safeText(response) {
@@ -595,11 +670,6 @@ function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_M
     } catch (e) {
       return [];
     }
-  }
-
-  function todayIst() {
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   }
 
   function cleanHistory(history) {
@@ -650,45 +720,13 @@ function createAgent({ model, store, bookingService = null, maxSteps = DEFAULT_M
     if (cleanMessage.length > 2000) throw new Error("Message is too long");
 
     const langCode = String(language || "").toLowerCase();
-    const langName = { en: "English", hi: "Hindi", pa: "Punjabi", mr: "Marathi" }[langCode] || null;
-    const languageLine = langName
-      ? `RESPONSE LANGUAGE: ${langName} (${langCode}).
-The farmer's selected app language is ${langName}. Answer in ${langName} by default, writing naturally and conversationally like a helpful local assistant: fluent sentences, correct farming and procurement terms, no awkward word-for-word translation, no random mixing of other languages.
-- If the farmer explicitly asks for a different response language, that explicit request may override this default.
-- Otherwise always answer in ${langName}. The question's language alone must NOT change your response language.`
-      : `No app language was supplied. Match the farmer's message language (English, Hindi, or Hinglish).`;
-
-    const identityLine = farmerId
-      ? `FARMER IDENTITY: verified server-side. Tools automatically read THIS farmer's data. Never ask the farmer for their farmer ID/phone for tool calls, and never try to pass one - tools ignore such arguments.`
-      : toolsAvailable
-        ? `FARMER IDENTITY: not logged in. Personal tools (bookings, payment, live booking) will return NOT_LOGGED_IN - tell the farmer to log in to the app for personal data. Queue/centre lookup may still work.`
-        : `LIVE DATA: not connected on this server. Tools are unavailable; answer general AgroBridge FAQs only and say live account data cannot be checked right now.`;
-
-    const bookingLine = bookingAvailable
-      ? `BOOKING: You CAN create a real booking, but only through the mandatory flow. Never claim a booking exists until confirmBooking returns ok:true with a booking id/token.
-1. Discover eligible mandis with getCentresForCrop when needed. Never invent a centre.
-2. Ask for the crop quantity in quintals, the date, and collect the farmer's preferred slot. Call getBookingSlots with the real quantity; offer ONLY returned open slots. Mention closed days and quantity-too-big reasons honestly.
-3. When the farmer chooses a slot and all details are known, call proposeBooking. This only creates an unconfirmed pending summary - it does NOT book.
-4. Show the exact summary back (crop, quantity, mandi, date, slot) and ask a clear yes/no confirmation question.
-5. Call confirmBooking ONLY when the farmer's CURRENT message explicitly confirms that summary (yes/haan/confirm/kar do). If they change any detail, call proposeBooking again and ask again. Never treat a question, silence or ambiguous reply as confirmation.
-6. If confirmBooking fails (slot full, daily limit, active-token limit, closed day, duplicate), explain the specific reason and offer fresh slots; do not pretend it succeeded.
-7. After confirmBooking returns ok:true, tell the farmer the real token number, booking id, date, slot and centre taken from that tool result.
-8. The backend decides identity, capacity and the actual token. Never ask for or invent booking ids, token numbers, gate codes or payment details.`
-      : `BOOKING: Live booking is not connected here. Do not claim to book; point to the app's booking flow.`;
-
-    const pendingLine = pendingBooking && pendingBooking.summary
-      ? `PENDING UNCONFIRMED BOOKING for this chat (not booked yet): ${JSON.stringify(pendingBooking.summary)}. It is valid until ${pendingBooking.expiresAt || "soon"}.`
-      : `PENDING UNCONFIRMED BOOKING: none.`;
-
-    const prompt = `${languageLine}
-
-Today's date (India): ${todayIst()}
-
-${identityLine}
-
-${bookingLine}
-
-${pendingLine}
+    const prompt = `${buildChatInstructions({
+      farmerId,
+      language,
+      pendingBooking,
+      toolsAvailable,
+      bookingAvailable,
+    })}
 
 Farmer's question:
 ${cleanMessage}`;
@@ -710,9 +748,6 @@ ${cleanMessage}`;
     for (const turn of cleanHistory(history)) contents.push(turn);
     contents.push({ role: "user", parts: [{ text: prompt }] });
 
-    const declarations = [];
-    if (store) declarations.push(...FUNCTION_DECLARATIONS);
-    if (bookingAvailable) declarations.push(...BOOKING_FUNCTION_DECLARATIONS);
     const baseRequest = declarations.length
       ? { tools: [{ functionDeclarations: declarations }] }
       : {};
@@ -752,7 +787,7 @@ ${cleanMessage}`;
       for (const call of calls) {
         const name = String((call.functionCall && call.functionCall.name) || "unknown");
         toolsUsed.push(name);
-        const out = await runTool(call.functionCall, ctx);
+        const out = await toolkit.run(call.functionCall, ctx);
         const functionResponse = { name, response: out };
         if (call.functionCall.id) functionResponse.id = call.functionCall.id;
         responseParts.push({ functionResponse });
@@ -778,6 +813,8 @@ ${cleanMessage}`;
 
 module.exports = {
   createAgent,
+  createToolkit,
+  buildChatInstructions,
   TOOL_NAMES,
   FUNCTION_DECLARATIONS,
   BOOKING_FUNCTION_DECLARATIONS,

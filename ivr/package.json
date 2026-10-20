@@ -6,14 +6,16 @@
   "scripts": {
     "start": "node server.js",
     "chatbot": "node chatbot-local.js",
-    "test": "node --test test/agent.test.js test/agent.scenarios.test.js test/agent.booking.test.js test/booking-service.test.js test/firebase-credential.test.js test/firebase.readonly.test.js test/key-guard.test.js test/chatbot.booking.e2e.test.js",
+    "test": "node --test test/agent.test.js test/agent.scenarios.test.js test/agent.booking.test.js test/antigravity.test.js test/booking-service.test.js test/firebase-credential.test.js test/firebase.readonly.test.js test/key-guard.test.js test/chatbot.booking.e2e.test.js",
     "test:live": "node --test test/agent.live.test.js",
+    "test:live:antigravity": "node --test test/antigravity.live.test.js",
     "verify:firebase": "node verify-firebase-readonly.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@google/genai": "^2.30.0",
     "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.6",
     "dotenv": "^16.4.5",

@@ -10,68 +10,29 @@ const { makeBookingService } = require("./booking-service");
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 const MODEL_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 30000;
 
-/**
- * createChatbot({ db, model?, store?, bookingService?, maxSteps? })
- *
- * Agentic AgroBridge Assistant. Gemini picks tools (see ivr/agent.js);
- * the trusted backend executes them against Firestore and feeds real
- * results back until a final answer. Booking tools are enabled only
- * when a booking service can be built (or is injected) and
- * CHATBOT_ALLOW_BOOKING is not "false".
- *
- * `db` is the firebase-admin Firestore instance from server.js.
- * All dependencies are injectable for tests (model / store / booking).
- */
-function createChatbot({ db, model = null, store = null, bookingService = null, maxSteps = undefined } = {}) {
-  if (!store && db) store = makeStore(db);
-  // Booking writes are disabled by default; must be explicitly enabled
-  // (CHATBOT_ALLOW_BOOKING=true) in the demo / trusted environment.
-  const bookingAllowed = String(process.env.CHATBOT_ALLOW_BOOKING || "false").toLowerCase() === "true";
-  if (
-    bookingAllowed &&
-    !bookingService &&
-    db &&
-    typeof db.runTransaction === "function" &&
-    typeof db.collection === "function"
-  ) {
-    try {
-      bookingService = makeBookingService({ db });
-    } catch (e) {
-      console.error("chatbot booking service init failed:", e.message);
-    }
-  }
-  const bookingEnabled = Boolean(bookingService && bookingService.enabled !== false);
-
-  if (!model) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("Missing GEMINI_API_KEY in environment");
-    }
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const readToolsBrief = store
-      ? `You have LIVE READ-ONLY TOOLS backed by the real AgroBridge database:
+function buildSystemInstruction({ store, bookingEnabled }) {
+  const readToolsBrief = store
+    ? `You have LIVE READ-ONLY TOOLS backed by the real AgroBridge database:
 - getFarmerBookings: the logged-in farmer's own active bookings.
 - getQueueStatus: live queue for a centre + date.
 - getAvailableSlots: remaining bookable slots for a centre + date.
 - getCentreInfo: centre address, hours, accepted crops.
 - getPaymentStatus: payment details of the farmer's own booking.`
-      : `Live account data is NOT connected on this server. Do not claim to know
+    : `Live account data is NOT connected on this server. Do not claim to know
 anyone's booking, queue, payment or slot details. If asked for personal live
 data, say it cannot be checked right now and suggest the app's dashboard.`;
 
-    const bookingBrief = bookingEnabled
-      ? `You also have LIVE BOOKING TOOLS; bookings are real and committed server-side:
+  const bookingBrief = bookingEnabled
+    ? `You also have LIVE BOOKING TOOLS; bookings are real and committed server-side:
 - getCentresForCrop: eligible active mandis for a crop.
 - getBookingSlots: actual open slots using the app's capacity engine and the farmer's quantity.
 - proposeBooking: validates details and creates a pending summary. It does NOT book.
 - confirmBooking: commits the pending booking ONLY when the farmer's current message explicitly confirms it.
 
 Never skip proposeBooking, never call confirmBooking without explicit confirmation, and never say "booked" unless confirmBooking returns ok:true. If details change, propose again. If capacity is full or a limit is hit, explain the real reason and offer returned alternatives.`
-      : `Live booking is NOT connected on this server. If asked to book, point to the app's booking flow; do not pretend to book.`;
+    : `Live booking is NOT connected on this server. If asked to book, point to the app's booking flow; do not pretend to book.`;
 
-    model = genAI.getGenerativeModel({
-      model: DEFAULT_MODEL,
-      systemInstruction: `
+  return `
 You are AgroBridge Assistant, a helpful agentic assistant for farmers using AgroBridge.
 
 AgroBridge helps farmers manage mandi/procurement-yard visits: slots, queues,
@@ -103,7 +64,66 @@ Rules:
   documents, MSP vs auction) from knowledge without tools.
 - Keep answers concise, practical and farmer-friendly.
 - Stay on AgroBridge/mandi/farming topics; politely redirect otherwise.
-`,
+`;
+}
+
+/**
+ * createChatbot({ db, model?, store?, bookingService?, maxSteps? })
+ *
+ * Agentic AgroBridge Assistant. Gemini picks tools (see ivr/agent.js);
+ * the trusted backend executes them against Firestore and feeds real
+ * results back until a final answer. Booking tools are enabled only
+ * when a booking service can be built (or is injected) and
+ * CHATBOT_ALLOW_BOOKING is not "false".
+ *
+ * `db` is the firebase-admin Firestore instance from server.js.
+ * All dependencies are injectable for tests (model / store / booking).
+ */
+function createChatbot({
+  db,
+  model = null,
+  store = null,
+  bookingService = null,
+  maxSteps = undefined,
+  provider = null,
+  antigravityClient = null,
+} = {}) {
+  if (!store && db) store = makeStore(db);
+  const providerName = String(provider || process.env.CHATBOT_PROVIDER || "gemini").toLowerCase();
+  if (providerName !== "gemini" && providerName !== "antigravity") {
+    throw new Error(`Unsupported CHATBOT_PROVIDER: ${providerName}`);
+  }
+  const antigravityFallback = String(
+    process.env.CHATBOT_ANTIGRAVITY_FALLBACK || ""
+  ).toLowerCase();
+  // Booking writes are disabled by default; must be explicitly enabled
+  // (CHATBOT_ALLOW_BOOKING=true) in the demo / trusted environment.
+  const bookingAllowed = String(process.env.CHATBOT_ALLOW_BOOKING || "false").toLowerCase() === "true";
+  if (
+    bookingAllowed &&
+    !bookingService &&
+    db &&
+    typeof db.runTransaction === "function" &&
+    typeof db.collection === "function"
+  ) {
+    try {
+      bookingService = makeBookingService({ db });
+    } catch (e) {
+      console.error("chatbot booking service init failed:", e.message);
+    }
+  }
+  const bookingEnabled = Boolean(bookingService && bookingService.enabled !== false);
+  const systemInstruction = buildSystemInstruction({ store, bookingEnabled });
+
+  if (!model) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Missing GEMINI_API_KEY in environment");
+    }
+    const genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({
+      model: DEFAULT_MODEL,
+      systemInstruction,
     });
   }
 
@@ -113,6 +133,23 @@ Rules:
     bookingService: bookingEnabled ? bookingService : null,
     maxSteps,
   });
+
+  let antigravity = null;
+  if (providerName === "antigravity") {
+    const { createAntigravityAgent } = require("./antigravity");
+    let client = antigravityClient;
+    if (!client) {
+      const { GoogleGenAI } = require("@google/genai");
+      client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    }
+    antigravity = createAntigravityAgent({
+      client,
+      store,
+      bookingService: bookingEnabled ? bookingService : null,
+      db,
+      maxSteps,
+    });
+  }
 
   /**
    * Validate the requester's claimed phone against Firestore:
@@ -155,14 +192,30 @@ Rules:
         console.error("chatbot pending booking lookup failed:", e.message);
       }
     }
-    const result = await agent.chat({
+    const request = {
       message,
       history,
       farmerId,
       sessionId,
       pendingBooking,
       language,
-    });
+    };
+    let result;
+    if (antigravity) {
+      try {
+        result = await antigravity.chat({ ...request, systemInstruction });
+      } catch (e) {
+        // Optional safety net: only before any tool ran, so a fallback can
+        // never duplicate or bypass a booking confirmation.
+        if (antigravityFallback === "gemini" && !e.toolExecuted) {
+          result = await agent.chat(request);
+        } else {
+          throw e;
+        }
+      }
+    } else {
+      result = await agent.chat(request);
+    }
     return {
       reply: result.reply,
       toolsUsed: result.toolsUsed,
