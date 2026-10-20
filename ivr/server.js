@@ -24,6 +24,7 @@ const path = require("path");
 
 const { makeIvr, makeCaller } = require("./ivr-core");
 const { createChatbot } = require("./chatbot");
+const { makeAiAgent } = require("./ai-agent");
 const { parseServiceAccount } = require("./firebase-credential");
 const { makeKeyGuard, requiredByEnv } = require("./key-guard");
 
@@ -135,6 +136,7 @@ console.log(
 // ---------------------------------------------------------------
 
 const chatbot = createChatbot({ db });
+const bookingAgent = makeAiAgent({ db });
 
 // ---------------------------------------------------------------
 // Express
@@ -525,6 +527,29 @@ app.post("/translate", chatGuard, async (req, res) => {
       error:
         "Unable to translate right now",
     });
+  }
+});
+
+// ---------------------------------------------------------------
+// AI BOOKING AGENT (natural talk + books slot, keeps IVR)
+// ---------------------------------------------------------------
+app.get("/agent", (_, res) => res.sendFile(path.join(__dirname, "agent.html")));
+app.post("/agent/chat", chatGuard, async (req, res) => {
+  try {
+    const { messages, phone, lang, language } = req.body;
+    // support both {messages:[...]} from agent.html and {message,history} from old callers
+    let msgs = Array.isArray(messages) ? messages : [];
+    if (!msgs.length && req.body.message) {
+      const hist = Array.isArray(req.body.history) ? req.body.history : [];
+      // convert old Gemini history format if needed
+      msgs = [...hist.flatMap(h => h.parts?.map(p=>({role: h.role==="model"?"assistant":"user", content:p.text}))||[]), {role:"user", content:req.body.message}];
+    }
+    const useLang = lang || language || "hi";
+    const result = await bookingAgent.handleChat({ messages: msgs, phone: phone || req.body.phone, lang: useLang });
+    res.json(result);
+  } catch (e) {
+    console.error("booking agent error:", e);
+    res.status(500).json({ error: "Booking agent failed", reply: "Sorry ji, thodi dikkat aa gayi." });
   }
 });
 
