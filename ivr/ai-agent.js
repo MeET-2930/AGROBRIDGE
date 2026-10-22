@@ -254,28 +254,23 @@ function makeAiAgent({db}){
     return j?.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
 
-  async function handleChat(req,res){
+  async function handleChat({messages=[], phone="9100000001", lang="hi"}={}){
+    const cleanMessages = Array.isArray(messages) ? messages : [];
+    if(!cleanMessages.length) return {reply: lang==="hi"?"नमस्ते जी! मैं एग्रोब्रिज एआई हूँ। कैसे मदद करूँ? मंडी का नाम बताइए।":"Hello! I'm AgroBridge AI. Which mandi do you want to book?", done:false};
+    let reply="";
     try{
-      const {messages=[], phone="9100000001", lang="hi"} = req.body||{};
-      if(!Array.isArray(messages) || !messages.length) return res.json({reply: lang==="hi"?"नमस्ते जी! मैं एग्रोब्रिज एआई हूँ। कैसे मदद करूँ? मंडी का नाम बताइए।":"Hello! I'm AgroBridge AI. Which mandi do you want to book?"});
-      let reply="";
-      try{
-        if(OPENAI_KEY) reply=await callOpenAI(messages, phone, lang);
-        else if(GEMINI_KEY) reply=await callGemini(messages, phone, lang);
-        else reply=await ruleBasedReply({messages, phone, store, lang});
-      }catch(inner){
-        console.error("ai-agent llm failed, falling back to rule-based:", inner.message);
-        reply=await ruleBasedReply({messages, phone, store, lang});
-      }
-      if(!reply || !String(reply).trim()){
-        reply=await ruleBasedReply({messages, phone, store, lang});
-      }
-      const isDone=/(टोकन|गेट कोड|हो गया|done|token)/i.test(reply);
-      return res.json({reply, done:isDone});
-    }catch(e){
-      console.error("ai-agent error",e);
-      res.status(500).json({reply:"क्षमा कीजिए जी, थोड़ी तकनीकी दिक्कत आ गई। कृपया फिर से बताइए।", error:e.message});
+      if(OPENAI_KEY) reply=await callOpenAI(cleanMessages, phone, lang);
+      else if(GEMINI_KEY) reply=await callGemini(cleanMessages, phone, lang);
+      else reply=await ruleBasedReply({messages: cleanMessages, phone, store, lang});
+    }catch(inner){
+      console.error("ai-agent llm failed, falling back to rule-based:", inner.message);
+      reply=await ruleBasedReply({messages: cleanMessages, phone, store, lang});
     }
+    if(!reply || !String(reply).trim()){
+      reply=await ruleBasedReply({messages: cleanMessages, phone, store, lang});
+    }
+    const isDone=/(टोकन|गेट कोड|हो गया|done|token)/i.test(reply);
+    return {reply, done:isDone};
   }
 
   return {store, handleChat};

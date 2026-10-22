@@ -551,7 +551,7 @@ app.post("/agent/chat", chatGuard, async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error("booking agent error:", e);
-    res.status(500).json({ error: "Booking agent failed", reply: "Sorry ji, thodi dikkat aa gayi." });
+    res.status(500).json({ error: "Booking agent failed", reply: "क्षमा कीजिए जी, थोड़ी तकनीकी दिक्कत आ गई। कृपया फिर से बताइए।" });
   }
 });
 
