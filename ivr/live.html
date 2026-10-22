@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroBridge — Gemini Live (Voice Booking)</title>
+<style>
+ :root{--saffron:#FF9933;--green:#138808;--ink:#111827;--muted:#6b7280;--bg:#0f1115}
+ *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;background:radial-gradient(1200px 600px at 50% -200px,#1a2332,#0f1115);color:#e5e7eb;min-height:100vh;display:flex;flex-direction:column}
+ .top{height:4px;background:linear-gradient(90deg,var(--saffron),#fff,var(--green))}
+ header{padding:16px;text-align:center}
+ header h1{margin:0;font-size:20px;font-weight:800;color:#fff} header p{color:#9ca3af;font-size:13px;margin:6px 0 0}
+ .wrap{max-width:560px;width:100%;margin:0 auto;padding:0 14px 18px;flex:1;display:flex;flex-direction:column}
+ .chat{flex:1;min-height:360px;max-height:55vh;overflow:auto;padding:14px;background:rgba(255,255,255,.06);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08);border-radius:18px}
+ .msg{max-width:88%;padding:10px 12px;border-radius:14px;margin:8px 0;font-size:15px;line-height:1.5}
+ .bot{background:rgba(19,136,8,.18);border-left:3px solid var(--green);color:#eaffea} .me{background:rgba(255,153,51,.16);border-right:3px solid var(--saffron);margin-left:auto;text-align:right;color:#fff7ed}
+ .sys{font-size:12px;color:#9ca3af;text-align:center;margin:6px 0}
+ .card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;margin:10px 0}
+ .row{display:flex;gap:8px;align-items:center}
+ input,select{height:42px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff;border-radius:10px;padding:0 12px;font-size:15px}
+ input::placeholder{color:#9ca3af} select option{color:#111}
+ .orb{width:140px;height:140px;border-radius:50%;margin:14px auto;display:grid;place-items:center;font-size:42px;background:radial-gradient(circle at 30% 30%,#2a6bff,#7c3aed);box-shadow:0 10px 40px rgba(124,58,237,.5);cursor:pointer;user-select:none;transition:transform .15s}
+ .orb.rec{animation:pulse 1.1s infinite; background:radial-gradient(circle at 30% 30%,#ff4d6d,#ff7a3d)}
+ .orb.idle{opacity:.9}
+ @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+ .status{font-size:13px;color:#cbd5e1;text-align:center;min-height:18px;margin-top:6px}
+ .hint{font-size:12px;color:#9ca3af;text-align:center;margin-top:8px}
+ .btn{height:42px;border:0;border-radius:10px;background:#111827;color:#fff;padding:0 14px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="top"></div>
+<header>
+  <h1>✦ Gemini Live — AgroBridge Booking</h1>
+  <p>Tap orb, speak naturally like Gemini app — it listens via Gemini, not browser</p>
+</header>
+<div class="wrap">
+  <div class="card row">
+    <select id="lang"><option value="hi">हिन्दी</option><option value="en">English</option></select>
+    <input id="phone" maxlength="10" value="9100000001" placeholder="10-digit mobile">
+    <span id="keyStatus" style="font-size:12px;color:#9ca3af"></span>
+  </div>
+  <div class="chat" id="chat"></div>
+  <div class="status" id="status">Tap orb to speak — एक बार टैप करें, बोलें, फिर टैप करें</div>
+  <div class="orb idle" id="orb">🎙️</div>
+  <div class="hint">Try: <em>गुरुग्राम में गेहूं 20 क्विंटल कल 10 बजे चाहिए</em> — one shot booking. Or type below.</div>
+  <div class="card row">
+    <input id="text" placeholder="Or type here and Send">
+    <button id="send" class="btn">Send</button>
+  </div>
+</div>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ const chat=$('chat'), status=$('status'), orb=$('orb'), text=$('text'), phoneEl=$('phone'), langEl=$('lang'), keyStatus=$('keyStatus');
+ let messages=[]; let mediaRecorder=null; let chunks=[]; let recording=false; let player=null;
+ const log=(c,t)=>{ const d=document.createElement('div'); d.className='msg '+c; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ function setStatus(t){ status.textContent=t; }
+ function setKeyStatus(){
+   fetch('/health').then(r=>r.json()).then(j=>{ keyStatus.textContent=j.gemini?'● Gemini ready':'● Rule-based (no key)'; }).catch(()=>{});
+ }
+ setKeyStatus();
+ function speak(txt){
+   return new Promise(res=>{
+     setStatus("🔊 Gemini बोल रहा है...");
+     const lang=langEl.value==='hi'?'hi':'en';
+     const clean=String(txt).slice(0,600);
+     const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(clean));
+     player=a; let done=false;
+     const finish=()=>{ if(done) return; done=true; try{a.pause();a.src='';}catch(e){} res(); setStatus("Tap orb to reply — फिर से टैप करके बोलें"); };
+     a.onended=finish; a.onerror=()=>fallback(clean,lang).then(finish);
+     const tmo=setTimeout(()=>{ if(!done) fallback(clean,lang).then(finish); }, 2500);
+     a.play().then(()=>clearTimeout(tmo)).catch(()=>{ clearTimeout(tmo); fallback(clean,lang).then(finish); });
+   });
+ }
+ function fallback(t,lang){
+   return new Promise(res=>{
+     if(!('speechSynthesis' in window)) return res();
+     const u=new SpeechSynthesisUtterance(t); u.lang=lang==='hi'?'hi-IN':'en-IN'; u.rate=0.96;
+     u.onend=res; u.onerror=res; speechSynthesis.speak(u); setTimeout(res,6500);
+   });
+ }
+ function stopAudio(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} }
+ async function sendText(content){
+   if(!content.trim()) return;
+   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10){ alert('10-digit phone डालें'); return; }
+   stopAudio(); log('me', content); messages.push({role:'user', content});
+   setStatus("… Gemini सोच रहा है");
+   try{
+     const r=await fetch('/agent/chat',{method:'POST',headers:{'Content-Type':'application/json','x-agb-key':'agb-dev-key'},body:JSON.stringify({messages, phone:p, lang:langEl.value})});
+     const j=await r.json();
+     const reply=j.reply||'क्षमा कीजिए जी, फिर से बताइए।';
+     messages.push({role:'assistant', content:reply}); log('bot', reply);
+     await speak(reply);
+     if(j.done) sys('✓ बुकिंग हो गई — Farmer Dashboard → My Tokens देखें');
+   }catch(e){ log('bot','नेटवर्क दिक्कत, फिर से बोलिए।'); setStatus("Tap orb to try again"); }
+ }
+ async function sendAudio(blob){
+   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10){ alert('10-digit phone डालें'); return; }
+   setStatus("… Gemini सुन रहा है, transcribe हो रहा है");
+   // show recording length
+   const buf=await blob.arrayBuffer();
+   const b64=btoa(String.fromCharCode(...new Uint8Array(buf)));
+   const mime=blob.type||'audio/webm';
+   try{
+     const r=await fetch('/live/audio',{method:'POST',headers:{'Content-Type':'application/json','x-agb-key':'agb-dev-key'},body:JSON.stringify({audioBase64:b64,mimeType:mime,phone:p,lang:langEl.value, messages})});
+     const j=await r.json();
+     if(j.transcript){ log('me', j.transcript); messages.push({role:'user', content:j.transcript}); }
+     else if(j.error){ log('bot', j.error); setStatus("फिर से tap करके बोलें"); return; }
+     const reply=j.reply||'क्षमा कीजिए जी, समझ नहीं आया।';
+     // if backend already pushed assistant message, sync it; else push now
+     if(j.reply && !messages.find(m=>m.content===reply)) messages.push({role:'assistant', content:reply});
+     log('bot', reply);
+     await speak(reply);
+     if(j.done) sys('✓ बुकिंग हो गई — Farmer Dashboard → My Tokens देखें');
+   }catch(e){
+     log('bot','Audio भेजने में दिक्कत — type करके भेजें।');
+     setStatus("Tap orb to try again or type");
+   }
+ }
+ async function toggleRecord(){
+   if(recording){
+     // stop
+     recording=false; orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️';
+     setStatus("… भेज रहा है");
+     try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){}
+     return;
+   }
+   // start
+   try{
+     const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+     chunks=[]; recording=true; orb.classList.remove('idle'); orb.classList.add('rec'); orb.textContent='⏹️'; setStatus("🎤 सुन रहा हूँ — बोलिए, फिर orb टैप करें");
+     mediaRecorder=new MediaRecorder(stream, {mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm'});
+     mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+     mediaRecorder.onstop=()=>{
+       const blob=new Blob(chunks, {type: mediaRecorder.mimeType||'audio/webm'});
+       stream.getTracks().forEach(t=>t.stop());
+       if(blob.size<800){ setStatus("कुछ सुनाई नहीं दिया — फिर से orb टैप करें"); orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️'; recording=false; return; }
+       orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️'; recording=false;
+       sendAudio(blob);
+     };
+     mediaRecorder.start(100);
+     // auto stop after 8s
+     setTimeout(()=>{ if(recording) toggleRecord(); }, 8000);
+   }catch(e){
+     setStatus("Mic blocked — lock icon में Allow करें या type करें");
+     orb.classList.remove('rec'); orb.classList.add('idle'); recording=false;
+   }
+ }
+ orb.onclick=toggleRecord;
+ $('send').onclick=()=>{ const v=text.value.trim(); if(v){ text.value=''; sendText(v);} };
+ text.onkeydown=e=>{ if(e.key==='Enter'){ const v=text.value.trim(); if(v){ text.value=''; sendText(v);} } };
+ langEl.onchange=()=>{ stopAudio(); messages=[]; chat.innerHTML=''; setStatus("Tap orb to start"); const g=langEl.value==='hi'?"नमस्ते जी! मैं एग्रोब्रिज Gemini Live हूँ। कौन सी मंडी में आना है?":"Hello! I'm AgroBridge Gemini Live. Which mandi?"; messages.push({role:'assistant', content:g}); log('bot',g); speak(g); };
+ // greet
+ (async()=>{
+   const g="नमस्ते जी! मैं एग्रोब्रिज Gemini Live हूँ। आप orb टैप करके बोलिए — मैं सीधे Gemini से सुन रहा हूँ, फिर बुक कर दूँगा।";
+   messages.push({role:'assistant', content:g}); log('bot', g); await speak(g);
+ })();
+})();
+</script>
+</body>
+</html>

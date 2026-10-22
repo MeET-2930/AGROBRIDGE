@@ -146,8 +146,8 @@ const bookingAgent = makeAiAgent({ db });
 
 const app = express();
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // Production web app (Firebase Hosting) calls /chat (and /call-me)
 // from the browser. Allow only that origin; preflight OPTIONS is
@@ -288,254 +288,9 @@ if (PROVIDER === "sim") {
 // Health
 // ---------------------------------------------------------------
 
-app.get("/health", (_, res) =>
-  res.send("ok")
-);
-
-// ---------------------------------------------------------------
-// Voice
-// ---------------------------------------------------------------
-
-app.post(
-  "/voice",
-  async (req, res, next) => {
-    // Missed-call booking:
-    // reject the call, then ring back after 3 seconds.
-    if (
-      req.query.step === "missedcall" &&
-      caller
-    ) {
-      const phone = String(
-        req.body.From || ""
-      );
-
-      setTimeout(
-        () =>
-          caller
-            .callMe(phone)
-            .catch((e) =>
-              console.error(
-                "callback failed",
-                e.message
-              )
-            ),
-        3000
-      );
-    }
-
-    return ivr.handleVoice(
-      req,
-      res,
-      next
-    );
-  }
-);
-
-// ---------------------------------------------------------------
-// Existing API authentication
-// ---------------------------------------------------------------
-
-function auth(req, res, next) {
-  if (
-    req.get("x-agb-key") !==
-    APP_SHARED_KEY
-  ) {
-    return res
-      .status(401)
-      .json({ error: "bad key" });
-  }
-
-  if (!caller) {
-    return res
-      .status(503)
-      .json({
-        error:
-          "telephony not configured",
-      });
-  }
-
-  next();
-}
-
-// Same shared-secret check as `auth`, but without the telephony
-// requirement - used by the chatbot endpoints. NOT strong
-// auth (the key ships in the client bundle). Opt-in: set
-// CHATBOT_REQUIRE_KEY=true once the app sends the header.
-// See README "Security limitations".
-const chatGuard = makeKeyGuard({
-  key: APP_SHARED_KEY,
-  enabled: requiredByEnv(),
-});
-
-// ---------------------------------------------------------------
-// Call farmer
-// ---------------------------------------------------------------
-
-app.post(
-  "/call-me",
-  auth,
-  async (req, res) => {
-    try {
-      const call = await caller.callMe(
-        req.body.phone,
-        req.body.lang
-      );
-
-      res.json({
-        ok: true,
-        sid: call.sid,
-      });
-    } catch (e) {
-      console.error(e);
-
-      res.status(500).json({
-        error: e.message,
-      });
-    }
-  }
-);
-
-// ---------------------------------------------------------------
-// Notify next farmer
-// ---------------------------------------------------------------
-
-app.post(
-  "/notify-next",
-  auth,
-  async (req, res) => {
-    try {
-      const {
-        centreId,
-        date,
-      } = req.body;
-
-      const b =
-        await ivr.store.nextWaitingBooking(
-          centreId,
-          date
-        );
-
-      if (!b) {
-        return res.json({
-          ok: true,
-          called: null,
-        });
-      }
-
-      // Don't call the same token twice
-      const ref = db
-        .collection("bookings")
-        .doc(b.tokenId);
-
-      if (b.reminderCallAt) {
-        return res.json({
-          ok: true,
-          called: null,
-          reason: "already",
-        });
-      }
-
-      const call =
-        await caller.callReminder(b);
-
-      await ref.set(
-        {
-          reminderCallAt:
-            new Date().toISOString(),
-          reminderCallSid:
-            call.sid,
-        },
-        { merge: true }
-      );
-
-      res.json({
-        ok: true,
-        called: b.tokenNumber,
-      });
-    } catch (e) {
-      console.error(e);
-
-      res.status(500).json({
-        error: e.message,
-      });
-    }
-  }
-);
-
-// ---------------------------------------------------------------
-// AI CHATBOT
-// ---------------------------------------------------------------
-
-app.post("/chat", chatGuard, async (req, res) => {
-  try {
-    const {
-      message,
-      phone,
-      history,
-      language,
-      sessionId,
-    } = req.body;
-
-    const result =
-      await chatbot.chat({
-        message,
-        phone,
-        history,
-        language,
-        sessionId,
-      });
-
-    res.json(result);
-  } catch (e) {
-    console.error(
-      "chatbot error:",
-      e
-    );
-
-    // Never echo internal error details (Gemini/SDK messages) to the client.
-    res.status(500).json({
-      error:
-        "Unable to get a response from AgroBridge Assistant",
-    });
-  }
-});
-
-// ---------------------------------------------------------------
-// TRANSLATE (display cache for the app's translated chat history)
-// ---------------------------------------------------------------
-
-app.post("/translate", chatGuard, async (req, res) => {
-  try {
-    const {
-      texts,
-      language,
-    } = req.body;
-
-    const result =
-      await chatbot.translateTexts({
-        texts,
-        language,
-      });
-
-    res.json(result);
-  } catch (e) {
-    console.error(
-      "translate error:",
-      e
-    );
-
-    // Never echo internal error details (Gemini/SDK messages) to the client.
-    res.status(500).json({
-      error:
-        "Unable to translate right now",
-    });
-  }
-});
-
-// ---------------------------------------------------------------
-// AI BOOKING AGENT (natural talk + books slot, keeps IVR)
-// ---------------------------------------------------------------
+app.get("/health", (_, res) => res.json({ ok: true, provider: process.env.PROVIDER||"sim", gemini: !!(process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY) }));
 app.get("/agent", (_, res) => res.sendFile(path.join(__dirname, "agent.html")));
+app.get("/agent-simple", (_, res) => res.sendFile(path.join(__dirname, "agent-simple.html")));
 app.get("/gemini-voice", (_, res) => res.sendFile(path.join(__dirname, "gemini-voice.html")));
 app.post("/agent/chat", chatGuard, async (req, res) => {
   try {
@@ -553,6 +308,44 @@ app.post("/agent/chat", chatGuard, async (req, res) => {
   } catch (e) {
     console.error("booking agent error:", e);
     res.status(500).json({ error: "Booking agent failed", reply: "क्षमा कीजिए जी, थोड़ी तकनीकी दिक्कत आ गई। कृपया फिर से बताइए।" });
+  }
+});
+
+app.get("/live", (_, res) => res.sendFile(path.join(__dirname, "live.html")));
+
+// Gemini Live audio -> transcribe via Gemini then book via same ai-agent
+app.post("/live/audio", chatGuard, async (req, res) => {
+  try {
+    const { audioBase64, mimeType, phone, lang, messages } = req.body;
+    if (!audioBase64) return res.status(400).json({ error: "No audio" });
+    const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+    let transcript = "";
+    if (GEMINI_KEY) {
+      try {
+        const { GoogleGenerativeAI } = require("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent([
+          { text: "Transcribe this farmer audio exactly in the language spoken (Hindi/English). Output ONLY the transcription, no extra words. If silence, output empty string." },
+          { inlineData: { data: audioBase64, mimeType: mimeType || "audio/webm" } }
+        ]);
+        transcript = (result.response.text() || "").trim();
+      } catch (e) {
+        console.error("gemini transcribe failed", e.message);
+      }
+    }
+    if (!transcript) {
+      // fallback: if no transcript, ask to type
+      return res.json({ transcript: "", reply: lang==="hi" ? "सुनाई नहीं दिया जी, फिर से बोलिए या type कर दीजिए।" : "Didn't catch that, please speak again or type.", done: false });
+    }
+    // call same booking agent with transcript as user message
+    let msgs = Array.isArray(messages) ? [...messages] : [];
+    msgs.push({ role: "user", content: transcript });
+    const result2 = await bookingAgent.handleChat({ messages: msgs, phone: phone || "9100000001", lang: lang || "hi" });
+    res.json({ transcript, reply: result2.reply, done: result2.done });
+  } catch (e) {
+    console.error("live/audio error", e);
+    res.status(500).json({ error: "Live audio failed", reply: "क्षमा कीजिए जी, दिक्कत आ गई। type करके भेजिए।" });
   }
 });
 
