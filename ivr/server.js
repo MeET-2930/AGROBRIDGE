@@ -536,6 +536,7 @@ app.post("/translate", chatGuard, async (req, res) => {
 // AI BOOKING AGENT (natural talk + books slot, keeps IVR)
 // ---------------------------------------------------------------
 app.get("/agent", (_, res) => res.sendFile(path.join(__dirname, "agent.html")));
+app.get("/gemini-voice", (_, res) => res.sendFile(path.join(__dirname, "gemini-voice.html")));
 app.post("/agent/chat", chatGuard, async (req, res) => {
   try {
     const { messages, phone, lang, language } = req.body;

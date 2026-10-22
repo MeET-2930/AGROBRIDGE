@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroBridge — Gemini Voice Bot</title>
+<style>
+ :root{--saffron:#FF9933;--green:#138808;--ink:#111827;--muted:#6b7280}
+ *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;background:#f9fafb;color:var(--ink);display:flex;flex-direction:column;min-height:100vh}
+ .strip{height:5px;width:100%} .top{background:var(--saffron)} .bottom{background:var(--green);margin-top:auto}
+ header{padding:16px;text-align:center} header h1{margin:0;font-size:22px} header p{color:var(--muted);font-size:13px}
+ .wrap{max-width:520px;width:100%;margin:0 auto;padding:0 14px;flex:1;display:flex;flex-direction:column}
+ .chat{flex:1;min-height:380px;max-height:55vh;overflow:auto;padding:12px;background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+ .msg{max-width:85%;padding:10px 12px;border-radius:14px;margin:8px 0;font-size:15px;line-height:1.5}
+ .bot{background:#e8f5e9;border-left:3px solid var(--green)} .me{background:#fff3e0;border-right:3px solid var(--saffron);margin-left:auto;text-align:right}
+ .btn{width:100%;height:60px;border:0;border-radius:14px;font-size:18px;font-weight:800;color:#fff;cursor:pointer}
+ .talk{background:var(--green)} .stop{background:#dc2626} .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="strip top"></div>
+<header>
+  <h1>🎤 Gemini Voice Bot — बोलो, जवाब सुनेगा</h1>
+  <p>Simple Gemini — no booking logic, just talks like a normal person in clear Hindi</p>
+</header>
+<div class="wrap">
+  <div class="chat" id="chat"></div>
+  <button id="mic" class="btn talk">🎤 बात शुरू करें — Tap & Speak</button>
+  <div class="hint">Allow mic → speak Hindi → Gemini replies with Swara voice. For booking, say “मुझे गुरुग्राम में गेहूं 20 क्विंटल बुक करना है”</div>
+</div>
+<div class="strip bottom"></div>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ const chat=$('chat'), mic=$('mic');
+ let rec=null, player=null, speaking=false;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const log=(c,t)=>{ const d=document.createElement('div'); d.className='msg '+c; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ function speak(t){
+   return new Promise(res=>{
+     speaking=true; mic.textContent="🔊 बोल रहा है..."; mic.className="btn stop";
+     const a=new Audio('/tts?lang=hi&text='+encodeURIComponent(String(t).slice(0,600)));
+     player=a; let done=false; const fin=()=>{ if(done) return; done=true; speaking=false; mic.textContent="🎤 बात शुरू करें — Tap & Speak"; mic.className="btn talk"; a.pause(); try{a.src='';}catch(e){} res(); };
+     a.onended=fin; a.onerror=()=>{ const u=new SpeechSynthesisUtterance(t); u.lang='hi-IN'; u.onend=fin; u.onerror=fin; speechSynthesis.speak(u); setTimeout(fin,7000); };
+     a.play().catch(()=>{ const u=new SpeechSynthesisUtterance(t); u.lang='hi-IN'; u.onend=fin; u.onerror=fin; speechSynthesis.speak(u); });
+     setTimeout(fin, 9000);
+   });
+ }
+ async function askGemini(text){
+   log('me', text);
+   try{
+     const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json','x-agb-key':'agb-dev-key'},body:JSON.stringify({message:text, phone:'9100000001', language:'hi'})});
+     const j=await r.json();
+     const reply=j.reply || j.error || 'क्षमा कीजिए, फिर से बोलिए जी।';
+     log('bot', reply);
+     await speak(reply);
+   }catch(e){ log('bot','नेटवर्क दिक्कत जी।'); }
+ }
+ function start(){
+   if(speaking) return;
+   if(!SR){ const t=prompt("Mic not supported, type here:"); if(t) askGemini(t); return; }
+   try{ if(rec) rec.abort(); }catch(e){}
+   rec=new SR(); rec.lang='hi-IN'; rec.interimResults=false; rec.continuous=false;
+   rec.onstart=()=>{ mic.textContent="🎤 सुन रहा हूँ... बोलिए"; mic.className="btn stop"; };
+   rec.onend=()=>{ mic.textContent="🎤 बात शुरू करें — Tap & Speak"; mic.className="btn talk"; };
+   rec.onerror=()=>{ mic.textContent="🎤 बात शुरू करें — Tap & Speak"; mic.className="btn talk"; };
+   rec.onresult=e=>{ const t=e.results[0][0].transcript||''; if(t.trim()) askGemini(t); };
+   try{ rec.start(); }catch(e){}
+ }
+ mic.onclick=start;
+ // greet
+ (async()=>{ const g="नमस्ते जी! मैं एग्रोब्रिज का Gemini बॉट हूँ। आप मुझसे मंडी, फसल या बुकिंग के बारे में कुछ भी पूछ सकते हैं। बोलिए जी!"; log('bot',g); await speak(g); })();
+})();
+</script>
+</body>
+</html>
