@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AgroBridge — AI Booking Agent</title>
+<title>AgroBridge — AI Booking Agent (Call)</title>
 <style>
  :root{--saffron:#FF9933;--green:#138808;--ink:#111827;--muted:#6b7280;--bg:#f9fafb}
  *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100vh}
@@ -19,99 +19,117 @@
  .msg{max-width:86%;padding:10px 12px;border-radius:14px;margin:8px 0;font-size:15px;line-height:1.45}
  .bot{background:#e8f5e9;border-left:3px solid var(--green)} .me{background:#fff3e0;border-right:3px solid var(--saffron);margin-left:auto;text-align:right}
  .sys{font-size:12px;color:var(--muted);text-align:center;margin:6px 0}
- .mic{width:68px;height:68px;border-radius:50%;border:0;color:#fff;font-size:26px;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,.2)}
- .idle{background:var(--green)} .listen{background:#dc2626;animation:pulse 1.2s infinite}
- @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
- .btn{height:42px;border:0;border-radius:12px;padding:0 16px;font-weight:700;cursor:pointer}
- .send{background:var(--ink);color:#fff} .grey{background:#e5e7eb}
+ .callbtn{width:100%;height:56px;border:0;border-radius:14px;font-size:18px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+ .idle{background:var(--green)} .active{background:#dc2626;animation:pulse 1.2s infinite} .listening{box-shadow:0 0 0 4px rgba(220,38,38,.25)}
+ @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+ .status{font-size:13px;color:var(--muted);text-align:center;min-height:18px}
 </style>
 </head>
 <body>
 <div class="strip top"></div>
 <header>
-  <h1>AgroBridge AI Agent <span style="font-weight:400">— talks like a person</span></h1>
-  <p>IVR is still there. This AI agent is extra — speak naturally, it books the slot.</p>
+  <h1>AgroBridge AI Agent — Continuous Call</h1>
+  <p>Tap Call, talk like a phone call — it listens automatically after every reply.</p>
 </header>
 <div class="wrap">
   <div class="card row">
     <select id="lang"><option value="hi">हिन्दी</option><option value="en">English</option></select>
-    <input id="phone" placeholder="10-digit mobile (farmer)" maxlength="10" value="9100000001">
-    <button class="btn grey" id="clear">Clear</button>
+    <input id="phone" placeholder="10-digit mobile" maxlength="10" value="9100000001">
   </div>
   <div class="chat" id="chat"></div>
+  <div class="status" id="status">Tap Call to start</div>
   <div class="card">
-    <div class="row" style="justify-content:center;gap:16px">
-      <button id="mic" class="mic idle">🎤</button>
-      <div style="flex:1">
-        <div class="row">
-          <input id="text" placeholder="Type or speak — e.g. 'Gurugram me gehu 20 quintal kal subah'">
-          <button id="send" class="btn send">Send</button>
-        </div>
-        <div class="hint">Tap mic and speak naturally. Example: <em>"Mujhe Karnal me sarson 15 quintal parson 10 baje chahiye"</em></div>
-      </div>
+    <button id="callBtn" class="callbtn idle">📞 Call — बात शुरू करें</button>
+    <div class="hint">After you speak, it auto-sends. After it speaks, it auto-listens — just like a real call. Say <em>"गुरुग्राम में गेहूं 20 क्विंटल"</em> etc. To type instead, use the box below.</div>
+    <div class="row" style="margin-top:10px">
+      <input id="text" placeholder="Or type here and press Send">
+      <button id="send" class="callbtn" style="width:80px;height:42px;font-size:15px;background:var(--ink)">Send</button>
     </div>
-    <p class="hint">Voice uses browser mic + <code>/tts</code> female Hindi (Swara) — same as IVR. No API key needed for demo. Add <code>OPENAI_API_KEY</code> on Render for smarter chat.</p>
   </div>
 </div>
 <div class="strip bottom"></div>
 <script>
 (function(){
  const $=id=>document.getElementById(id);
- const chat=$('chat'), mic=$('mic'), text=$('text'), phoneEl=$('phone'), langEl=$('lang');
- let messages=[]; let speaking=false; let player=null;
+ const chat=$('chat'), status=$('status'), callBtn=$('callBtn'), text=$('text'), phoneEl=$('phone'), langEl=$('lang');
+ let messages=[]; let inCall=false; let isSpeaking=false; let rec=null; let player=null;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  const log=(cls,t)=>{ const d=document.createElement('div'); d.className='msg '+cls; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
  const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ function setStatus(t){ status.textContent=t; }
  function speak(txt){
-   const lang=langEl.value==='hi'?'hi':'en';
-   if(txt.length>600) txt=txt.slice(0,600);
-   const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(txt));
-   player=a; speaking=true;
-   a.onended=()=>speaking=false; a.onerror=()=>{ speaking=false; fallbackSpeak(txt,lang); };
-   a.play().catch(()=>fallbackSpeak(txt,lang));
+   return new Promise(res=>{
+     isSpeaking=true; callBtn.classList.add("listening"); setStatus("🔊 बोल रही है...");
+     const lang=langEl.value==='hi'?'hi':'en';
+     const clean=String(txt).slice(0,600);
+     // try server TTS first (Swara), fallback to browser
+     const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(clean));
+     player=a;
+     let done=false; const finish=()=>{ if(done) return; done=true; isSpeaking=false; callBtn.classList.remove("listening"); a.pause(); try{a.src='';}catch(e){} res(); if(inCall) setTimeout(startListen, 400); };
+     a.onended=finish; a.onerror=()=>{ fallbackSpeak(clean, lang).then(finish); }; a.onplaying=()=>{};
+     const tmo=setTimeout(()=>{ if(!done) fallbackSpeak(clean,lang).then(finish); }, 8000);
+     a.play().then(()=>{ clearTimeout(tmo); }).catch(()=>{ clearTimeout(tmo); fallbackSpeak(clean,lang).then(finish); });
+     // if audio actually plays, finish on ended; else fallback
+     a.addEventListener('ended', ()=>{ clearTimeout(tmo); finish(); });
+   });
  }
- function fallbackSpeak(t,lang){
-   try{ const u=new SpeechSynthesisUtterance(t); u.lang=lang==='hi'?'hi-IN':'en-IN'; speechSynthesis.speak(u);}catch(e){}
+ function fallbackSpeak(t, lang){
+   return new Promise(res=>{
+     if(!('speechSynthesis' in window)) return res();
+     const u=new SpeechSynthesisUtterance(t); u.lang=lang==='hi'?'hi-IN':'en-IN'; u.rate=0.95;
+     u.onend=res; u.onerror=res; speechSynthesis.speak(u);
+     setTimeout(res, 8000);
+   });
  }
- function stopSpeak(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} speaking=false; }
+ function stopAll(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} try{ if(rec){rec.abort();} }catch(e){} isSpeaking=false; }
  async function send(content){
    if(!content.trim()) return;
-   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10) return alert('Enter 10-digit phone');
-   log('me',content); text.value='';
+   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10) { alert('10-digit phone डालें'); return; }
+   log('me',content); 
    messages.push({role:'user', content});
-   sys('…'); 
+   setStatus("…");
    try{
-     const r=await fetch('/agent/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages, phone:p, lang:langEl.value})});
+     const r=await fetch('/agent/chat',{method:'POST',headers:{'Content-Type':'application/json','x-agb-key':'agb-dev-key'},body:JSON.stringify({messages, phone:p, lang:langEl.value})});
      const j=await r.json();
-     chat.lastChild.remove();
-     const reply=j.reply||'Sorry ji, phir boliye.';
+     const reply=j.reply||'क्षमा कीजिए जी, फिर से बताइए।';
      messages.push({role:'assistant', content:reply});
-     log('bot',reply); speak(reply);
-     if(j.done) sys('✓ Booking done — check Farmer Dashboard with this phone.');
-   }catch(e){ chat.lastChild.remove(); log('bot','Network error — try again.'); }
+     log('bot',reply);
+     await speak(reply);
+     if(j.done) { sys('✓ बुकिंग हो गई — Farmer Dashboard में देखें'); }
+     else if(!inCall) setStatus("Type or tap Call to continue");
+   }catch(e){ log('bot','नेटवर्क दिक्कत, फिर से बोलिए।'); if(inCall) setTimeout(startListen, 800); }
  }
- $('send').onclick=()=>send(text.value);
- text.onkeydown=e=>{ if(e.key==='Enter') send(text.value); };
- $('clear').onclick=()=>{ messages=[]; chat.innerHTML=''; stopSpeak(); greet(); };
- function greet(){
-   const g=langEl.value==='hi' ? 'Namaste ji! Main AgroBridge AI hun — normal insaan ki tarah baat karti hun. Kaunsi mandi aur kaunsi fasal leke aana hai?' : 'Hello! I am AgroBridge AI — I talk like a person. Which mandi and which crop do you want to book?';
-   messages=[{role:'assistant', content:g}]; log('bot',g); // don't auto-speak greet to avoid noise
+ function startListen(){
+   if(!inCall || isSpeaking) return;
+   if(!SR){ setStatus("Mic not supported — type instead"); return; }
+   try{ if(rec) rec.abort(); }catch(e){}
+   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=false; rec.continuous=false; rec.maxAlternatives=1;
+   rec.onstart=()=>{ setStatus("🎤 सुन रही हूँ... बोलिए"); callBtn.classList.add("listening"); };
+   rec.onend=()=>{ callBtn.classList.remove("listening"); if(inCall && !isSpeaking) setStatus("सुनना बंद — फिर से Call दबाएँ या बोलें"); };
+   rec.onerror=e=>{
+     if(e.error==='not-allowed') { setStatus("Mic blocked — lock icon में Allow करें"); inCall=false; callBtn.textContent="📞 Call — बात शुरू करें"; callBtn.className="callbtn idle"; }
+     else if(inCall && !isSpeaking) setTimeout(startListen, 800);
+   };
+   rec.onresult=e=>{
+     const t=e.results[0][0].transcript||''; if(t.trim()) { setStatus("आपने कहा: "+t); send(t); } else if(inCall) setTimeout(startListen, 500);
+   };
+   try{ rec.start(); }catch(e){ setStatus("Mic start failed — type करें"); }
  }
- // mic
- const SR=window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null;
- function startMic(){
-   if(!SR) return alert('Mic not supported in this browser — type instead.');
-   if(rec) try{rec.abort()}catch(e){}
-   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=false; rec.continuous=false;
-   rec.onstart=()=>{ mic.className='mic listen'; mic.textContent='●'; };
-   rec.onend=()=>{ mic.className='mic idle'; mic.textContent='🎤'; };
-   rec.onerror=e=>{ mic.className='mic idle'; mic.textContent='🎤'; if(e.error==='not-allowed') alert('Allow mic in address bar lock icon.'); };
-   rec.onresult=e=>{ const t=e.results[0][0].transcript||''; if(t) send(t); };
-   try{rec.start();}catch(e){}
- }
- mic.onclick=()=>{ stopSpeak(); if(mic.classList.contains('listen')){ try{rec.abort()}catch(e){} mic.className='mic idle'; mic.textContent='🎤'; } else startMic(); };
- langEl.onchange=()=>{ messages=[]; chat.innerHTML=''; greet(); };
- greet();
+ callBtn.onclick=()=>{
+   if(!inCall){
+     inCall=true; callBtn.textContent="🔴 End Call — कॉल बंद करें"; callBtn.className="callbtn active";
+     messages=[]; chat.innerHTML='';
+     const greet=langEl.value==='hi'?"नमस्ते जी! मैं एग्रोब्रिज एआई हूँ। कौन सी मंडी में आना है जी?":"Hello! I'm AgroBridge AI. Which mandi do you want to book?";
+     messages.push({role:'assistant', content:greet}); log('bot',greet);
+     speak(greet);
+   } else {
+     inCall=false; stopAll(); callBtn.textContent="📞 Call — बात शुरू करें"; callBtn.className="callbtn idle"; setStatus("Call ended — tap Call to start again");
+   }
+ };
+ $('send').onclick=()=>{ const v=text.value.trim(); if(v){ text.value=''; send(v);} };
+ text.onkeydown=e=>{ if(e.key==='Enter'){ const v=text.value.trim(); if(v){ text.value=''; send(v);} } };
+ langEl.onchange=()=>{ if(inCall){ inCall=false; stopAll(); callBtn.textContent="📞 Call — बात शुरू करें"; callBtn.className="callbtn idle"; } messages=[]; chat.innerHTML=''; setStatus("Tap Call to start"); };
 })();
 </script>
 </body>
