@@ -66,9 +66,9 @@
      // try server TTS first (Swara), fallback to browser
      const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(clean));
      player=a;
-     let done=false; const finish=()=>{ if(done) return; done=true; isSpeaking=false; callBtn.classList.remove("listening"); a.pause(); try{a.src='';}catch(e){} res(); if(inCall) setTimeout(startListen, 400); };
+     let done=false; const finish=()=>{ if(done) return; done=true; isSpeaking=false; callBtn.classList.remove("listening"); a.pause(); try{a.src='';}catch(e){} res(); if(inCall) setTimeout(startListen, 8000); };
      a.onended=finish; a.onerror=()=>{ fallbackSpeak(clean, lang).then(finish); }; a.onplaying=()=>{};
-     const tmo=setTimeout(()=>{ if(!done) fallbackSpeak(clean,lang).then(finish); }, 8000);
+     const tmo=setTimeout(()=>{ if(!done) fallbackSpeak(clean,lang).then(finish); }, 8000); // 8s gap
      a.play().then(()=>{ clearTimeout(tmo); }).catch(()=>{ clearTimeout(tmo); fallbackSpeak(clean,lang).then(finish); });
      // if audio actually plays, finish on ended; else fallback
      a.addEventListener('ended', ()=>{ clearTimeout(tmo); finish(); });
@@ -104,12 +104,13 @@
  }
  function scheduleRepeat(txt){ clearTimeout(repeatTimer); if(!inCall) return; repeatTimer=setTimeout(()=>{ if(inCall && !isSpeaking && !recActive){ speak(txt); } }, 8000); }
  function startListen(){
-   if(!inCall || isSpeaking) return;
+   if(!inCall) return; // listen even while speaking - will filter TTS echo
+   if(isSpeaking) { setTimeout(startListen, 500); return; }
    if(!SR){ setStatus("Mic not supported — type instead"); return; }
    try{ if(rec) rec.abort(); }catch(e){}
-   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=false; rec.continuous=false; rec.maxAlternatives=1;
-   rec.onstart=()=>{ recActive=true; setStatus("🎤 सुन रही हूँ... बोलिए"); callBtn.classList.add("listening"); };
-   rec.onend=()=>{ recActive=false; callBtn.classList.remove("listening"); if(inCall && !isSpeaking) setStatus("सुनना बंद — 8 सेकंड में दोहराएगी"); };
+   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=true; rec.continuous=true; rec.maxAlternatives=1;
+   rec.onstart=()=>{ recActive=true; setStatus("🎤 हमेशा सुन रही हूँ — बोलते रहिए"); callBtn.classList.add("listening"); };
+   rec.onend=()=>{ recActive=false; callBtn.classList.remove("listening"); if(inCall){ setStatus("🎤 हमेशा सुन रही हूँ... बोलिए"); setTimeout(()=>{ if(inCall && !isSpeaking) startListen(); }, 300); } };
    rec.onerror=e=>{ recActive=false;
    if(e.error==='not-allowed') { setStatus("Mic blocked — lock icon में Allow करें"); inCall=false; callBtn.textContent="📞 Call — बात शुरू करें"; callBtn.className="callbtn idle"; }
      else if(inCall && !isSpeaking) setTimeout(startListen, 1200);
