@@ -45,10 +45,8 @@ services:
       # EAS); until then "false" keeps current clients working.
       - key: CHATBOT_REQUIRE_KEY
         value: "false"
-      # Server-side kill switch for real chat bookings. Disabled by default
-      # (value: "false"). Set to "true" only in the intended demo environment
-      # once Firebase identity verification is in place and the deployment
-      # is trusted. This flag must be explicitly set in Render; it is NEVER
-      # on by default (see ivr/chatbot.js CHATBOT_ALLOW_BOOKING).
+      # Enable the already-implemented, explicitly-confirmed booking flow for
+      # the demo deployment. Keep this as an explicit server-side flag so it
+      # can be disabled immediately if the demo environment is not trusted.
       - key: CHATBOT_ALLOW_BOOKING
-        value: "false"
+        value: "true"
