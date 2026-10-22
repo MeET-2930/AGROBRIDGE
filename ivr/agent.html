@@ -53,7 +53,7 @@
 (function(){
  const $=id=>document.getElementById(id);
  const chat=$('chat'), status=$('status'), callBtn=$('callBtn'), text=$('text'), phoneEl=$('phone'), langEl=$('lang');
- let messages=[]; let inCall=false; let isSpeaking=false; let rec=null; let player=null; let repeatTimer=null;
+ let messages=[]; let inCall=false; let isSpeaking=false; let rec=null; let player=null; let repeatTimer=null; let recActive=false;
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  const log=(cls,t)=>{ const d=document.createElement('div'); d.className='msg '+cls; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
  const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
@@ -102,17 +102,17 @@
      else if(!inCall) setStatus("Type or tap Call to continue");
    }catch(e){ log('bot','नेटवर्क दिक्कत, फिर से बोलिए।'); if(inCall) setTimeout(startListen, 800); }
  }
- function scheduleRepeat(txt){ clearTimeout(repeatTimer); if(!inCall) return; repeatTimer=setTimeout(()=>{ if(inCall && !isSpeaking){ speak(txt); } }, 5000); }
+ function scheduleRepeat(txt){ clearTimeout(repeatTimer); if(!inCall) return; repeatTimer=setTimeout(()=>{ if(inCall && !isSpeaking && !recActive){ speak(txt); } }, 8000); }
  function startListen(){
    if(!inCall || isSpeaking) return;
    if(!SR){ setStatus("Mic not supported — type instead"); return; }
    try{ if(rec) rec.abort(); }catch(e){}
    rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=false; rec.continuous=false; rec.maxAlternatives=1;
-   rec.onstart=()=>{ setStatus("🎤 सुन रही हूँ... बोलिए"); callBtn.classList.add("listening"); };
-   rec.onend=()=>{ callBtn.classList.remove("listening"); if(inCall && !isSpeaking) setStatus("सुनना बंद — फिर से Call दबाएँ या बोलें"); };
-   rec.onerror=e=>{
-     if(e.error==='not-allowed') { setStatus("Mic blocked — lock icon में Allow करें"); inCall=false; callBtn.textContent="📞 Call — बात शुरू करें"; callBtn.className="callbtn idle"; }
-     else if(inCall && !isSpeaking) setTimeout(startListen, 800);
+   rec.onstart=()=>{ recActive=true; setStatus("🎤 सुन रही हूँ... बोलिए"); callBtn.classList.add("listening"); };
+   rec.onend=()=>{ recActive=false; callBtn.classList.remove("listening"); if(inCall && !isSpeaking) setStatus("सुनना बंद — 8 सेकंड में दोहराएगी"); };
+   rec.onerror=e=>{ recActive=false;
+   if(e.error==='not-allowed') { setStatus("Mic blocked — lock icon में Allow करें"); inCall=false; callBtn.textContent="📞 Call — बात शुरू करें"; callBtn.className="callbtn idle"; }
+     else if(inCall && !isSpeaking) setTimeout(startListen, 1200);
    };
    rec.onresult=e=>{
      const t=e.results[0][0].transcript||''; if(t.trim()) { setStatus("आपने कहा: "+t); send(t); } else if(inCall) setTimeout(startListen, 500);

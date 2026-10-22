@@ -149,11 +149,21 @@ function extractFromText(text, centres){
   }
   const qMatch=raw.match(/(\d{1,3})\s*(q|quintal|kuntal|bori|क्विंटल)?/);
   const quantity=qMatch?Number(qMatch[1]):null;
+  let date=null;
   const dateMatch=raw.match(/(\d{4}-\d{2}-\d{2})/);
-  // spoken dates like "kal", "parson", "आज", "कल" -> map to actual dates (handled in ruleBasedReply, keep raw)
-  const slotMatch=raw.match(/(\d{1,2})\s*[:\-]?\s*00/) || raw.match(/(\d{1,2})\s*baje/);
+  if(dateMatch) date=dateMatch[1];
+  else {
+    // Hindi relative dates
+    const ist=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
+    const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    if(raw.includes("परसों") || raw.includes("parso")) { const d=new Date(ist); d.setDate(d.getDate()+2); date=fmt(d); }
+    else if(raw.includes("कल") || raw.includes("kal")) { const d=new Date(ist); d.setDate(d.getDate()+1); date=fmt(d); }
+    else if(raw.includes("आज") || raw.includes("aaj")) { date=fmt(ist); }
+    else if(raw.includes("नरसों") || raw.includes("narso")) { const d=new Date(ist); d.setDate(d.getDate()+3); date=fmt(d); }
+  }
+  const slotMatch=raw.match(/(\d{1,2})\s*[:\-]?\s*00/) || raw.match(/(\d{1,2})\s*baje/) || raw.match(/(\d{1,2})\s*बजे/);
   const slot=slotMatch?`${String(slotMatch[1]).padStart(2,"0")}:00`:null;
-  return {centreId,crop,quantity,slot, date: dateMatch?dateMatch[1]:null};
+  return {centreId,crop,quantity,slot, date};
 }
 async function ruleBasedReply({messages, phone, store, lang}){
   const centres=await store.fetchCentres();
@@ -199,10 +209,11 @@ async function ruleBasedReply({messages, phone, store, lang}){
       ? `वाह जी, ${extracted.date} को ये स्लॉट खाली हैं: ${slotList}। कौन सा समय चाहिए?`
       : `${extracted.date} has these free: ${slotList}. Which time slot?`;
   }
-  // all collected -> ask confirm if last message not confirming
+  // all collected -> if user said everything in one go and is asking to book, auto-confirm if they said "chahiye" or gave slot
   const last=lastUser.toLowerCase();
-  const isConfirm = /(ha|yes|confirm|kar do|book|theek|ok)/.test(last);
-  if(!isConfirm){
+  const isConfirm = /(ha|yes|confirm|kar do|book|theek|ok|chahiye|कर.*दो|बुक)/.test(last);
+  const isOneShot = extracted.centreId && extracted.crop && extracted.quantity && extracted.date && extracted.slot && /(chahiye|चाहिए|book|करो)/.test(last);
+  if(!isConfirm && !isOneShot){
     return lang==="hi"
       ? `तो कन्फर्म करूं जी — ${centre.name||centre.id}, ${extracted.crop}, ${extracted.quantity} क्विंटल, ${extracted.date} ${extracted.slot} वाली स्लॉट? हाँ बोलिए तो बुक कर देता हूँ।`
       : `Confirm — ${centre.name||centre.id}, ${extracted.crop}, ${extracted.quantity} quintals, ${extracted.date} ${extracted.slot}? Say yes to book.`;
