@@ -119,30 +119,48 @@
      setStatus("Tap orb to try again or type");
    }
  }
+ let srTranscript=""; let recSR=null;
  async function toggleRecord(){
    if(recording){
-     // stop
      recording=false; orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️';
      setStatus("… भेज रहा है");
      try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){}
+     try{ if(recSR) recSR.stop(); }catch(e){}
      return;
    }
-   // start
+   srTranscript="";
    try{
      const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
      chunks=[]; recording=true; orb.classList.remove('idle'); orb.classList.add('rec'); orb.textContent='⏹️'; setStatus("🎤 सुन रहा हूँ — बोलिए, फिर orb टैप करें");
+     // start Web Speech in parallel for instant Hindi
+     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+     if(SR){
+       recSR=new SR(); recSR.lang=langEl.value==='hi'?'hi-IN':'en-IN'; recSR.interimResults=false; recSR.continuous=false;
+       recSR.onresult=e=>{ srTranscript=(e.results[0]&&e.results[0][0]&&e.results[0][0].transcript)||""; };
+       recSR.onerror=()=>{};
+       try{ recSR.start(); }catch(e){}
+     }
      mediaRecorder=new MediaRecorder(stream, {mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm'});
      mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
      mediaRecorder.onstop=()=>{
-       const blob=new Blob(chunks, {type: mediaRecorder.mimeType||'audio/webm'});
        stream.getTracks().forEach(t=>t.stop());
-       if(blob.size<800){ setStatus("कुछ सुनाई नहीं दिया — फिर से orb टैप करें"); orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️'; recording=false; return; }
-       orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️'; recording=false;
-       sendAudio(blob);
+       try{ if(recSR) recSR.stop(); }catch(e){}
+       const blob=new Blob(chunks, {type: mediaRecorder.mimeType||'audio/webm'});
+       // prefer browser transcript if Gemini would fail or is empty — fixes repeat of first line
+       setTimeout(()=>{
+         orb.classList.remove('rec'); orb.classList.add('idle'); orb.textContent='🎙️'; recording=false;
+         if(srTranscript && srTranscript.trim().length>2){
+           setStatus("आपने कहा: "+srTranscript);
+           sendText(srTranscript.trim());
+         } else if(blob.size>800){
+           sendAudio(blob);
+         } else {
+           setStatus("कुछ सुनाई नहीं दिया — फिर से orb टैप करें या type करें");
+         }
+       }, 400);
      };
      mediaRecorder.start(100);
-     // auto stop after 8s
-     setTimeout(()=>{ if(recording) toggleRecord(); }, 8000);
+     setTimeout(()=>{ if(recording) toggleRecord(); }, 7500);
    }catch(e){
      setStatus("Mic blocked — lock icon में Allow करें या type करें");
      orb.classList.remove('rec'); orb.classList.add('idle'); recording=false;
