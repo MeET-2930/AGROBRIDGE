@@ -24,6 +24,7 @@ const path = require("path");
 
 const { makeIvr, makeCaller } = require("./ivr-core");
 const { createChatbot } = require("./chatbot");
+const { makeRetellWebhook } = require("./retell");
 const { makeAiAgent } = require("./ai-agent");
 const { parseServiceAccount } = require("./firebase-credential");
 const { makeKeyGuard, requiredByEnv } = require("./key-guard");
@@ -136,6 +137,7 @@ console.log(
 // ---------------------------------------------------------------
 
 const chatbot = createChatbot({ db });
+const retellWebhook = makeRetellWebhook({ db });
 const bookingAgent = makeAiAgent({ db });
 
 // ---------------------------------------------------------------
@@ -552,6 +554,10 @@ app.post("/agent/chat", chatGuard, async (req, res) => {
     res.status(500).json({ error: "Booking agent failed", reply: "Sorry ji, thodi dikkat aa gayi." });
   }
 });
+
+// Retell AI webhook (booking capable) — free, no key, talk like human
+app.post("/retell/webhook", async (req,res)=> retellWebhook.handleWebhook(req,res));
+app.get("/retell/test", (_,res)=> res.json({ok:true, message:"Retell webhook is live. POST /retell/webhook with {function_name, arguments}"}));
 
 // A malformed JSON body must not surface an Express stack trace.
 app.use((err, req, res, next) => {
