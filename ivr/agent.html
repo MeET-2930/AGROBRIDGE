@@ -53,7 +53,7 @@
 (function(){
  const $=id=>document.getElementById(id);
  const chat=$('chat'), status=$('status'), callBtn=$('callBtn'), text=$('text'), phoneEl=$('phone'), langEl=$('lang');
- let messages=[]; let inCall=false; let isSpeaking=false; let rec=null; let player=null;
+ let messages=[]; let inCall=false; let isSpeaking=false; let rec=null; let player=null; let repeatTimer=null;
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  const log=(cls,t)=>{ const d=document.createElement('div'); d.className='msg '+cls; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
  const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
@@ -86,6 +86,7 @@
  async function send(content){
    if(!content.trim()) return;
    const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10) { alert('10-digit phone डालें'); return; }
+   clearTimeout(repeatTimer);
    log('me',content); 
    messages.push({role:'user', content});
    setStatus("…");
@@ -96,10 +97,12 @@
      messages.push({role:'assistant', content:reply});
      log('bot',reply);
      await speak(reply);
+     scheduleRepeat(reply);
      if(j.done) { sys('✓ बुकिंग हो गई — Farmer Dashboard में देखें'); }
      else if(!inCall) setStatus("Type or tap Call to continue");
    }catch(e){ log('bot','नेटवर्क दिक्कत, फिर से बोलिए।'); if(inCall) setTimeout(startListen, 800); }
  }
+ function scheduleRepeat(txt){ clearTimeout(repeatTimer); if(!inCall) return; repeatTimer=setTimeout(()=>{ if(inCall && !isSpeaking){ speak(txt); } }, 5000); }
  function startListen(){
    if(!inCall || isSpeaking) return;
    if(!SR){ setStatus("Mic not supported — type instead"); return; }

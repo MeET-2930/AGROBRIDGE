@@ -119,15 +119,39 @@ function buildTools(){ return [
 
 // ---------- rule-based fallback (no API key, still sounds human) ----------
 function extractFromText(text, centres){
-  const t=text.toLowerCase();
+  const raw=text.toLowerCase();
+  // normalize Hindi variations to roman for matching
+  const norm = raw.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   let centreId=null;
-  for(const c of centres){ if(t.includes(c.id.toLowerCase()) || t.includes(String(c.name||"").toLowerCase().slice(0,4))) {centreId=c.id; break;} }
+  const centreKeywords = {
+    "centre_gurugram_01": ["gurugram","गुरु","गुडगाँव"],
+    "centre_sohna_02": ["sohna","सोहना"],
+    "centre_rewari_03": ["rewari","रेवाड़ी","रेवाडी"],
+    "centre_pataudi_04": ["pataudi","पटौदी"],
+    "centre_farrukhnagar_05": ["farrukhnagar","फर्रुख","फरुखनगर"],
+  };
+  for(const c of centres){
+    const kws = centreKeywords[c.id] || [c.id.toLowerCase(), String(c.name||"").toLowerCase().slice(0,4)];
+    if(kws.some(k=> raw.includes(k) || norm.includes(k))) { centreId=c.id; break; }
+  }
   let crop=null;
-  for(const c of CROP_LIST){ if(t.includes(c.id) || t.includes(c.hi) || t.includes(c.en.toLowerCase())) crop=c.id; }
-  const qMatch=t.match(/(\d{1,3})\s*(q|quintal|kuntal|bori)?/);
+  const cropKeywords = {
+    "wheat": ["wheat","geh","गेह","kank","kanak"],
+    "paddy": ["paddy","dha","धान","chawal","dhan"],
+    "mustard": ["mustard","sar","सरसों","sarso","sarson","must"],
+    "cotton": ["cotton","kap","कपास"],
+    "maize": ["maize","mak","मक्का","corn","makka"],
+    "gram": ["gram","chan","चना","chana"],
+  };
+  for(const c of CROP_LIST){
+    const kws = cropKeywords[c.id] || [c.id, c.hi, c.en.toLowerCase()];
+    if(kws.some(k=> raw.includes(k) || norm.includes(k.toLowerCase()))) { crop=c.id; break; }
+  }
+  const qMatch=raw.match(/(\d{1,3})\s*(q|quintal|kuntal|bori|क्विंटल)?/);
   const quantity=qMatch?Number(qMatch[1]):null;
-  const dateMatch=t.match(/(\d{4}-\d{2}-\d{2})/);
-  const slotMatch=t.match(/(\d{1,2})\s*[:\-]?\s*00/);
+  const dateMatch=raw.match(/(\d{4}-\d{2}-\d{2})/);
+  // spoken dates like "kal", "parson", "आज", "कल" -> map to actual dates (handled in ruleBasedReply, keep raw)
+  const slotMatch=raw.match(/(\d{1,2})\s*[:\-]?\s*00/) || raw.match(/(\d{1,2})\s*baje/);
   const slot=slotMatch?`${String(slotMatch[1]).padStart(2,"0")}:00`:null;
   return {centreId,crop,quantity,slot, date: dateMatch?dateMatch[1]:null};
 }
