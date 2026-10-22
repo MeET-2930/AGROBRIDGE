@@ -32,7 +32,7 @@
 <div class="top"></div>
 <header>
   <h1>✦ Gemini Live — AgroBridge Booking</h1>
-  <p>Tap orb, speak naturally like Gemini app — it listens via Gemini, not browser</p>
+  <p>Tap orb, speak — it stays silent and listens</p>
 </header>
 <div class="wrap">
   <div class="card row">
@@ -41,7 +41,7 @@
     <span id="keyStatus" style="font-size:12px;color:#9ca3af"></span>
   </div>
   <div class="chat" id="chat"></div>
-  <div class="status" id="status">Tap orb to speak — एक बार टैप करें, बोलें, फिर टैप करें</div>
+  <div class="status" id="status">Tap orb → speak → it listens silently</div>
   <div class="orb idle" id="orb">🎙️</div>
   <div class="hint">Try: <em>गुरुग्राम में गेहूं 20 क्विंटल कल 10 बजे चाहिए</em> — one shot booking. Or type below.</div>
   <div class="card row">
@@ -63,7 +63,7 @@
  setKeyStatus();
  function speak(txt){
    return new Promise(res=>{
-     setStatus("🔊 Gemini बोल रहा है...");
+     setStatus("🔊 सुन रहा है...");
      const lang=langEl.value==='hi'?'hi':'en';
      const clean=String(txt).slice(0,600);
      const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(clean));
@@ -169,12 +169,9 @@
  orb.onclick=toggleRecord;
  $('send').onclick=()=>{ const v=text.value.trim(); if(v){ text.value=''; sendText(v);} };
  text.onkeydown=e=>{ if(e.key==='Enter'){ const v=text.value.trim(); if(v){ text.value=''; sendText(v);} } };
- langEl.onchange=()=>{ stopAudio(); messages=[]; chat.innerHTML=''; setStatus("Tap orb to start"); const g=langEl.value==='hi'?"नमस्ते जी! मैं एग्रोब्रिज Gemini Live हूँ। कौन सी मंडी में आना है?":"Hello! I'm AgroBridge Gemini Live. Which mandi?"; messages.push({role:'assistant', content:g}); log('bot',g); speak(g); };
- // greet
- (async()=>{
-   const g="नमस्ते जी! मैं एग्रोब्रिज Gemini Live हूँ। आप orb टैप करके बोलिए — मैं सीधे Gemini से सुन रहा हूँ, फिर बुक कर दूँगा।";
-   messages.push({role:'assistant', content:g}); log('bot', g); await speak(g);
- })();
+ langEl.onchange=()=>{ stopAudio(); messages=[]; chat.innerHTML=''; setStatus("Tap orb → बोलें"); };
+ // silent start — no greeting, just listen
+ setStatus("Tap orb → बोलें");
 })();
 </script>
 </body>

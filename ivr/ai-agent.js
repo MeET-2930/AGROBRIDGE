@@ -118,17 +118,18 @@ function buildTools(){ return [
 ];}
 
 // ---------- rule-based fallback (no API key, still sounds human) ----------
+function extractName(text){ const m=text.match(/(?:मेरा नाम|नाम|name is|i am|मैं)\s*([\u0900-\u097F a-zA-Z]{3,20})/i); return m?m[1].trim().split(" ").slice(0,2).join(" "):null; }
 function extractFromText(text, centres){
   const raw=text.toLowerCase();
   // normalize Hindi variations to roman for matching
   const norm = raw.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   let centreId=null;
   const centreKeywords = {
-    "centre_gurugram_01": ["gurugram","गुरु","गुडगाँव"],
-    "centre_sohna_02": ["sohna","सोहना"],
-    "centre_rewari_03": ["rewari","रेवाड़ी","रेवाडी"],
-    "centre_pataudi_04": ["pataudi","पटौदी"],
-    "centre_farrukhnagar_05": ["farrukhnagar","फर्रुख","फरुखनगर"],
+    "centre_gurugram_01": ["gurugram","gurgaon","गुरु","गुडगाँव","गुड़गांव","गुड़गाँव","gur gram"],
+    "centre_sohna_02": ["sohna","सोहना","sohna"],
+    "centre_rewari_03": ["rewari","रेवाड़ी","रेवाडी","rewadi"],
+    "centre_pataudi_04": ["pataudi","पटौदी","pataudi"],
+    "centre_farrukhnagar_05": ["farrukhnagar","फर्रुख","फरुखनगर","farrukh","farukh"],
   };
   for(const c of centres){
     const kws = centreKeywords[c.id] || [c.id.toLowerCase(), String(c.name||"").toLowerCase().slice(0,4)];
@@ -136,12 +137,12 @@ function extractFromText(text, centres){
   }
   let crop=null;
   const cropKeywords = {
-    "wheat": ["wheat","geh","गेह","kank","kanak"],
-    "paddy": ["paddy","dha","धान","chawal","dhan"],
-    "mustard": ["mustard","sar","सरसों","sarso","sarson","must"],
-    "cotton": ["cotton","kap","कपास"],
-    "maize": ["maize","mak","मक्का","corn","makka"],
-    "gram": ["gram","chan","चना","chana"],
+    "wheat": ["wheat","geh","गेह","kank","kanak","gehu","gehun"],
+    "paddy": ["paddy","dha","धान","chawal","dhan","padi"],
+    "mustard": ["mustard","sar","सरसों","sarso","sarson","must","sarson"],
+    "cotton": ["cotton","kap","कपास","kapas"],
+    "maize": ["maize","mak","मक्का","corn","makka","makki"],
+    "gram": ["gram","chan","चना","chana","chane"],
   };
   for(const c of CROP_LIST){
     const kws = cropKeywords[c.id] || [c.id, c.hi, c.en.toLowerCase()];
@@ -170,32 +171,39 @@ async function ruleBasedReply({messages, phone, store, lang}){
   const lastUser=[...messages].reverse().find(m=>m.role==="user")?.content||"";
   const historyText=messages.filter(m=>m.role==="user").map(m=>m.content).join(" | ");
   const extracted=extractFromText(historyText, centres);
-  // try to infer farmerName from first user message if looks like name
-  let farmerName=messages.find(m=>m.role==="user")?.content?.split(" ").slice(0,2).join(" ")||phone;
-  if(farmerName.length>20) farmerName=phone;
-  // check what's missing
+  // extract farmer name via helper or default to phone
+  let farmerName=extractName(historyText) || messages.find(m=>m.role==="user")?.content?.split(" ").slice(0,2).join(" ")||phone;
+  if(!farmerName || farmerName.length>20 || /\d/.test(farmerName)) farmerName=phone;
+  // single-ask tracking: check what we already asked in last assistant message
+  const lastAsk = [...messages].reverse().find(m=>m.role==="assistant")?.content||"";
+  const alreadyAsked = (kw)=> lastAsk.includes(kw);
+  // check what's missing — ask only once, second time give type fallback
   if(!extracted.centreId){
+    if(alreadyAsked("मंडी") || alreadyAsked("mandi")) return lang==="hi" ? `मंडी का नाम अभी भी समझ नहीं आया जी, कृपया नीचे type कर दीजिए — जैसे Gurugram` : `Mandi name still unclear, please type it below.`;
     const list=centres.slice(0,3).map(c=>c.name||c.id).join(", ");
     return lang==="hi"
-      ? `बिल्कुल जी! कौन सी मंडी में लाना है? ${list} — नाम बता दीजिए।`
-      : `Sure! Which mandi do you want? Try ${list} — just tell me the name.`;
+      ? `कौन सी मंडी में लाना है? ${list} — नाम बता दीजिए।`
+      : `Which mandi? Try ${list}.`;
   }
   if(!extracted.crop){
+    if(alreadyAsked("फसल") || alreadyAsked("crop")) return lang==="hi" ? `फसल समझ नहीं आई, कृपया type करें — गेहूं/धान/सरसों` : `Crop unclear, please type wheat/paddy/mustard.`;
     return lang==="hi"
-      ? `समझ गया जी, ${extracted.centreId} में। कौन सी फसल है — गेहूं, धान, सरसों?`
-      : `Got it — ${extracted.centreId}. Which crop — wheat, paddy or mustard?`;
+      ? `कौन सी फसल है — गेहूं, धान, सरसों?`
+      : `Which crop — wheat, paddy or mustard?`;
   }
   if(!extracted.quantity || extracted.quantity<1 || extracted.quantity>999){
+    if(alreadyAsked("क्विंटल") || alreadyAsked("quintal") || alreadyAsked("quantity")) return lang==="hi" ? `मात्रा समझ नहीं आई, कृपया type करें — जैसे 20` : `Quantity unclear, please type e.g. 20.`;
     return lang==="hi"
-      ? `ठीक है, ${extracted.crop} जी। कितना माल है — कितने क्विंटल?`
-      : `Great, ${extracted.crop}. How much quantity — how many quintals?`;
+      ? `कितना माल है — कितने क्विंटल?`
+      : `How much quantity — how many quintals?`;
   }
   if(!extracted.date){
+    if(alreadyAsked("दिन") || alreadyAsked("date")) return lang==="hi" ? `तारीख समझ नहीं आई, कृपया type करें — जैसे 2026-10-24 या कल` : `Date unclear, please type YYYY-MM-DD or kal.`;
     const dates=store.getDateOptions(lang);
     const opts=dates.slice(0,3).map(d=>`${d.value} (${d.label})`).join(" | ");
     return lang==="hi"
-      ? `शुक्रिया जी, ${extracted.quantity} क्विंटल। किस दिन आएंगे? ${opts} — बता दीजिए।`
-      : `Thanks, ${extracted.quantity} quintals. Which date? ${opts}`;
+      ? `किस दिन आएंगे? ${opts} — बता दीजिए।`
+      : `Which date? ${opts}`;
   }
   // need slot
   const centre=await store.fetchCentreById(extracted.centreId);
@@ -204,6 +212,7 @@ async function ruleBasedReply({messages, phone, store, lang}){
     return lang==="hi" ? `उस दिन कोई स्लॉट खाली नहीं है जी, दूसरा दिन बताइए।` : `No slots free that day, please pick another date.`;
   }
   if(!extracted.slot || !slots.find(s=>s.slotTime===extracted.slot)){
+    if(alreadyAsked("स्लॉट") || alreadyAsked("slot") || alreadyAsked("समय")) return lang==="hi" ? `समय समझ नहीं आया, कृपया type करें — जैसे 10:00` : `Time unclear, please type e.g. 10:00.`;
     const slotList=slots.slice(0,4).map(s=>s.windowLabel).join(", ");
     return lang==="hi"
       ? `वाह जी, ${extracted.date} को ये स्लॉट खाली हैं: ${slotList}। कौन सा समय चाहिए?`
