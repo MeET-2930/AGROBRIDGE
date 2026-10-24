@@ -558,6 +558,9 @@ app.post("/agent/chat", chatGuard, async (req, res) => {
 });
 
 // Retell AI webhook (booking capable) — free, no key, talk like human
+app.get("/booking-sim", (_, res) => res.sendFile(path.join(__dirname, "booking-sim.html")));
+app.get("/sim-openrouter", (_, res) => res.sendFile(path.join(__dirname, "sim-openrouter.html")));
+app.get("/sim-agent", (_, res) => res.sendFile(path.join(__dirname, "sim-agent.html")));
 app.get("/live", (_, res) => res.sendFile(path.join(__dirname, "live.html")));
 
 app.post("/live/audio", chatGuard, async (req, res) => {
