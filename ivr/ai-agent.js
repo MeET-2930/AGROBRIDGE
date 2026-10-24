@@ -90,7 +90,20 @@ function makeStore(db){
       return booking;
     });
   }
-  return {fetchCentres, fetchCentreById, fetchAvailableSlots, getDateOptions, createBooking, capacityPerWindow};
+  async function ensureFarmer(phone, name){
+    try{
+      const ref=db.collection("farmers").doc(phone);
+      const snap=await ref.get();
+      if(!snap.exists){
+        await ref.set({ phone, name: name||phone, createdAt: new Date().toISOString(), source: "ai-agent", registeredVia: "voice" }, { merge: true });
+        return { wasNew: true };
+      }
+      // update name if provided and different
+      if(name && snap.data().name!==name) await ref.set({ name }, { merge: true });
+      return { wasNew: false };
+    }catch(e){ console.error("ensureFarmer", e.message); return { wasNew: false }; }
+  }
+  return {fetchCentres, fetchCentreById, fetchAvailableSlots, getDateOptions, createBooking, capacityPerWindow, ensureFarmer};
 }
 
 const SYSTEM_PROMPT = `You are AgroBridge AI Booking Assistant — a warm, human, Indian farmer helper. Speak ONLY in clear Hindi (Devanagari script) when lang is 'hi', pure Hindi with 'जी' respectfully. Never use Roman Hindi. Be natural like a person, not a robot.
@@ -172,8 +185,23 @@ async function ruleBasedReply({messages, phone, store, lang}){
   const historyText=messages.filter(m=>m.role==="user").map(m=>m.content).join(" | ");
   const extracted=extractFromText(historyText, centres);
   // extract farmer name via helper or default to phone
-  let farmerName=extractName(historyText) || messages.find(m=>m.role==="user")?.content?.split(" ").slice(0,2).join(" ")||phone;
+  let farmerName=extractName(historyText) || null;
+  // try to extract name even if not with keyword — take first 2 words if they look like name and not a mandi/crop
+  if(!farmerName){
+    const firstUser=messages.find(m=>m.role==="user")?.content||"";
+    const cand=firstUser.split(" ").slice(0,2).join(" ").trim();
+    if(cand && !/\d/.test(cand) && cand.length<20 && !/(gurugram|gurgaon|sohna|rewari|pataudi|farrukh|गेहूं|धान|सरसों|कपास|मक्का|चना|quintal|क्विंटल)/i.test(cand)) farmerName=cand;
+  }
   if(!farmerName || farmerName.length>20 || /\d/.test(farmerName)) farmerName=phone;
+  // check/register farmer by phone
+  const farmerCheck=await store.ensureFarmer(phone, farmerName);
+  // if name still phone and not provided, ask for name once
+  if(farmerName===phone && !extractName(historyText)){
+    const lastAsk2=[...messages].reverse().find(m=>m.role==="assistant")?.content||"";
+    if(!lastAsk2.includes("नाम")){
+      return lang==="hi" ? `आपका नाम क्या है जी?` : `What is your name?`;
+    }
+  }
   // single-ask tracking: check what we already asked in last assistant message
   const lastAsk = [...messages].reverse().find(m=>m.role==="assistant")?.content||"";
   const alreadyAsked = (kw)=> lastAsk.includes(kw);

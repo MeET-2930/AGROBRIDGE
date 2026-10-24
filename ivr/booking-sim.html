@@ -67,7 +67,9 @@
      if(j.done) sys('✓ Booked — check Farmer Dashboard');
    }catch(e){ log('bot','नेटवर्क दिक्कत'); }
  }
+ function stopAllAudio(){ try{ if(player){player.pause();player.src='';} }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} }
  function toggleMic(){
+   stopAllAudio();
    if(recording){ try{rec.stop()}catch(e){} return; }
    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
    if(!SR){ const t=prompt("Type:"); if(t) send(t); return; }
