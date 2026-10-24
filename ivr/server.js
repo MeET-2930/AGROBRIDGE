@@ -289,7 +289,7 @@ if (PROVIDER === "sim") {
 // ---------------------------------------------------------------
 
 app.get("/health", (_, res) =>
-  res.send("ok")
+  res.json({ ok: true, provider: process.env.PROVIDER||"sim", gemini: !!(process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY), openrouter: !!process.env.OPENROUTER_API_KEY, openrouterModel: process.env.OPENROUTER_MODEL||"meta-llama/llama-3.1-8b-instruct:free" })
 );
 
 // ---------------------------------------------------------------
@@ -558,6 +558,7 @@ app.post("/agent/chat", chatGuard, async (req, res) => {
 });
 
 // Retell AI webhook (booking capable) — free, no key, talk like human
+app.get("/open-router-call", (_, res) => res.sendFile(path.join(__dirname, "open-router-call.html")));
 app.get("/booking-sim", (_, res) => res.sendFile(path.join(__dirname, "booking-sim.html")));
 app.get("/sim-openrouter", (_, res) => res.sendFile(path.join(__dirname, "sim-openrouter.html")));
 app.get("/sim-agent", (_, res) => res.sendFile(path.join(__dirname, "sim-agent.html")));

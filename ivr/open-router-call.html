@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgroBridge — Open Router Call</title>
+<style>
+ :root{--saffron:#FF9933;--green:#138808;--bg:#0a0e13}
+ *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1000px 600px at 50% -200px,#1b2a41,#0a0e13);color:#e5e7eb;min-height:100vh;display:flex;flex-direction:column}
+ .top{height:4px;background:linear-gradient(90deg,var(--saffron),#fff,var(--green))}
+ header{padding:16px;text-align:center} header h1{margin:0;font-size:19px;font-weight:800;color:#fff;letter-spacing:.2px} header p{color:#9ca3af;font-size:12px;margin:6px 0 0}
+ .wrap{max-width:560px;width:100%;margin:0 auto;padding:0 14px 20px;flex:1;display:flex;flex-direction:column}
+ .call-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(10px);border-radius:24px;padding:18px;margin:10px 0;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+ .meta{display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:8px}
+ .chip{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:#cbd5e1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);padding:6px 10px;border-radius:999px}
+ .chip.live{color:#86efac;border-color:rgba(134,239,172,.3);background:rgba(34,197,94,.12)}
+ .orb{width:160px;height:160px;border-radius:50%;margin:14px auto;display:grid;place-items:center;font-size:48px;color:#fff;background:radial-gradient(circle at 30% 30%,#3b82f6,#7c3aed 60%,#111827);box-shadow:0 12px 50px rgba(124,58,237,.55), inset 0 0 30px rgba(255,255,255,.15);cursor:pointer;user-select:none;transition:transform .18s, box-shadow .18s}
+ .orb.calling{animation:breathe 1.6s ease-in-out infinite; background:radial-gradient(circle at 30% 30%,#22c55e,#16a34a 55%,#0a2a12)}
+ .orb.speaking{animation:pulse 0.9s ease-in-out infinite; background:radial-gradient(circle at 30% 30%,#f59e0b,#ef4444 60%,#1f0a0a)}
+ .orb.listening{animation:listen 1.1s ease-in-out infinite; background:radial-gradient(circle at 30% 30%,#38bdf8,#2563eb 60%,#0a1a2a); box-shadow:0 12px 50px rgba(56,189,248,.45)}
+ @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+ @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+ @keyframes listen{0%,100%{transform:scale(1); box-shadow:0 12px 50px rgba(56,189,248,.45)}50%{transform:scale(1.03); box-shadow:0 16px 60px rgba(56,189,248,.65)}}
+ .status{font-size:13px;color:#cbd5e1;text-align:center;min-height:20px;margin:6px 0 2px}
+ .timer{font-size:12px;color:#9ca3af;text-align:center;letter-spacing:.3px}
+ .chat{max-height:38vh;overflow:auto;padding:10px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.06);border-radius:16px;margin-top:12px}
+ .msg{max-width:88%;padding:10px 12px;border-radius:14px;margin:8px 0;font-size:14px;line-height:1.5}
+ .bot{background:rgba(34,197,94,.14);border-left:3px solid var(--green);color:#eaffea} .me{background:rgba(251,146,60,.14);border-right:3px solid var(--saffron);margin-left:auto;text-align:right;color:#fff7ed}
+ .sys{font-size:12px;color:#9ca3af;text-align:center;margin:6px 0}
+ .controls{display:flex;gap:10px;margin-top:14px}
+ .btn{height:48px;border:0;border-radius:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;flex:1}
+ .call{background:var(--green);color:#fff} .end{background:#dc2626;color:#fff} .ghost{background:rgba(255,255,255,.08);color:#e5e7eb;border:1px solid rgba(255,255,255,.12)}
+ .row{display:flex;gap:8px;align-items:center}
+ input,select{height:42px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.28);color:#fff;border-radius:10px;padding:0 12px;flex:1}
+ input::placeholder{color:#9ca3af} select option{color:#111}
+ .hint{font-size:11px;color:#9ca3af;text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="top"></div>
+<header>
+ <h1>● Open Router Call — AgroBridge</h1>
+ <p>Gemini-like voice call • OpenRouter brain • one sentence books</p>
+</header>
+<div class="wrap">
+ <div class="call-card">
+  <div class="meta">
+   <span class="chip" id="modelChip">openrouter • free</span>
+   <span class="chip live" id="liveChip">● LIVE</span>
+   <span class="chip" id="phoneChip">9100000001</span>
+  </div>
+  <div class="orb" id="orb">📞</div>
+  <div class="status" id="status">Tap Call to start — like Gemini Live</div>
+  <div class="timer" id="timer">00:00</div>
+  <div class="chat" id="chat"></div>
+  <div class="controls">
+   <button id="callBtn" class="btn call">📞 Call</button>
+   <button id="muteBtn" class="btn ghost" title="Mute mic">🎤</button>
+   <button id="endBtn" class="btn end" style="display:none">✕ End</button>
+  </div>
+  <div class="hint">Say: <em>गुरुग्राम में गेहूं 20 क्विंटल कल 10 बजे चाहिए</em> — extracts, asks once, confirms, books</div>
+ </div>
+ <div class="call-card row">
+  <select id="lang"><option value="hi">हिन्दी</option><option value="en">English</option></select>
+  <input id="phone" maxlength="10" value="9100000001" placeholder="10-digit mobile">
+  <input id="text" placeholder="Or type here" style="flex:1.2">
+  <button id="send" class="btn ghost" style="width:84px">Send</button>
+ </div>
+</div>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ const chat=$('chat'), status=$('status'), timer=$('timer'), orb=$('orb'), callBtn=$('callBtn'), endBtn=$('endBtn'), muteBtn=$('muteBtn'), text=$('text'), phoneEl=$('phone'), langEl=$('lang'), modelChip=$('modelChip'), phoneChip=$('phoneChip');
+ let messages=[]; let inCall=false; let isSpeaking=false; let rec=null; let player=null; let recActive=false; let muted=false; let t0=null; let tick=null;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const log=(c,t)=>{ const d=document.createElement('div'); d.className='msg '+c; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
+ function setStatus(t){ status.textContent=t; }
+ function setOrb(state){ orb.className='orb '+state; }
+ function startTimer(){ t0=Date.now(); tick=setInterval(()=>{ const s=Math.floor((Date.now()-t0)/1000); const m=String(Math.floor(s/60)).padStart(2,'0'); const sc=String(s%60).padStart(2,'0'); timer.textContent=`${m}:${sc}`; }, 500); }
+ function stopTimer(){ clearInterval(tick); tick=null; timer.textContent="00:00"; }
+ function speak(txt){
+   return new Promise(res=>{
+     isSpeaking=true; setOrb('speaking'); setStatus("🔊 बोल रहा है...");
+     const lang=langEl.value==='hi'?'hi':'en';
+     const clean=String(txt).slice(0,600);
+     const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(clean));
+     player=a; let done=false;
+     const finish=()=>{ if(done) return; done=true; isSpeaking=false; try{a.pause();a.src='';}catch(e){} res(); if(inCall && !muted) setTimeout(startListen, 450); else setOrb('calling'); };
+     a.onended=finish; a.onerror=()=>fallback(clean,lang).then(finish);
+     const tmo=setTimeout(()=>{ if(!done) fallback(clean,lang).then(finish); }, 2600);
+     a.play().then(()=>clearTimeout(tmo)).catch(()=>{ clearTimeout(tmo); fallback(clean,lang).then(finish); });
+   });
+ }
+ function fallback(t,lang){
+   return new Promise(res=>{
+     if(!('speechSynthesis' in window)) return res();
+     const u=new SpeechSynthesisUtterance(t); u.lang=lang==='hi'?'hi-IN':'en-IN'; u.rate=0.96;
+     u.onend=res; u.onerror=res; speechSynthesis.speak(u); setTimeout(res,6500);
+   });
+ }
+ function stopAudio(){ try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){} isSpeaking=false; }
+ async function send(content){
+   if(!content.trim() || !inCall) return;
+   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10){ alert('10-digit phone'); return; }
+   stopAudio(); log('me', content); messages.push({role:'user', content}); setStatus("… सोच रहा है");
+   try{
+     const r=await fetch('/agent/chat',{method:'POST',headers:{'Content-Type':'application/json','x-agb-key':'agb-dev-key'},body:JSON.stringify({messages, phone:p, lang:langEl.value})});
+     const j=await r.json();
+     const reply=j.reply||'क्षमा कीजिए';
+     messages.push({role:'assistant', content:reply}); log('bot', reply);
+     await speak(reply);
+     if(j.done){ sys('✓ बुकिंग हो गई — Token '+ (j.reply.match(/A\s*-\s*\d+/)||[''])[0]); setStatus("Booked — you can End Call"); }
+     else if(inCall && !muted) setStatus("🎤 सुन रहा हूँ — बोलिए");
+   }catch(e){ log('bot','नेटवर्क दिक्कत'); setStatus("Tap mic or type again"); }
+ }
+ function startListen(){
+   if(!inCall || isSpeaking || muted) return;
+   if(!SR){ setStatus("Mic not supported — type below"); return; }
+   try{ if(rec) rec.abort(); }catch(e){}
+   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=true; rec.continuous=true; rec.maxAlternatives=1;
+   rec.onstart=()=>{ recActive=true; setOrb('listening'); setStatus("🎤 सुन रहा हूँ — बोलते रहिए"); };
+   rec.onend=()=>{ recActive=false; if(inCall && !isSpeaking && !muted){ setOrb('calling'); setStatus("🎤 सुन रहा हूँ — बोलते रहिए"); setTimeout(()=>{ if(inCall && !isSpeaking && !muted) startListen(); }, 350); } };
+   rec.onerror=e=>{ recActive=false; if(e.error==='not-allowed'){ setStatus("Mic blocked — Allow करें"); } else if(inCall && !isSpeaking && !muted) setTimeout(startListen, 900); };
+   rec.onresult=e=>{
+     let final='';
+     for(let i=e.resultIndex;i<e.results.length;i++){
+       const res=e.results[i]; const txt=(res[0]&&res[0].transcript)||'';
+       if(res.isFinal) final+=txt+' ';
+       else setStatus("सुन रहा हूँ: "+txt);
+     }
+     final=final.trim();
+     if(final){ setStatus("आपने कहा: "+final); send(final); }
+   };
+   try{ rec.start(); }catch(e){ setStatus("Mic start failed — type करें"); }
+ }
+ function startCall(){
+   if(inCall) return;
+   inCall=true; messages=[]; chat.innerHTML=''; phoneChip.textContent=phoneEl.value||'9100000001';
+   callBtn.style.display='none'; endBtn.style.display='flex'; setOrb('calling'); startTimer();
+   const greet=langEl.value==='hi'?"नमस्ते जी! मैं एग्रोब्रिज Open Router Call हूँ। एक वाक्य में बोल दीजिए — जैसे 'गुरुग्राम में गेहूं 20 क्विंटल कल 10 बजे चाहिए'":"Hello! I'm AgroBridge Open Router Call. Say one sentence like 'Gurugram wheat 20 quintal tomorrow 10 AM'";
+   messages.push({role:'assistant', content:greet}); log('bot', greet);
+   speak(greet);
+   // fetch model chip
+   fetch('/health').then(r=>r.json()).then(j=>{ modelChip.textContent = j.openrouter ? 'openrouter • '+ (j.openrouterModel||'free') : 'rule-based • free'; }).catch(()=>{});
+ }
+ function endCall(){
+   inCall=false; stopAudio(); try{ if(rec) rec.abort(); }catch(e){} recActive=false; isSpeaking=false;
+   stopTimer(); setOrb(''); setStatus("Call ended — tap Call to start again");
+   callBtn.style.display='flex'; endBtn.style.display='none';
+ }
+ callBtn.onclick=startCall;
+ endBtn.onclick=endCall;
+ muteBtn.onclick=()=>{ muted=!muted; muteBtn.textContent=muted?'🔇':'🎤'; muteBtn.style.opacity=muted?'0.6':'1'; setStatus(muted?"Muted — tap again to unmute":"🎤 सुन रहा हूँ — बोलिए"); if(!muted && inCall && !isSpeaking) startListen(); else try{ if(rec) rec.abort(); }catch(e){} };
+ $('send').onclick=()=>{ const v=text.value.trim(); if(v){ text.value=''; if(!inCall) startCall(); setTimeout(()=>send(v), 300);} };
+ text.onkeydown=e=>{ if(e.key==='Enter'){ const v=text.value.trim(); if(v){ text.value=''; if(!inCall) startCall(); setTimeout(()=>send(v), 300);} } };
+ phoneEl.oninput=()=> phoneChip.textContent=phoneEl.value||'9100000001';
+ langEl.onchange=()=>{ if(inCall) endCall(); messages=[]; chat.innerHTML=''; setStatus("Tap Call to start"); };
+ // expose
+ window.__call={startCall,endCall};
+})();
+</script>
+</body>
+</html>
