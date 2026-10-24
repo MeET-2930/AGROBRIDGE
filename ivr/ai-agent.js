@@ -242,6 +242,8 @@ async function ruleBasedReply({messages, phone, store, lang}){
 function makeAiAgent({db}){
   const store=makeStore(db);
   const OPENAI_KEY=process.env.OPENAI_API_KEY||process.env.OPENAI_KEY||"";
+  const OPENROUTER_KEY=process.env.OPENROUTER_API_KEY||"";
+  const OPENROUTER_MODEL=process.env.OPENROUTER_MODEL||"meta-llama/llama-3.1-8b-instruct:free";
   const GEMINI_KEY=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||"";
 
   async function callOpenAI(messages, phone, lang){
@@ -287,6 +289,42 @@ function makeAiAgent({db}){
     return msg.content;
   }
 
+  async function callOpenRouter(messages, phone, lang){
+    const OpenAI=require("openai");
+    const client=new OpenAI({apiKey:OPENROUTER_KEY, baseURL: "https://openrouter.ai/api/v1"});
+    const centres=await store.fetchCentres();
+    const centreHint=`Active mandis: ${centres.map(c=>`${c.id} (${c.name||c.id})`).join(", ")}.`;
+    const sys=SYSTEM_PROMPT+"\n"+centreHint+`\nFarmer phone: ${phone}. Today IST: ${new Date().toLocaleDateString("en-IN",{timeZone:"Asia/Kolkata"})}. Use OpenRouter model ${OPENROUTER_MODEL}.`;
+    const tools=buildTools();
+    const resp=await client.chat.completions.create({
+      model: OPENROUTER_MODEL,
+      messages:[{role:"system", content:sys}, ...messages],
+      tools, tool_choice:"auto", temperature:0.6, max_tokens:300,
+    });
+    const msg=resp.choices[0].message;
+    if(msg.tool_calls && msg.tool_calls.length){
+      const toolResults=[];
+      for(const tc of msg.tool_calls){
+        const name=tc.function.name; const args=JSON.parse(tc.function.arguments||"{}"); let result="";
+        try{
+          if(name==="list_mandis"){ result=JSON.stringify(centres.slice(0,10).map(c=>({id:c.id,name:c.name}))); }
+          else if(name==="list_crops"){ result=JSON.stringify(CROP_LIST); }
+          else if(name==="list_dates"){ result=JSON.stringify(store.getDateOptions(args.lang||lang)); }
+          else if(name==="list_slots"){ const centre=await store.fetchCentreById(args.centreId); const slots=await store.fetchAvailableSlots(centre,args.date); result=JSON.stringify(slots.slice(0,10)); }
+          else if(name==="book_slot"){ const centre=await store.fetchCentreById(args.centreId); const booking=await store.createBooking({farmerId:phone, farmerName:args.farmerName||phone, centre, crop:args.crop, quantity:args.quantity, date:args.date, slot:args.slot}); result=JSON.stringify({ok:true, tokenNumber:booking.tokenNumber, gatePassCode:booking.gatePassCode}); }
+        }catch(e){ result=JSON.stringify({error:e.message}); }
+        toolResults.push({ tool_call_id: tc.id, role:"tool", content: result });
+      }
+      const second=await client.chat.completions.create({
+        model: OPENROUTER_MODEL,
+        messages:[{role:"system", content:sys}, ...messages, msg, ...toolResults],
+        temperature:0.6, max_tokens:300
+      });
+      return second.choices[0].message.content;
+    }
+    return msg.content;
+  }
+
   async function callGemini(messages, phone, lang){
     const centres=await store.fetchCentres();
     const prompt=SYSTEM_PROMPT+"\nActive mandis: "+centres.map(c=>c.id).join(", ")+"\nFarmer phone:"+phone+"\nConversation:\n"+messages.map(m=>`${m.role}: ${m.content}`).join("\n")+"\nReply as assistant in "+(lang==="hi"?"Hindi":"English")+":";
@@ -303,7 +341,8 @@ function makeAiAgent({db}){
     if(!cleanMessages.length) return {reply: lang==="hi"?"नमस्ते जी! मैं एग्रोब्रिज एआई हूँ। कैसे मदद करूँ? मंडी का नाम बताइए।":"Hello! I'm AgroBridge AI. Which mandi do you want to book?", done:false};
     let reply="";
     try{
-      if(OPENAI_KEY) reply=await callOpenAI(cleanMessages, phone, lang);
+      if(OPENROUTER_KEY) reply=await callOpenRouter(cleanMessages, phone, lang);
+      else if(OPENAI_KEY) reply=await callOpenAI(cleanMessages, phone, lang);
       else if(GEMINI_KEY) reply=await callGemini(cleanMessages, phone, lang);
       else reply=await ruleBasedReply({messages: cleanMessages, phone, store, lang});
     }catch(inner){
