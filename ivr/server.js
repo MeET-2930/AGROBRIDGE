@@ -607,6 +607,7 @@ app.get("/open-router-call", (_, res) => res.sendFile(path.join(__dirname, "open
 app.get("/booking-sim", (_, res) => res.sendFile(path.join(__dirname, "booking-sim.html")));
 app.get("/sim-openrouter", (_, res) => res.sendFile(path.join(__dirname, "sim-openrouter.html")));
 app.get("/sim-agent", (_, res) => res.sendFile(path.join(__dirname, "sim-agent.html")));
+app.get("/test-booking", (_, res) => res.sendFile(require("path").join(__dirname, "test-booking.html")));
 app.get("/11labs", (_, res) => res.sendFile(path.join(__dirname, "11labs.html")));
 app.get("/live", (_, res) => res.sendFile(path.join(__dirname, "live.html")));
 
