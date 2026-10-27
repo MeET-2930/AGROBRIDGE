@@ -9,65 +9,38 @@
   header{padding:18px 14px 6px;text-align:center}
   h1{margin:0;font-size:22px} h1 span{color:#a78bfa}
   .sub{color:#9ca3af;font-size:13px;margin-top:6px}
-  .card{width:min(520px,92vw);background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:16px;margin:14px 0}
+  .card{width:min(520px,92vw);background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:16px;margin:14px 0;text-align:center}
   .orb-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 0}
-  .orb{width:180px;height:180px;border-radius:50%;background:radial-gradient(circle at 30% 25%, #c4b5fd 0%, #7c3aed 35%, #4c1d95 70%, #1e1b4b 100%);box-shadow:0 0 40px rgba(124,58,237,0.6), inset 0 0 30px rgba(255,255,255,0.25);position:relative;transition:transform 0.15s}
+  .orb{width:180px;height:180px;border-radius:50%;background:radial-gradient(circle at 30% 25%, #c4b5fd 0%, #7c3aed 35%, #4c1d95 70%, #1e1b4b 100%);box-shadow:0 0 40px rgba(124,58,237,0.6), inset 0 0 30px rgba(255,255,255,0.25);position:relative}
   .orb::after{content:"";position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.85), transparent 55%);opacity:0.7}
   .orb.idle{animation:breathe 3s ease-in-out infinite}
-  .orb.listening{animation:pulse 0.9s ease-in-out infinite;box-shadow:0 0 55px rgba(34,197,94,0.7), inset 0 0 30px rgba(255,255,255,0.25)}
-  .orb.speaking{animation:speak 0.45s ease-in-out infinite}
   @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-  @keyframes speak{0%,100%{transform:scale(1)}25%{transform:scale(1.06)}50%{transform:scale(0.98)}75%{transform:scale(1.07)}}
-  .state{font-size:13px;padding:6px 10px;border-radius:999px;background:#18181b;border:1px solid #27272a;color:#a1a1aa}
-  .state.dot::before{content:"●";margin-right:6px;font-size:10px}
-  .state.idle.dot::before{color:#71717a} .state.listening.dot::before{color:#22c55e} .state.speaking.dot::before{color:#a78bfa}
-  .hint{font-size:11px;color:#71717a;text-align:center;margin-top:8px}
-  /* hide default widget launcher, we use our orb */
-  elevenlabs-convai{position:fixed;bottom:16px;right:16px;z-index:10}
+  .btn{display:inline-block;padding:14px 18px;border-radius:12px;background:#7c3aed;color:white;text-decoration:none;font-weight:700;margin:8px 4px}
+  .btn.ghost{background:#1f1f23;border:1px solid #2a2a33}
+  .hint{font-size:11px;color:#71717a;margin-top:8px;line-height:1.5}
+  elevenlabs-convai{display:block;min-height:60px}
 </style>
 </head>
 <body>
 <header>
   <h1><span>11</span>Labs — Conversational Orb</h1>
-  <div class="sub">Tap orb to talk — powered by ElevenLabs Hindi agent</div>
+  <div class="sub">Hindi girl voice • agent_7401m5z5yqanemg8d06kb9eafhh6</div>
 </header>
 
 <div class="card">
   <div class="orb-wrap">
-    <div id="orb" class="orb idle" title="Tap to start"></div>
-    <div id="state" class="state dot idle">idle — tap orb to start</div>
-    <div style="font-size:12px;color:#71717a;text-align:center">agent_7401m5z5yqanemg8d06kb9eafhh6 • Hindi • widget mode (no 400)</div>
+    <div class="orb idle"></div>
+    <div style="font-size:13px;color:#a1a1aa">Tap a button below to talk</div>
   </div>
-  <div class="hint">If orb says listening, speak: <b>गुरुग्राम में गेहूं 20 क्विंटल कल रात 10 बजे</b><br/>Uses official ElevenLabs widget — same as dashboard Test.</div>
+  <!-- Primary: widget (works on laptop, sometimes blocked on phone) -->
+  <div id="widgetWrap" style="margin:8px 0">
+    <elevenlabs-convai agent-id="agent_7401m5z5yqanemg8d06kb9eafhh6"></elevenlabs-convai>
+  </div>
+  <!-- Fallback: direct ElevenLabs link — ALWAYS works on phone -->
+  <a class="btn" href="https://elevenlabs.io/app/talk-to?agent_id=agent_7401m5z5yqanemg8d06kb9eafhh6" target="_blank" rel="noopener">📱 Open on Phone (if no button above)</a>
+  <div class="hint">If you see no black phone button above, tap the purple button — it opens the official ElevenLabs talk page where mic always works.<br/>On laptop, use the widget above. Both use same Hindi girl voice.</div>
 </div>
 
-<!-- Official widget for public agents — this never 400s when auth is OFF -->
-<elevenlabs-convai agent-id="agent_7401m5z5yqanemg8d06kb9eafhh6"></elevenlabs-convai>
 <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
-
-<script>
-const orb=document.getElementById('orb'), state=document.getElementById('state');
-function setState(s,t){ orb.className='orb '+s; state.className='state dot '+s; state.textContent=t; }
-let widget=null;
-function bind(){
-  widget=document.querySelector('elevenlabs-convai');
-  if(!widget){ setTimeout(bind,500); return; }
-  // widget events — keep orb in sync
-  widget.addEventListener('elevenlabs-convai:call',()=> setState('listening','listening — speak now'));
-  widget.addEventListener('elevenlabs-convai:conversationStarted',()=> setState('listening','listening...'));
-  widget.addEventListener('elevenlabs-convai:conversationEnded',()=> setState('idle','idle — tap orb'));
-  widget.addEventListener('elevenlabs-convai:error', (e)=> console.error('widget error', e.detail));
-  // some widget versions emit mode changes via message
-  setState('idle','idle — tap orb to start (or use widget button)');
-}
-bind();
-orb.onclick=()=>{
-  widget=document.querySelector('elevenlabs-convai');
-  if(widget && widget.startConversation) widget.startConversation();
-  else setState('listening','opening widget...');
-};
-// also pulse orb when widget's audio plays (fallback analyser on widget audio)
-</script>
 </body>
 </html>
