@@ -219,6 +219,50 @@ if (PROVIDER === "sim") {
 
     const key = `${lang}|${text}`;
 
+    // Try Sarvam first if key set (best Hindi voice)
+    const SARVAM_KEY = process.env.SARVAM_API_KEY || process.env.SARVAM_API_SUBSCRIPTION_KEY || "";
+    if (SARVAM_KEY) {
+      try {
+        if (!ttsCache.has(key)) {
+          const resp = await fetch("https://api.sarvam.ai/text-to-speech", {
+            method: "POST",
+            headers: {
+              "api-subscription-key": SARVAM_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: text,
+              target_language_code: lang === "hi" ? "hi-IN" : "en-IN",
+              model: "bulbul:v3",
+              speaker: lang === "hi" ? "meera" : "anushka",
+              pace: 1,
+              speech_sample_rate: 22050,
+            }),
+          });
+          if (resp.ok) {
+            const j = await resp.json();
+            const b64 = j.audios && j.audios[0];
+            if (b64) {
+              const buf = Buffer.from(b64, "base64");
+              if (ttsCache.size > 300) ttsCache.delete(ttsCache.keys().next().value);
+              ttsCache.set(key, buf);
+            }
+          }
+        }
+        if (ttsCache.has(key)) {
+          return res
+            .set({
+              "Content-Type": "audio/mpeg",
+              "Cache-Control": "public, max-age=86400",
+              "X-TTS": "sarvam",
+            })
+            .send(ttsCache.get(key));
+        }
+      } catch (e) {
+        console.error("sarvam tts failed, falling back to Edge:", e.message);
+      }
+    }
+
     try {
       if (!ttsCache.has(key)) {
         const {
@@ -271,6 +315,7 @@ if (PROVIDER === "sim") {
           "Content-Type": "audio/mpeg",
           "Cache-Control":
             "public, max-age=86400",
+          "X-TTS": "edge",
         })
         .send(ttsCache.get(key));
     } catch (e) {
