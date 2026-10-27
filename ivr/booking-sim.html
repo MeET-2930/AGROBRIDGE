@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AgroBridge — Booking Simulation</title>
+<title>AgroBridge — Booking</title>
 <style>
  :root{--saffron:#FF9933;--green:#138808;--ink:#111827;--muted:#6b7280;--bg:#f9fafb}
  *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100vh}
- .strip{height:5px} .top{background:var(--saffron)} .bottom{background:var(--green);margin-top:auto}
+ .top{height:5px;background:var(--saffron)} .bottom{height:5px;background:var(--green);margin-top:auto}
  header{padding:14px;text-align:center} h1{margin:0;font-size:18px} p{color:var(--muted);font-size:13px;margin:6px 0 0}
  .wrap{max-width:560px;width:100%;margin:0 auto;padding:0 14px 16px;flex:1;display:flex;flex-direction:column}
  .card{background:#fff;border-radius:16px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,.07);margin:8px 0}
@@ -24,66 +24,90 @@
 </style>
 </head>
 <body>
-<div class="strip top"></div>
-<header><h1>AgroBridge — One-Sentence Booking</h1><p>Say it once: <em>गुरुग्राम में गेहूं 20 क्विंटल आज</em> → it extracts and asks only what's missing, then confirms</p></header>
+<div class="top"></div>
+<header><h1>AgroBridge — Booking</h1><p>Say once, I ask only what's missing, then confirm</p></header>
 <div class="wrap">
  <div class="card row"><select id="lang"><option value="hi">हिन्दी</option><option value="en">English</option></select><input id="phone" maxlength="10" value="9100000001"></div>
  <div class="chat" id="chat"></div>
- <div class="status" id="status">Type or tap 🎤 and say your sentence</div>
+ <div class="status" id="status">Ready</div>
  <div class="card">
-  <div class="row"><input id="text" placeholder="e.g. gurugram me gehu 20 quintal aaj"><button id="send" class="btn send">Send</button></div>
-  <button id="mic" class="btn mic" style="margin-top:10px;width:100%">🎤 Speak Sentence</button>
+  <div class="row"><input id="text" placeholder="gurugram me gehu 20 quintal aaj"><button id="send" class="btn send">Send</button></div>
+  <button id="mic" class="btn mic" style="margin-top:10px;width:100%">🎤 Speak</button>
  </div>
 </div>
-<div class="strip bottom"></div>
+<div style="text-align:center;font-size:10px;color:#9ca3af;opacity:0.6;margin:8px 0;letter-spacing:0.4px">Powered by Sarvam • Bulbul</div>
+<div class="bottom"></div>
 <script>
 (function(){
  const $=id=>document.getElementById(id);
  const chat=$('chat'), status=$('status'), text=$('text'), phoneEl=$('phone'), langEl=$('lang'), micBtn=$('mic');
  let messages=[]; let rec=null; let recording=false; let player=null;
  const log=(c,t)=>{ const d=document.createElement('div'); d.className='msg '+c; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
- const sys=t=>{ const d=document.createElement('div'); d.className='sys'; d.textContent=t; chat.appendChild(d); chat.scrollTop=1e9; };
  function setStatus(t){ status.textContent=t; }
- function speak(tt){
-   const lang=langEl.value==='hi'?'hi':'en';
-   const a=new Audio('/tts?lang='+lang+'&text='+encodeURIComponent(String(tt).slice(0,600)));
-   player=a; a.onended=()=>setStatus("Reply or speak again"); a.onerror=()=>fallback(tt,lang);
-   a.play().catch(()=>fallback(tt,lang));
+ // hard stop any audio
+ function hardStop(){
+   try{ if(player){player.pause();player.src='';player.currentTime=0;player=null;} }catch(e){}
+   try{ window.speechSynthesis.cancel(); }catch(e){}
+   try{ document.querySelectorAll('audio').forEach(a=>{a.pause();a.src='';}); }catch(e){}
  }
- function fallback(t,lang){
-   if(!('speechSynthesis' in window)) return;
-   const u=new SpeechSynthesisUtterance(t); u.lang=lang==='hi'?'hi-IN':'en-IN'; u.rate=0.96; speechSynthesis.speak(u);
+ function speak(tt){
+   hardStop();
+   const lang=langEl.value==='hi'?'hi':'en';
+   const a=new Audio('/tts?lang='+encodeURIComponent(lang)+'&text='+encodeURIComponent(String(tt).slice(0,400)));
+   player=a;
+   setStatus("🔊 बोल रहा हूँ — tap mic to interrupt");
+   a.onended=()=>setStatus("Ready");
+   a.onerror=()=>{
+     try{
+       const u=new SpeechSynthesisUtterance(tt);
+       u.lang=lang==='hi'?'hi-IN':'en-IN'; u.rate=0.96;
+       u.onend=()=>setStatus("Ready");
+       window.speechSynthesis.speak(u);
+     }catch(e){ setStatus("Ready"); }
+   };
+   a.play().catch(()=>{
+     try{
+       const u=new SpeechSynthesisUtterance(tt);
+       u.lang=lang==='hi'?'hi-IN':'en-IN';
+       window.speechSynthesis.speak(u);
+     }catch(e){}
+   });
  }
  async function send(content){
    if(!content.trim()) return;
-   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10){ alert('10-digit phone'); return; }
-   try{ if(player){player.pause();player.src='';} speechSynthesis.cancel(); }catch(e){}
-   log('me', content); messages.push({role:'user', content}); setStatus("… extracting");
+   const p=phoneEl.value.replace(/\D/g,''); if(p.length!==10){ alert('10-digit'); return; }
+   hardStop();
+   log('me', content);
+   messages.push({role:'user', content});
+   setStatus("…");
    try{
      const r=await fetch('/agent/chat',{method:'POST',headers:{'Content-Type':'application/json','x-agb-key':'agb-dev-key'},body:JSON.stringify({messages, phone:p, lang:langEl.value})});
      const j=await r.json();
-     const reply=j.reply||'क्षमा कीजिए';
-     messages.push({role:'assistant', content:reply}); log('bot', reply); speak(reply);
-     if(j.done) sys('✓ Booked — check Farmer Dashboard');
-   }catch(e){ log('bot','नेटवर्क दिक्कत'); }
+     const reply=j.reply||'क्षमा';
+     messages.push({role:'assistant', content:reply});
+     log('bot', reply);
+     speak(reply);
+     if(j.done) log('sys','✓ Booked');
+   }catch(e){ log('bot','नेटवर्क'); setStatus("Ready"); }
  }
- function stopAllAudio(){ try{ if(player){player.pause();player.src='';} }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} }
  function toggleMic(){
-   stopAllAudio();
+   hardStop(); // <— shuts up instantly
    if(recording){ try{rec.stop()}catch(e){} return; }
    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
    if(!SR){ const t=prompt("Type:"); if(t) send(t); return; }
-   rec=new SR(); rec.lang=langEl.value==='hi'?'hi-IN':'en-IN'; rec.interimResults=false; rec.continuous=false;
-   recording=true; micBtn.classList.add('rec'); micBtn.textContent='⏹️ Listening…'; setStatus("🎤 बोलिए — एक वाक्य");
+   rec=new SR();
+   rec.lang=langEl.value==='hi'?'hi-IN':'en-IN';
+   rec.interimResults=false; rec.continuous=false;
+   recording=true; micBtn.classList.add('rec'); micBtn.textContent='⏹️ Stop'; setStatus("🎤 सुन रहा हूँ");
    rec.onresult=e=>{ const t=(e.results[0]&&e.results[0][0]&&e.results[0][0].transcript)||""; if(t) send(t); };
-   rec.onend=()=>{ recording=false; micBtn.classList.remove('rec'); micBtn.textContent='🎤 Speak Sentence'; setStatus("Type or speak again"); };
+   rec.onend=()=>{ recording=false; micBtn.classList.remove('rec'); micBtn.textContent='🎤 Speak'; setStatus("Ready"); };
    rec.onerror=()=>{ recording=false; micBtn.classList.remove('rec'); };
-   try{ rec.start(); setTimeout(()=>{ if(recording) try{rec.stop()}catch(e){} }, 7000);}catch(e){ recording=false; }
+   try{ rec.start(); setTimeout(()=>{ try{rec.stop()}catch(e){} }, 6000);}catch(e){ recording=false; }
  }
  micBtn.onclick=toggleMic;
  $('send').onclick=()=>{ const v=text.value.trim(); if(v){ text.value=''; send(v);} };
  text.onkeydown=e=>{ if(e.key==='Enter'){ const v=text.value.trim(); if(v){ text.value=''; send(v);} } };
- setStatus("Ready — say: gurugram me gehu 20 quintal aaj");
+ setStatus("Ready — type or tap Speak");
 })();
 </script>
 </body>

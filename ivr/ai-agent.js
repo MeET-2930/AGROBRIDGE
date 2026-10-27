@@ -175,8 +175,16 @@ function extractFromText(text, centres){
     else if(raw.includes("आज") || raw.includes("aaj")) { date=fmt(ist); }
     else if(raw.includes("नरसों") || raw.includes("narso")) { const d=new Date(ist); d.setDate(d.getDate()+3); date=fmt(d); }
   }
-  const slotMatch=raw.match(/(\d{1,2})\s*[:\-]?\s*00/) || raw.match(/(\d{1,2})\s*baje/) || raw.match(/(\d{1,2})\s*बजे/);
-  const slot=slotMatch?`${String(slotMatch[1]).padStart(2,"0")}:00`:null;
+  let slot=null;
+  let slotMatch=raw.match(/(\d{1,2})\s*[:\-]?\s*00/) || raw.match(/(\d{1,2})\s*baje/) || raw.match(/(\d{1,2})\s*बजे/);
+  if(slotMatch){
+    let h=Number(slotMatch[1]);
+    const isNight = raw.includes("रात") || raw.includes("raat") || raw.includes("pm") || raw.includes("पीएम");
+    const isEvening = raw.includes("शाम") || raw.includes("shaam") || raw.includes("evening");
+    if((isNight || isEvening) && h>=1 && h<=11) h+=12;
+    if(h===24) h=0;
+    if(h>=0 && h<=23) slot=`${String(h).padStart(2,"0")}:00`;
+  }
   return {centreId,crop,quantity,slot, date};
 }
 async function ruleBasedReply({messages, phone, store, lang}){
