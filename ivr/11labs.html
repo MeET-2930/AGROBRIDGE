@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>11Labs — Conversational Orb</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;min-height:100vh;background:radial-gradient(1200px 600px at 50% -10%, #1e1b4b 0%, #09090b 60%);color:#e5e7eb;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;align-items:center}
+  header{padding:18px 14px 6px;text-align:center}
+  h1{margin:0;font-size:22px;letter-spacing:0.3px} h1 span{color:#a78bfa}
+  .sub{color:#9ca3af;font-size:13px;margin-top:6px}
+  .card{width:min(520px,92vw);background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:16px;margin:14px 0}
+  label{font-size:12px;color:#9ca3af;display:block;margin:8px 0 6px}
+  input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a2a33;background:#0f1115;color:#fff;outline:none}
+  input:focus{border-color:#7c3aed}
+  .orb-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 0}
+  .orb{width:180px;height:180px;border-radius:50%;background:radial-gradient(circle at 30% 25%, #c4b5fd 0%, #7c3aed 35%, #4c1d95 70%, #1e1b4b 100%);box-shadow:0 0 40px rgba(124,58,237,0.6), inset 0 0 30px rgba(255,255,255,0.25);position:relative;transition:transform 0.15s, box-shadow 0.2s}
+  .orb::after{content:"";position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.85), transparent 55%);opacity:0.7}
+  .orb.idle{animation: breathe 3s ease-in-out infinite}
+  .orb.listening{animation: pulse 0.9s ease-in-out infinite; box-shadow:0 0 55px rgba(34,197,94,0.7), inset 0 0 30px rgba(255,255,255,0.25)}
+  .orb.speaking{animation: speak 0.45s ease-in-out infinite}
+  .orb.thinking{animation: breathe 1.2s ease-in-out infinite; filter:brightness(1.15)}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @keyframes speak{0%,100%{transform:scale(1)}25%{transform:scale(1.06)}50%{transform:scale(0.98)}75%{transform:scale(1.07)}}
+  .state{font-size:13px;padding:6px 10px;border-radius:999px;background:#18181b;border:1px solid #27272a;color:#a1a1aa}
+  .state.dot::before{content:"●";margin-right:6px;font-size:10px}
+  .state.idle.dot::before{color:#71717a} .state.listening.dot::before{color:#22c55e} .state.speaking.dot::before{color:#a78bfa} .state.thinking.dot::before{color:#f59e0b}
+  .btns{display:flex;gap:10px;justify-content:center;margin-top:4px}
+  button{flex:1;padding:12px 14px;border-radius:12px;border:none;font-weight:600;cursor:pointer}
+  .primary{background:#7c3aed;color:white} .primary:disabled{opacity:0.45;cursor:not-allowed}
+  .ghost{background:#1f1f23;color:#e5e7eb;border:1px solid #2a2a33}
+  .log{height:170px;overflow:auto;background:#0a0a0f;border-radius:12px;padding:10px;font-size:13px;line-height:1.5;border:1px solid #1f1f23}
+  .log b{color:#c4b5fd} .hint{font-size:11px;color:#71717a;text-align:center;margin-top:8px}
+  a{color:#a78bfa}
+</style>
+<script type="importmap">
+{ "imports": { "@elevenlabs/client": "https://esm.sh/@elevenlabs/client@0.6.0" } }
+</script>
+</head>
+<body>
+<header>
+  <h1><span>11</span>Labs — Conversational Orb</h1>
+  <div class="sub">Paste your Agent ID → Start → talk. Orb reacts to listening / speaking.</div>
+</header>
+
+<div class="card">
+  <label>ElevenLabs Agent ID <span style="color:#71717a">(Dashboard → Agents → copy ID like agent_...)</span></label>
+  <input id="agentId" placeholder="agent_xxxxxxxxxxxxxxxx" value=""/>
+  <div class="orb-wrap">
+    <div id="orb" class="orb idle"></div>
+    <div id="state" class="state dot idle">idle — click Start</div>
+    <div class="btns" style="width:100%">
+      <button id="startBtn" class="primary">Start conversation</button>
+      <button id="endBtn" class="ghost" disabled>End</button>
+    </div>
+  </div>
+  <div id="log" class="log"><span style="color:#71717a">Transcript will appear here...</span></div>
+  <div class="hint">Uses <code>Conversation.startSession({agentId})</code> — public agents need no key. For private agents, create a signed URL in your backend and use <code>signedUrl</code> instead. <a href="https://elevenlabs.io/docs/conversational-ai/libraries/java-script" target="_blank">Docs</a></div>
+</div>
+
+<script type="module">
+import { Conversation } from '@elevenlabs/client';
+
+const $ = s=>document.getElementById(s);
+const orb=$('orb'), state=$('state'), log=$('log'), startBtn=$('startBtn'), endBtn=$('endBtn'), agentIn=$('agentId');
+
+// remember id
+agentIn.value = localStorage.getItem('eleven_agent_id')||'';
+agentIn.addEventListener('change',()=>localStorage.setItem('eleven_agent_id', agentIn.value.trim()));
+
+let conversation=null;
+let analyzer=null, audioCtx=null, raf=null;
+
+function setState(s, txt){
+  orb.className='orb '+s;
+  state.className='state dot '+s;
+  state.textContent=txt;
+}
+function addLog(who, msg){
+  const el=document.createElement('div');
+  el.innerHTML=`<b>${who}:</b> ${msg}`;
+  log.appendChild(el);
+  log.scrollTop=log.scrollHeight;
+}
+
+// optional mic analyser to pulse orb while user talks
+async function attachMicAnalyser(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(stream);
+    analyzer=audioCtx.createAnalyser();
+    analyzer.fftSize=256;
+    src.connect(analyzer);
+    const data=new Uint8Array(analyzer.frequencyBinCount);
+    const tick=()=>{
+      if(!analyzer) return;
+      raf=requestAnimationFrame(tick);
+      analyzer.getByteFrequencyData(data);
+      const vol=data.reduce((a,b)=>a+b,0)/data.length/255;
+      if(conversation && state.classList.contains('listening')){
+        orb.style.transform=`scale(${1+vol*0.12})`;
+      }
+    };
+    tick();
+  }catch(e){ console.warn('mic analyser failed',e)}
+}
+function detachAnalyser(){
+  if(raf) cancelAnimationFrame(raf);
+  if(audioCtx) try{audioCtx.close()}catch{}
+  analyzer=null; audioCtx=null;
+}
+
+startBtn.onclick=async()=>{
+  const agentId=agentIn.value.trim();
+  if(!agentId.startsWith('agent_')){ alert('Paste your Agent ID (starts with agent_)'); return; }
+  localStorage.setItem('eleven_agent_id', agentId);
+  startBtn.disabled=true; endBtn.disabled=false;
+  setState('thinking','connecting…');
+  log.innerHTML='';
+  addLog('system','Requesting microphone…');
+  try{
+    await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){
+    addLog('error','Microphone denied — allow mic and retry');
+    setState('idle','idle — mic denied'); startBtn.disabled=false; endBtn.disabled=true; return;
+  }
+
+  // start analyser pulse
+  attachMicAnalyser();
+
+  try{
+    conversation = await Conversation.startSession({
+      agentId,
+      connectionType: 'webrtc', // or 'websocket'
+      onConnect: ({conversationId})=>{
+        setState('listening','listening — speak now');
+        addLog('system','connected '+conversationId);
+      },
+      onDisconnect: ()=>{
+        setState('idle','idle — ended');
+        addLog('system','disconnected');
+        startBtn.disabled=false; endBtn.disabled=true;
+        detachAnalyser();
+      },
+      onMessage: (msg)=>{
+        // msg.message or msg.text
+        const text = msg.message || msg.text || JSON.stringify(msg);
+        const role = msg.source==='ai' || msg.role==='agent' ? 'agent' : msg.source==='user' || msg.role==='user' ? 'you' : 'agent';
+        addLog(role, text);
+      },
+      onModeChange: ({mode})=>{
+        // mode: speaking | listening | idle
+        if(mode==='speaking') setState('speaking','speaking…');
+        else if(mode==='listening') setState('listening','listening…');
+        else setState('idle','idle');
+      },
+      onError: (e)=>{
+        addLog('error', String(e?.message||e));
+        console.error(e);
+      },
+      onStatusChange: ({status})=>{
+        console.log('status',status);
+      }
+    });
+    addLog('system','Session started — talk to the orb');
+  }catch(e){
+    console.error(e);
+    addLog('error', 'Failed: '+(e?.message||e));
+    setState('idle','idle — error');
+    startBtn.disabled=false; endBtn.disabled=true;
+    detachAnalyser();
+  }
+};
+
+endBtn.onclick=async()=>{
+  try{ await conversation?.endSession(); }catch{}
+  conversation=null;
+  setState('idle','idle — ended');
+  startBtn.disabled=false; endBtn.disabled=true;
+  detachAnalyser();
+};
+</script>
+</body>
+</html>

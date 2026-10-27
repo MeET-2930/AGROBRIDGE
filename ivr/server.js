@@ -607,6 +607,7 @@ app.get("/open-router-call", (_, res) => res.sendFile(path.join(__dirname, "open
 app.get("/booking-sim", (_, res) => res.sendFile(path.join(__dirname, "booking-sim.html")));
 app.get("/sim-openrouter", (_, res) => res.sendFile(path.join(__dirname, "sim-openrouter.html")));
 app.get("/sim-agent", (_, res) => res.sendFile(path.join(__dirname, "sim-agent.html")));
+app.get("/11labs", (_, res) => res.sendFile(path.join(__dirname, "11labs.html")));
 app.get("/live", (_, res) => res.sendFile(path.join(__dirname, "live.html")));
 
 app.post("/live/audio", chatGuard, async (req, res) => {
@@ -644,6 +645,46 @@ app.post("/live/audio", chatGuard, async (req, res) => {
 
 app.post("/retell/webhook", async (req,res)=> retellWebhook.handleWebhook(req,res));
 app.get("/retell/test", (_,res)=> res.json({ok:true, message:"Retell webhook is live. POST /retell/webhook with {function_name, arguments}"}));
+
+// ---------------------------------------------------------------
+// ELEVENLABS WEBHOOK - direct booking for 11labs agent
+// POST /api/book  {centreId,crop,quantity,date,slot,farmerName,phone}
+// Also supports GET query params for ElevenLabs GET tools
+// ---------------------------------------------------------------
+app.all("/api/book", async (req, res) => {
+  try {
+    const src = { ...(req.query||{}), ...(req.body||{}) };
+    let { centreId, crop, quantity, date, slot, farmerName, phone } = src;
+    quantity = Number(quantity);
+    // fuzzy centre resolve: accept "Gurugram" or id
+    if (centreId && !String(centreId).startsWith("centre_")) {
+      const centres = await bookingAgent.store.fetchCentres();
+      const q = String(centreId).toLowerCase();
+      const hit = centres.find(c => c.name?.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || q.includes(c.name?.toLowerCase().slice(0,4)));
+      if (hit) centreId = hit.id;
+    }
+    if (!centreId || !crop || !quantity || !date || !slot) {
+      return res.status(400).json({ ok:false, error:"Missing required: centreId, crop, quantity, date, slot", received: src });
+    }
+    const centre = await bookingAgent.store.fetchCentreById(centreId);
+    if (!centre) return res.status(404).json({ ok:false, error:"Mandi not found: "+centreId });
+    const slots = await bookingAgent.store.fetchAvailableSlots(centre, date);
+    if (!slots.find(s=>s.slotTime===slot)) {
+      return res.status(400).json({ ok:false, error:"Slot not available", availableSlots: slots.map(s=>s.slotTime) });
+    }
+    const bPhone = String(phone||"919999999999");
+    const bName = String(farmerName||bPhone);
+    await bookingAgent.store.ensureFarmer(bPhone, bName);
+    const booking = await bookingAgent.store.createBooking({ farmerId:bPhone, farmerName:bName, centre, crop:String(crop).toLowerCase(), quantity, date, slot });
+    return res.json({ ok:true, tokenNumber: booking.tokenNumber, gatePassCode: booking.gatePassCode, centreName: booking.centreName, date: booking.date, slot: booking.slot, message: `Booked ${booking.tokenNumber} at ${booking.centreName} ${booking.date} ${booking.slot}` });
+  } catch(e){
+    console.error("/api/book error", e);
+    const msg = String(e.message||"");
+    if(msg.includes("SLOT_FULL")) return res.status(409).json({ ok:false, error:"Slot full, try another time" });
+    return res.status(500).json({ ok:false, error: msg||"Booking failed" });
+  }
+});
+
 
 // A malformed JSON body must not surface an Express stack trace.
 app.use((err, req, res, next) => {
