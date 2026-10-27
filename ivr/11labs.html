@@ -15,10 +15,14 @@
   .orb::after{content:"";position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.85), transparent 55%);opacity:0.7}
   .orb.idle{animation:breathe 3s ease-in-out infinite}
   @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-  .btn{display:inline-block;padding:14px 18px;border-radius:12px;background:#7c3aed;color:white;text-decoration:none;font-weight:700;margin:8px 4px}
+  .btn{display:inline-block;padding:14px 18px;border-radius:12px;background:#7c3aed;color:white;text-decoration:none;font-weight:700;margin:8px 4px;border:none;cursor:pointer}
   .btn.ghost{background:#1f1f23;border:1px solid #2a2a33}
+  .btn:disabled{opacity:0.45;cursor:not-allowed}
   .hint{font-size:11px;color:#71717a;margin-top:8px;line-height:1.5}
+  input.phone{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #2a2a33;background:#0f1115;color:#fff;outline:none;font-size:16px;text-align:center;letter-spacing:1px;margin:8px 0}
+  input.phone:focus{border-color:#7c3aed}
   elevenlabs-convai{display:block;min-height:60px}
+  .step{display:none} .step.active{display:block}
 </style>
 </head>
 <body>
@@ -28,19 +32,87 @@
 </header>
 
 <div class="card">
-  <div class="orb-wrap">
-    <div class="orb idle"></div>
-    <div style="font-size:13px;color:#a1a1aa">Tap a button below to talk</div>
+  <!-- STEP 1: Phone number -->
+  <div id="phoneStep" class="step active">
+    <div style="font-size:15px;font-weight:600;margin:6px 0">पहले अपना फोन नंबर डालिए</div>
+    <div style="font-size:13px;color:#9ca3af">एजेंट इसी नंबर से आपको पहचानेगी और इसी पर SMS भेजेगी</div>
+    <input id="phoneInput" class="phone" type="tel" inputmode="numeric" maxlength="10" placeholder="10 अंकों का नंबर — 98XXXXXXXX" />
+    <button id="phoneBtn" class="btn" style="width:100%">आगे बढ़ें →</button>
+    <div id="phoneErr" style="font-size:12px;color:#f87171;margin-top:6px;min-height:16px"></div>
+    <div class="hint">बिना नंबर के कॉल नहीं लगेगा। नंबर Firebase में चेक होगा — नया है तो नाम पूछेगी, पुराना है तो नाम से बुलाएगी।</div>
   </div>
-  <!-- Primary: widget (works on laptop, sometimes blocked on phone) -->
-  <div id="widgetWrap" style="margin:8px 0">
-    <elevenlabs-convai agent-id="agent_7401m5z5yqanemg8d06kb9eafhh6"></elevenlabs-convai>
+
+  <!-- STEP 2: Orb + Widget -->
+  <div id="orbStep" class="step">
+    <div class="orb-wrap">
+      <div class="orb idle"></div>
+      <div style="font-size:13px;color:#a1a1aa">नमस्ते <span id="phoneShow" style="color:#c4b5fd;font-weight:600"></span> जी — नीचे बटन से बात शुरू करें</div>
+    </div>
+    <div id="widgetWrap" style="margin:8px 0">
+      <elevenlabs-convai id="convai" agent-id="agent_7401m5z5yqanemg8d06kb9eafhh6"></elevenlabs-convai>
+    </div>
+    <a id="phoneLink" class="btn" href="https://elevenlabs.io/app/talk-to?agent_id=agent_7401m5z5yqanemg8d06kb9eafhh6" target="_blank" rel="noopener">📱 Phone पर खोलें</a>
+    <div class="hint">लैपटॉप पर ऊपर वाला widget, फोन पर purple बटन — दोनों एक ही एजेंट, एक ही आवाज़।</div>
+    <button id="changePhone" class="btn ghost" style="font-size:12px;padding:8px 12px;margin-top:8px">नंबर बदलें</button>
   </div>
-  <!-- Fallback: direct ElevenLabs link — ALWAYS works on phone -->
-  <a class="btn" href="https://elevenlabs.io/app/talk-to?agent_id=agent_7401m5z5yqanemg8d06kb9eafhh6" target="_blank" rel="noopener">📱 Open on Phone (if no button above)</a>
-  <div class="hint">If you see no black phone button above, tap the purple button — it opens the official ElevenLabs talk page where mic always works.<br/>On laptop, use the widget above. Both use same Hindi girl voice.</div>
 </div>
 
 <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+<script>
+const phoneInput=document.getElementById('phoneInput');
+const phoneBtn=document.getElementById('phoneBtn');
+const phoneErr=document.getElementById('phoneErr');
+const phoneStep=document.getElementById('phoneStep');
+const orbStep=document.getElementById('orbStep');
+const phoneShow=document.getElementById('phoneShow');
+const phoneLink=document.getElementById('phoneLink');
+
+function isPhone(v){ return /^[6-9]\d{9}$/.test(v); }
+
+function showOrb(phone){
+  phoneShow.textContent=phone;
+  phoneStep.classList.remove('active');
+  orbStep.classList.add('active');
+  // pass phone to widget via dynamic variables + URL var
+  const w=document.getElementById('convai');
+  if(w){
+    // ElevenLabs widget reads dynamic-variables as JSON string
+    try{
+      w.setAttribute('dynamic-variables', JSON.stringify({phone: phone, phone_number: phone, user_phone: phone}));
+      // also set variant that widget v2 uses
+      w.setAttribute('data-dynamic-variables', JSON.stringify({phone}));
+    }catch(e){}
+  }
+  phoneLink.href=`https://elevenlabs.io/app/talk-to?agent_id=agent_7401m5z5yqanemg8d06kb9eafhh6&var_phone=${phone}&var_phone_number=${phone}`;
+  localStorage.setItem('orb_phone', phone);
+  // also store for direct API fallback if widget uses fetch
+  try{ localStorage.setItem('eleven_phone', phone); }catch{}
+}
+
+// restore if already entered
+const saved=localStorage.getItem('orb_phone');
+if(saved && isPhone(saved)){
+  phoneInput.value=saved;
+  showOrb(saved);
+}
+
+phoneBtn.onclick=()=>{
+  const v=phoneInput.value.replace(/\D/g,'').slice(-10);
+  if(!isPhone(v)){ phoneErr.textContent='कृपया 10 अंकों का सही नंबर डालें (6-9 से शुरू)'; phoneInput.focus(); return; }
+  phoneErr.textContent='';
+  showOrb(v);
+};
+phoneInput.addEventListener('input',()=>{
+  phoneInput.value=phoneInput.value.replace(/\D/g,'').slice(0,10);
+  if(isPhone(phoneInput.value)) phoneErr.textContent='';
+});
+phoneInput.addEventListener('keydown',e=>{ if(e.key==='Enter') phoneBtn.click(); });
+
+document.getElementById('changePhone').onclick=()=>{
+  orbStep.classList.remove('active');
+  phoneStep.classList.add('active');
+  phoneInput.focus();
+};
+</script>
 </body>
 </html>

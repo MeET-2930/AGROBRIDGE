@@ -647,10 +647,92 @@ app.post("/retell/webhook", async (req,res)=> retellWebhook.handleWebhook(req,re
 app.get("/retell/test", (_,res)=> res.json({ok:true, message:"Retell webhook is live. POST /retell/webhook with {function_name, arguments}"}));
 
 // ---------------------------------------------------------------
+
+// 11labs signed URL for private agents (fixes 400 conversation token error)
+app.get("/11labs/token", async (req,res)=>{
+  try{
+    const agentId = String(req.query.agent_id||"").trim();
+    if(!agentId) return res.status(400).json({error:"missing agent_id"});
+    const key = process.env.ELEVENLABS_API_KEY || process.env.XI_API_KEY || "";
+    if(!key) return res.status(500).json({error:"ELEVENLABS_API_KEY not set on Render"});
+    const r = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(agentId)}`,{
+      headers: {"xi-api-key": key}
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) return res.status(r.status).json({error: j?.detail||j?.message||"elevenlabs error", raw:j});
+    // j.signed_url
+    return res.json(j);
+  }catch(e){ console.error("/11labs/token",e); res.status(500).json({error:e.message}) }
+});
+
 // ELEVENLABS WEBHOOK - direct booking for 11labs agent
 // POST /api/book  {centreId,crop,quantity,date,slot,farmerName,phone}
 // Also supports GET query params for ElevenLabs GET tools
 // ---------------------------------------------------------------
+
+// 11labs: check if farmer exists by phone (for Hindi orb name flow)
+app.get("/api/farmer", async (req,res)=>{
+  try{
+    const phone = String(req.query.phone||req.query.phoneNumber||"").replace(/\D/g,"").slice(-10);
+    if(!phone || phone.length<10) return res.status(400).json({ok:false, error:"missing phone 10 digits"});
+    const full = "91"+phone;
+    // try full, then last10
+    let doc = await db.collection("farmers").doc(full).get();
+    if(!doc.exists) doc = await db.collection("farmers").doc(phone).get();
+    if(!doc.exists){
+      // also try query by phone field
+      const q = await db.collection("farmers").where("phone","==",full).limit(1).get();
+      if(!q.empty) doc = q.docs[0];
+      else {
+        const q2 = await db.collection("farmers").where("phone","==",phone).limit(1).get();
+        if(!q2.empty) doc = q2.docs[0];
+      }
+    }
+    if(doc && doc.exists){
+      const d=doc.data();
+      return res.json({ok:true, exists:true, phone: d.phone||full, name: d.name||"", farmerId: doc.id});
+    }
+    return res.json({ok:true, exists:false});
+  }catch(e){ console.error("/api/farmer",e); res.status(500).json({ok:false, error:e.message})}
+});
+app.post("/api/farmer", async (req,res)=>{
+  try{
+    const phoneRaw = String(req.body.phone||req.query.phone||"").replace(/\D/g,"").slice(-10);
+    const name = String(req.body.name||req.body.farmerName||"").trim().slice(0,30);
+    if(!phoneRaw || phoneRaw.length<10) return res.status(400).json({ok:false, error:"phone required"});
+    if(!name || name.length<2) return res.status(400).json({ok:false, error:"name required"});
+    const phone="91"+phoneRaw;
+    await db.collection("farmers").doc(phone).set({phone, name, createdAt:new Date().toISOString(), source:"11labs-orb", registeredVia:"voice"}, {merge:true});
+    return res.json({ok:true, phone, name});
+  }catch(e){ console.error("POST /api/farmer",e); res.status(500).json({ok:false, error:e.message})}
+});
+
+
+// Verify bookings for a phone — proves Firebase connection
+app.get("/api/bookings", async (req,res)=>{
+  try{
+    const phone = String(req.query.phone||"").replace(/\D/g,"").slice(-10);
+    if(!phone) return res.status(400).json({ok:false, error:"phone query required"});
+    const full="91"+phone;
+    const snaps = await Promise.all([
+      db.collection("bookings").where("farmerId","==",full).limit(10).get(),
+      db.collection("bookings").where("farmerId","==",phone).limit(10).get()
+    ]);
+    const all = [...snaps[0].docs, ...snaps[1].docs].map(d=>({id:d.id, ...d.data()}));
+    return res.json({ok:true, count: all.length, bookings: all.sort((a,b)=> String(b.createdAt).localeCompare(String(a.createdAt)))});
+  }catch(e){ console.error("/api/bookings",e); res.status(500).json({ok:false, error:e.message})}
+});
+app.get("/api/slots", async (req,res)=>{
+  try{
+    const {centreId, date} = req.query;
+    if(!centreId || !date) return res.status(400).json({ok:false, error:"centreId and date required"});
+    const centre = await bookingAgent.store.fetchCentreById(centreId);
+    if(!centre) return res.status(404).json({ok:false, error:"centre not found"});
+    const slots = await bookingAgent.store.fetchAvailableSlots(centre, date);
+    return res.json({ok:true, centre: centre.name, date, slots});
+  }catch(e){ res.status(500).json({ok:false, error:e.message}) }
+});
+
 app.all("/api/book", async (req, res) => {
   try {
     const src = { ...(req.query||{}), ...(req.body||{}) };
@@ -676,7 +758,8 @@ app.all("/api/book", async (req, res) => {
     const bName = String(farmerName||bPhone);
     await bookingAgent.store.ensureFarmer(bPhone, bName);
     const booking = await bookingAgent.store.createBooking({ farmerId:bPhone, farmerName:bName, centre, crop:String(crop).toLowerCase(), quantity, date, slot });
-    return res.json({ ok:true, tokenNumber: booking.tokenNumber, gatePassCode: booking.gatePassCode, centreName: booking.centreName, date: booking.date, slot: booking.slot, message: `Booked ${booking.tokenNumber} at ${booking.centreName} ${booking.date} ${booking.slot}` });
+    console.log(`✅ Firebase booking created: ${booking.tokenNumber} ${booking.centreName} ${booking.date} ${booking.slot} for ${bPhone} (${bName})`);
+    return res.json({ ok:true, tokenNumber: booking.tokenNumber, gatePassCode: booking.gatePassCode, centreName: booking.centreName, date: booking.date, slot: booking.slot, phone: bPhone, smsSent: false, firebase: true, message: `Booked ${booking.tokenNumber} at ${booking.centreName} ${booking.date} ${booking.slot} — SMS will be sent to ${bPhone}` });
   } catch(e){
     console.error("/api/book error", e);
     const msg = String(e.message||"");
