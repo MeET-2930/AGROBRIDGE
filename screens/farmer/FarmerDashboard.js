@@ -284,7 +284,7 @@ export default function FarmerDashboard({ navigation }) {
           </View>
         )}
 
-        <!-- Highlight: Voice + News always on top -->
+        {/* Highlight: Voice + News always on top */}
         <View style={[styles.grid, {marginTop: 8}]}>
           <DashboardCard
             title={lang === 'hi' ? '🎤 AI Voice से बुक करें' : '🎤 AI Voice Booking'}
