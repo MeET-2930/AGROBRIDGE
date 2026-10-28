@@ -599,6 +599,104 @@ app.post("/agent/chat", chatGuard, async (req, res) => {
   } catch (e) {
     console.error("booking agent error:", e);
     res.status(500).json({ error: "Booking agent failed", reply: "क्षमा कीजिए जी, थोड़ी तकनीकी दिक्कत आ गई। कृपया फिर से बताइए।" });
+
+// Gemma endpoint — speak whatever you wish, in-app (no phone check, uses session)
+app.post("/agent/gemma", chatGuard, async (req, res) => {
+  try {
+    const { messages, phone, farmerName, lang, text } = req.body;
+    const phoneClean = String(phone||"").replace(/\D/g,"").slice(-10) || "9100000001";
+    const nameFromSession = String(farmerName||"").trim();
+    // Use the same store as bookingAgent
+    const store = bookingAgent.store;
+    // Build messages for Gemma
+    let msgs = Array.isArray(messages) ? messages : [];
+    if (!msgs.length && text) msgs = [{role:"user", content: text}];
+    const lastUser = [...msgs].reverse().find(m=>m.role==="user")?.content || text || "";
+    const GEMMA_KEY = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || "";
+    const GEMMA_MODEL = process.env.GEMMA_MODEL || "google/gemma-3-27b-it:free";
+
+    // If no key, fall back to ruleBasedReply but with session phone/name (no registration ask)
+    if (!GEMMA_KEY) {
+      // directly try rule-based with session
+      const centres = await store.fetchCentres();
+      const historyText = msgs.filter(m=>m.role==="user").map(m=>m.content).join(" | ") + " | " + lastUser;
+      // Reuse extractFromText from ai-agent (duplicate logic but simplified)
+      // For now just delegate to bookingAgent.handleChat but with phone from session and skip name ask if we have it
+      const result = await bookingAgent.handleChat({ messages: msgs, phone: phoneClean, lang: lang||"hi" });
+      // If result asks for name but we have nameFromSession, inject it
+      if (nameFromSession && /आपका नाम|What is your name/.test(result.reply)) {
+        // auto-register if needed and retry
+        await store.ensureFarmer(phoneClean, nameFromSession);
+        msgs.push({role:"assistant", content: result.reply});
+        msgs.push({role:"user", content: nameFromSession});
+        const retry = await bookingAgent.handleChat({ messages: msgs, phone: phoneClean, lang: lang||"hi" });
+        return res.json(retry);
+      }
+      return res.json(result);
+    }
+
+    // Call Gemma via OpenRouter
+    try {
+      const OpenAI = require("openai");
+      const client = new OpenAI({ apiKey: GEMMA_KEY, baseURL: "https://openrouter.ai/api/v1" });
+      const centres = await store.fetchCentres();
+      const centreList = centres.map(c=>`${c.id} (${c.name})`).join(", ");
+      const sys = `You are AgroBridge Gemma — extract booking details from Hindi/English free speech.\nActive mandis: ${centreList}\nUser phone: ${phoneClean}, name: ${nameFromSession||"unknown"} — do NOT ask for phone/name, you already know it.\nExtract JSON only: {"centreId": "...", "crop": "wheat|paddy|mustard|cotton|maize|gram", "quantity": number, "date": "YYYY-MM-DD", "slot": "HH:00"}\nRules: quantity is number only (e.g. 20), slot is HH:00 24h (raat 10 baje=22:00, shaam 6=18:00, subah 10=10:00), date is YYYY-MM-DD (आज=${new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Kolkata"})}). If any field missing, ask ONLY that field in Hindi (if lang hi) or English. If all present, say "कन्फर्म करूँ जी — ..." and wait for yes. Never ask for phone.\nConversation: ${msgs.map(m=>m.role+": "+m.content).join("\n")}`;
+
+      const resp = await client.chat.completions.create({
+        model: GEMMA_MODEL,
+        messages: [{role:"system", content: sys}, ...msgs.map(m=>({role: m.role==="assistant"?"assistant":"user", content: m.content}))],
+        temperature: 0.4,
+        max_tokens: 400,
+      });
+      let reply = resp.choices[0].message.content || "";
+
+      // Also try to extract and book if Gemma included JSON and user confirmed
+      const jsonMatch = reply.match(/\{[^}]*"centreId"[^}]*\}/);
+      if (jsonMatch) {
+        try {
+          const data = JSON.parse(jsonMatch[0]);
+          if (data.centreId && data.crop && data.quantity && data.date && data.slot) {
+            const isConfirm = /(ha|yes|confirm|कर दो|बुक|ठीक|ok)/i.test(lastUser);
+            if (isConfirm) {
+              const centre = await store.fetchCentreById(data.centreId);
+              const slots = await store.fetchAvailableSlots(centre, data.date);
+              if (slots.find(s=>s.slotTime===data.slot)) {
+                const booking = await store.createBooking({ farmerId: phoneClean, farmerName: nameFromSession||phoneClean, centre, crop: data.crop, quantity: Number(data.quantity), date: data.date, slot: data.slot });
+                reply = lang==="hi" ? `हो गया जी! टोकन ${booking.tokenNumber} — गेट कोड ${booking.gatePassCode}. ${data.date} ${data.slot} पर आइए।` : `Done! Token ${booking.tokenNumber} — gate code ${booking.gatePassCode}.`;
+                return res.json({ reply, done: true, booking });
+              }
+            }
+          }
+        } catch(e){}
+      }
+
+      // Fallback to ruleBasedReply for actual booking (ensures Firebase capacity checks)
+      const fb = await bookingAgent.handleChat({ messages: msgs, phone: phoneClean, lang: lang||"hi" });
+      // If bookingAgent asks for name but we have it, auto-fill
+      if (nameFromSession && /आपका नाम|What is your name/.test(fb.reply)) {
+        await store.ensureFarmer(phoneClean, nameFromSession);
+        msgs.push({role:"assistant", content: fb.reply});
+        msgs.push({role:"user", content: nameFromSession});
+        const retry2 = await bookingAgent.handleChat({ messages: msgs, phone: phoneClean, lang: lang||"hi" });
+        return res.json(retry2);
+      }
+      // Prefer Gemma reply if it asked for missing field, else bookingAgent reply
+      if (/मंडी|फसल|क्विंटल|तारीख|समय|mandi|crop|quantity|date|slot/i.test(reply) && reply.length < 120) {
+        return res.json({ reply, done: false });
+      }
+      return res.json(fb);
+    } catch (e) {
+      console.error("gemma call failed", e.message);
+      const fb2 = await bookingAgent.handleChat({ messages: msgs, phone: phoneClean, lang: lang||"hi" });
+      return res.json(fb2);
+    }
+  } catch (e) {
+    console.error("/agent/gemma error", e);
+    res.status(500).json({ reply: "क्षमा कीजिए जी, दिक्कत आ गई। फिर से बोलिए।", done: false });
+  }
+});
+
   }
 });
 
@@ -738,7 +836,26 @@ app.all("/api/book", async (req, res) => {
   try {
     const src = { ...(req.query||{}), ...(req.body||{}) };
     let { centreId, crop, quantity, date, slot, farmerName, phone } = src;
-    quantity = Number(quantity);
+    // robust quantity: handle "20 क्विंटल", "बीस" etc — extract first number
+    if(typeof quantity==="string"){ const m=String(quantity).match(/(\d{1,3})/); quantity = m ? Number(m[1]) : Number(quantity); }
+    else quantity = Number(quantity);
+    // robust slot: handle "raat 10 baje", "10 baje", "10", "10-11" etc -> HH:00
+    if(slot){
+      let raw = String(slot).toLowerCase().trim();
+      // already HH:00 -> keep
+      if(!/^\d{2}:00$/.test(raw)){
+        // extract hour from Hindi/English strings
+        const m = raw.match(/(\d{1,2})/);
+        if(m){
+          let h=Number(m[1]);
+          const isNight = raw.includes("रात")||raw.includes("raat")||raw.includes("pm")||raw.includes("पीएम")||raw.includes("night");
+          const isEve = raw.includes("शाम")||raw.includes("shaam")||raw.includes("evening");
+          if((isNight||isEve) && h>=1 && h<=11) h+=12;
+          if(h===24) h=0;
+          if(h>=0 && h<=23) slot=`${String(h).padStart(2,"0")}:00`;
+        }
+      }
+    }
     // fuzzy centre resolve: accept "Gurugram" or id
     if (centreId && !String(centreId).startsWith("centre_")) {
       const centres = await bookingAgent.store.fetchCentres();
@@ -746,6 +863,7 @@ app.all("/api/book", async (req, res) => {
       const hit = centres.find(c => c.name?.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || q.includes(c.name?.toLowerCase().slice(0,4)));
       if (hit) centreId = hit.id;
     }
+    console.log("📞 /api/book received:", {centreId,crop,quantity,date,slot,phone,farmerName});
     if (!centreId || !crop || !quantity || !date || !slot) {
       return res.status(400).json({ ok:false, error:"Missing required: centreId, crop, quantity, date, slot", received: src });
     }

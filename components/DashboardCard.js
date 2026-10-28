@@ -1,46 +1,57 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../theme/colors';
 
-export default function DashboardCard({ title, icon, onPress, badge }) {
-  const main = title != null ? String(title) : '';
-  const badgeText = badge != null && String(badge).trim() !== '' ? String(badge) : '';
-
+export default function DashboardCard({ title, subtitle, icon, highlight, onPress }) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      {badgeText !== '' ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badgeText}</Text>
-        </View>
-      ) : null}
-      <View style={styles.iconContainer}>
-        <Ionicons name={icon || 'grid-outline'} size={32} color={Colors.secondary} />
+    <TouchableOpacity
+      style={[styles.card, highlight && styles.highlight]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={[styles.iconWrap, highlight && styles.iconWrapHighlight]}>
+        <Ionicons name={icon || 'ellipse-outline'} size={24} color={highlight ? Colors.white : Colors.secondary} />
       </View>
-      {main !== '' ? (
-        <Text style={styles.title} numberOfLines={2}>{main}</Text>
-      ) : null}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.title, highlight && styles.titleHighlight]} numberOfLines={2}>{title}</Text>
+        {subtitle ? <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={highlight ? Colors.white : Colors.subText} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    width: '47.5%',
+    width: '48%',
     backgroundColor: Colors.white,
     borderRadius: 14,
-    paddingVertical: 22,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    alignItems: 'center',
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  badge: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: Colors.error, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10,
+  highlight: {
+    backgroundColor: Colors.navy,
+    borderColor: Colors.secondary,
+    borderWidth: 1.5,
   },
-  badgeText: { color: Colors.white, fontSize: 10, fontWeight: '700' },
-  iconContainer: { marginBottom: 12 },
-  title: { fontSize: 14, fontWeight: '700', color: Colors.navy, textAlign: 'center' },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapHighlight: {
+    backgroundColor: Colors.primary,
+  },
+  title: { fontSize: 13, fontWeight: '800', color: Colors.navy, lineHeight: 16 },
+  titleHighlight: { color: Colors.white },
+  subtitle: { fontSize: 11, color: Colors.subText, marginTop: 2, lineHeight: 14 },
 });

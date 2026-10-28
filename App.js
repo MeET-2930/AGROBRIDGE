@@ -7,6 +7,7 @@
  * ---------------------------------------------------------------
  */
 import './utils/webAlert';   // install34: makes Alert.alert work on the website
+import { LogBox } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import {
   Image,
@@ -23,10 +24,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
-
-export const navigationRef = createNavigationContainerRef();
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+export const navigationRef = createNavigationContainerRef();
+LogBox.ignoreAllLogs();
+if (typeof console !== 'undefined'){ const origWarn = console.warn; console.warn = (...a)=>{ if(String(a[0]).includes('Require cycle')||String(a[0]).includes('expo-asset')) return; origWarn(...a); }; }
 
 import { LanguageProvider, useLang, StopSpeechOnNavigate } from './i18n/LanguageContext';
 import Colors from './theme/colors';
@@ -54,14 +57,17 @@ import HistoryScreen from './screens/farmer/HistoryScreen';
 import PaymentsScreen from './screens/farmer/PaymentsScreen';
 import FarmerProfileScreen from './screens/farmer/FarmerProfileScreen';
 import HelpScreen from './screens/common/HelpScreen';
-import ChatbotScreen from './screens/common/ChatbotScreen';
 import NotificationsScreen from './screens/common/NotificationsScreen';
+import OnionAssayTest from './screens/common/OnionAssayTest'; // test onion grader
+import AIVoiceBookingScreen from './screens/farmer/AIVoiceBookingScreen';
+import FarmerNewsScreen from './screens/farmer/FarmerNewsScreen';
 import { NotificationProvider } from './notifications/NotificationContext';
 
-// Officer & Trader portals
+// Officer, Trader, Arhtiya & Assay portals
 import OfficerStack from './navigation/OfficerStack';
 import TraderStack from './navigation/TraderStack';
 import ArhtiyaStack from './navigation/ArhtiyaStack';
+import AssayStack from './navigation/AssayStack';
 
 const Root = createNativeStackNavigator();
 const AuthNav = createNativeStackNavigator();
@@ -95,8 +101,10 @@ function FarmerStack() {
       <FarmerNav.Screen name="Payments" component={PaymentsScreen} />
       <FarmerNav.Screen name="FarmerProfile" component={FarmerProfileScreen} />
       <FarmerNav.Screen name="Help" component={HelpScreen} />
-      <FarmerNav.Screen name="Chatbot" component={ChatbotScreen} />
       <FarmerNav.Screen name="Notifications" component={NotificationsScreen} />
+      <FarmerNav.Screen name="OnionAssayTest" component={OnionAssayTest} />
+      <FarmerNav.Screen name="AIVoiceBooking" component={AIVoiceBookingScreen} />
+      <FarmerNav.Screen name="FarmerNews" component={FarmerNewsScreen} />
     </FarmerNav.Navigator>
   );
 }
@@ -162,6 +170,7 @@ function RootApp({ initialRoute }) {
               <Root.Screen name="Officer" component={OfficerStack} />
               <Root.Screen name="Trader" component={TraderStack} />
               <Root.Screen name="Arhtiya" component={ArhtiyaStack} />
+              <Root.Screen name="Assay" component={AssayStack} />
             </Root.Navigator>
             <GlobalLanguageModalHost />
           </NotificationProvider>
@@ -194,6 +203,7 @@ export default function App() {
         if (session?.role === 'officer') setInitialRoute('Officer');
         else if (session?.role === 'trader') setInitialRoute('Trader');
         else if (session?.role === 'arhtiya') setInitialRoute('Arhtiya');
+        else if (session?.role === 'assay') setInitialRoute('Assay');
         else if (session?.role === 'farmer') setInitialRoute('Farmer');
       })
       .catch(() => {})
@@ -241,3 +251,4 @@ const styles = StyleSheet.create({
   langLabel: { fontSize: 12, color: Colors.subText, marginRight: 8 },
   langActiveText: { color: Colors.secondary },
 });
+

@@ -284,7 +284,22 @@ export default function FarmerDashboard({ navigation }) {
           </View>
         )}
 
-        <View style={styles.grid}>
+        <!-- Highlight: Voice + News always on top -->
+        <View style={[styles.grid, {marginTop: 8}]}>
+          <DashboardCard
+            title={lang === 'hi' ? '🎤 AI Voice से बुक करें' : '🎤 AI Voice Booking'}
+            subtitle={lang === 'hi' ? 'बोल कर बुक करें — Gemma' : 'Speak to book — Gemma'}
+            icon="mic-outline"
+            highlight
+            onPress={() => navigation.navigate('AIVoiceBooking')}
+          />
+          <DashboardCard
+            title={lang === 'hi' ? 'समाचार' : 'News'}
+            subtitle={lang === 'hi' ? 'योजनाएं व मंडी अपडेट' : 'Schemes & mandi updates'}
+            icon="newspaper-outline"
+            highlight
+            onPress={() => navigation.navigate('FarmerNews')}
+          />
           <DashboardCard
             title={tr('bookSlot')}
             icon="calendar-outline"
@@ -314,9 +329,9 @@ export default function FarmerDashboard({ navigation }) {
           />
 
           <DashboardCard
-            title={tr('chat_withAssistant')}
-            icon="chatbubbles-outline"
-            onPress={() => navigation.navigate('Chatbot')}
+            title={tr('help')}
+            icon="help-circle-outline"
+            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
           />
 
           {IVR_BASE_URL ? (
@@ -328,9 +343,9 @@ export default function FarmerDashboard({ navigation }) {
           ) : null}
 
           <DashboardCard
-            title={tr('help')}
-            icon="help-circle-outline"
-            onPress={() => navigation.navigate('Help', { role: 'farmer' })}
+            title="Check Onions"
+            icon="camera-outline"
+            onPress={() => navigation.navigate('OnionAssayTest')}
           />
         </View>
       </ScrollView>
@@ -495,3 +510,4 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });
+
